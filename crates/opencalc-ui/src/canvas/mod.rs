@@ -8,6 +8,7 @@
 
 pub mod adapt;
 pub mod hit;
+mod page;
 mod paint;
 mod plot;
 pub mod view;
@@ -15,7 +16,7 @@ pub mod view;
 use eframe::egui::{
     self, FontId, Id, Key, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit, Ui, Vec2,
 };
-use opencalc_core::document::{Region, RegionId, RegionKind};
+use opencalc_core::document::{PageSetup, Region, RegionId, RegionKind};
 use opencalc_core::edit::Edit;
 use opencalc_core::eval::Output;
 use opencalc_core::registry::UnitSystem;
@@ -28,7 +29,11 @@ use view::{snap, GRID};
 
 /// Read-only inputs the canvas needs besides the document.
 pub struct Env<'a> {
+    /// The window theme: the desk, selection and overlays.
     pub theme: &'a Theme,
+    /// The palette of what is drawn on a page (see `Theme::paper`).
+    pub paper: &'a Theme,
+    pub page: PageSetup,
     pub output: &'a Output,
     pub units: UnitSystem,
     pub show_grid: bool,
@@ -68,6 +73,9 @@ pub struct CanvasUi {
     pub insert_at: Pos2,
     /// Content sizes measured by the last paint.
     pub sizes: Sizes,
+    /// Fit the page width into the viewport on the next frame (set when a
+    /// worksheet is first shown).
+    pub fit_pending: bool,
     drag: Option<Drag>,
 }
 
@@ -79,6 +87,7 @@ impl Default for CanvasUi {
             focus_edit: false,
             insert_at: Pos2::new(40.0, 40.0),
             sizes: Sizes::new(),
+            fit_pending: true,
             drag: None,
         }
     }
@@ -106,6 +115,8 @@ pub struct CanvasOut {
     pub cmds: Vec<CanvasCmd>,
     /// Screen rectangle the canvas occupied.
     pub viewport: Rect,
+    /// The page in view (counting from 1) and the number of pages.
+    pub page: (usize, usize),
 }
 
 /// Everything the pointer logic reads, bundled so functions take one argument.
@@ -129,9 +140,19 @@ pub fn show(
     let theme = env.theme;
     let mut cmds = Vec::new();
 
+    if st.fit_pending && rect.width() > 1.0 {
+        *view = page::fit_width(&env.page, rect.size());
+        st.fit_pending = false;
+    }
     navigate(ui, &resp, origin, view);
-    if env.show_grid {
-        paint::grid(&painter, rect, view, origin, theme);
+
+    // The pages, and the grid on them. Pages exist as far down as content reaches.
+    let pages = page::page_count(&env.page, page::content_bottom(regions, &st.sizes));
+    for screen in page::paint(&painter, rect, view, origin, &env.page, pages, env.paper) {
+        if env.show_grid {
+            let on_page = painter.with_clip_rect(screen.intersect(rect));
+            paint::grid(&on_page, screen, view, origin, env.paper);
+        }
     }
 
     for r in regions {
@@ -182,9 +203,11 @@ pub fn show(
         FontId::proportional(type_size::SMALL),
         theme.text_weak,
     );
+    let middle = view.screen_to_doc(rect.center(), origin).y;
     CanvasOut {
         cmds,
         viewport: rect,
+        page: (page::page_at(&env.page, middle, pages) + 1, pages),
     }
 }
 

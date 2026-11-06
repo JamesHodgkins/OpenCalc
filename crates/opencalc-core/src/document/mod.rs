@@ -4,12 +4,14 @@
 //! autosave and the file format share one choke point (rule R3).
 
 mod geometry;
+mod page;
 mod plot;
 mod region;
 
 use serde::{Deserialize, Serialize};
 
 pub use geometry::{Point, Size};
+pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
 pub use plot::{PlotInput, PlotSpec, MAX_SERIES};
 pub use region::{MathRegion, Region, RegionId, RegionKind};
 
@@ -32,6 +34,9 @@ pub struct Worksheet {
     /// Units defined by this worksheet, beyond the built-in ones.
     #[serde(default)]
     pub(crate) custom_units: Vec<UnitDef>,
+    /// Paper size, orientation and margins the regions are laid out on.
+    #[serde(default)]
+    pub(crate) page: PageSetup,
     /// Bumped by every applied edit. Not saved; lets caches notice change.
     #[serde(skip)]
     pub(crate) revision: u64,
@@ -48,6 +53,7 @@ impl PartialEq for Worksheet {
         self.title == other.title
             && self.regions == other.regions
             && self.unit_system == other.unit_system
+            && self.page == other.page
             && self.custom_units == other.custom_units
     }
 }
@@ -60,6 +66,7 @@ impl Worksheet {
             next_id: 1,
             unit_system: UnitSystem::default(),
             custom_units: Vec::new(),
+            page: PageSetup::default(),
             revision: 0,
             eval_revision: 0,
         }
@@ -67,6 +74,10 @@ impl Worksheet {
 
     pub fn title(&self) -> &str {
         &self.title
+    }
+
+    pub fn page(&self) -> PageSetup {
+        self.page
     }
 
     pub fn unit_system(&self) -> UnitSystem {
@@ -294,5 +305,21 @@ mod tests {
         let old: Worksheet = serde_json::from_value(value).unwrap();
         assert_eq!(old.unit_system(), UnitSystem::Si);
         assert!(old.custom_units().is_empty());
+    }
+
+    #[test]
+    fn page_setup_is_saved_and_old_files_get_a4_portrait() {
+        let mut w = sample();
+        w.page = PageSetup {
+            paper: PaperSize::Letter,
+            landscape: true,
+            margin_mm: 12.5,
+        };
+        let back: Worksheet = serde_json::from_str(&serde_json::to_string(&w).unwrap()).unwrap();
+        assert_eq!(back.page(), w.page());
+        let mut value: serde_json::Value = serde_json::to_value(sample()).unwrap();
+        value.as_object_mut().unwrap().remove("page");
+        let old: Worksheet = serde_json::from_value(value).unwrap();
+        assert_eq!(old.page(), PageSetup::default());
     }
 }

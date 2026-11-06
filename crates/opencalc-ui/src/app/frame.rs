@@ -124,8 +124,11 @@ impl App {
 
     fn show_canvas(&mut self, ui: &mut egui::Ui, sheet: usize, ctx: &egui::Context) {
         let state = &mut self.state;
+        let paper = crate::theme::Theme::paper();
         let env = canvas::Env {
             theme: &state.theme,
+            paper: &paper,
+            page: state.sheets[sheet].doc.page(),
             output: &state.output,
             units: state.sheets[sheet].doc.unit_system(),
             show_grid: state.show_grid,
@@ -140,6 +143,7 @@ impl App {
             &mut open.canvas,
         );
         state.viewport = out.viewport;
+        state.page = out.page;
         let effects = super::dispatch::apply_canvas(state, sheet, out.cmds);
         self.run_effects(ctx, effects);
     }

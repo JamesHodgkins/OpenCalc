@@ -15,19 +15,6 @@ use super::Env;
 use crate::format::axis_unit;
 use crate::theme::{metrics, type_size};
 
-/// Line colours for the series. The first is the accent; the rest are chosen to
-/// stay apart from it and from each other on the dark surface.
-const SERIES: [Color32; 8] = [
-    Color32::from_rgb(0xFF, 0x7B, 0x7B),
-    Color32::from_rgb(0x4F, 0xC3, 0xF7),
-    Color32::from_rgb(0x81, 0xC7, 0x84),
-    Color32::from_rgb(0xFF, 0xB7, 0x4D),
-    Color32::from_rgb(0xBA, 0x68, 0xC8),
-    Color32::from_rgb(0x4D, 0xB6, 0xAC),
-    Color32::from_rgb(0xFF, 0xD5, 0x4F),
-    Color32::from_rgb(0xA1, 0x88, 0x7F),
-];
-
 /// Below this on-screen text size, text is left out rather than drawn as noise.
 const MIN_TEXT: f32 = 5.0;
 
@@ -85,7 +72,7 @@ fn data_extent(values: impl Iterator<Item = f64>) -> (f64, f64) {
 }
 
 pub fn paint(painter: &Painter, env: &Env, r: &Region, spec: &PlotSpec, top_left: Pos2, zoom: f32) {
-    let theme = env.theme;
+    let theme = env.paper;
     let rect = Rect::from_min_size(top_left, vec(r.size) * zoom);
     let radius = eframe::egui::CornerRadius::same(metrics::RADIUS);
     painter.rect_filled(rect, radius, theme.surface);
@@ -144,7 +131,7 @@ fn chart(
     top: f32,
     zoom: f32,
 ) {
-    let theme = env.theme;
+    let theme = env.paper;
     let size = |base: f32| base * zoom;
     let text_ok = size(type_size::SMALL) >= MIN_TEXT;
     let font = FontId::proportional(size(type_size::SMALL));
@@ -223,7 +210,7 @@ fn chart(
     let clipped = painter.with_clip_rect(area);
     let width = (1.6 * zoom).max(1.0);
     for (k, series) in data.series.iter().enumerate() {
-        let colour = SERIES[k % SERIES.len()];
+        let colour = env.paper.series[k % 8];
         let line: Vec<Pos2> = series
             .points
             .iter()
@@ -283,14 +270,14 @@ fn legend(
     let row = font.size * 1.4;
     let mut y = area.min.y + 4.0 * zoom;
     for (k, name) in names.iter().enumerate().take(data.series.len()) {
-        let colour = SERIES[k % SERIES.len()];
+        let colour = env.paper.series[k % 8];
         let x_right = area.max.x - 6.0 * zoom;
         painter.text(
             Pos2::new(x_right, y),
             Align2::RIGHT_TOP,
             *name,
             font.clone(),
-            env.theme.text,
+            env.paper.text,
         );
         let swatch = Rect::from_min_size(
             Pos2::new(x_right - 80.0 * zoom, y + row * 0.35),

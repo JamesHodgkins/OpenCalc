@@ -32,6 +32,8 @@ pub struct AppState {
     pub output: Output,
     pub calc: CalcStatus,
     pub show_grid: bool,
+    /// The page in view (from 1) and the number of pages, from the last frame.
+    pub page: (usize, usize),
     pub snap: bool,
     pub live_recalc: bool,
     pub show_names: bool,
@@ -60,7 +62,8 @@ impl AppState {
                 applied: 0,
                 worker_ok: true,
             },
-            show_grid: true,
+            show_grid: false,
+            page: (1, 1),
             snap: true,
             live_recalc: true,
             show_names: true,
@@ -164,7 +167,11 @@ mod tests {
     #[test]
     fn active_toggles_list_exactly_the_switched_on_ones() {
         let mut s = AppState::new(PaletteKey::Neutral);
-        assert_eq!(s.active_toggles().len(), 6);
+        // The grid starts off, as on a page; the other four toggles and the unit
+        // system are on.
+        assert_eq!(s.active_toggles().len(), 5);
+        assert!(!s.active_toggles().contains(&CommandId::ViewGrid));
+        s.show_grid = true;
         s.snap = false;
         s.show_names = false;
         let on = s.active_toggles();

@@ -249,21 +249,23 @@ mod tests {
     #[test]
     fn toggles_flip_and_flip_back() {
         let mut s = state();
-        for (command, get) in [
+        // (command, how to read it, whether it starts on). The grid starts off.
+        for (command, get, starts_on) in [
             (
                 CommandId::ViewGrid,
                 (|s: &AppState| s.show_grid) as fn(&AppState) -> bool,
+                false,
             ),
-            (CommandId::ViewSnap, |s| s.snap),
-            (CommandId::ViewLive, |s| s.live_recalc),
-            (CommandId::ViewNames, |s| s.show_names),
-            (CommandId::ViewProperties, |s| s.show_props),
+            (CommandId::ViewSnap, |s| s.snap, true),
+            (CommandId::ViewLive, |s| s.live_recalc, true),
+            (CommandId::ViewNames, |s| s.show_names, true),
+            (CommandId::ViewProperties, |s| s.show_props, true),
         ] {
-            assert!(get(&s));
+            assert_eq!(get(&s), starts_on, "{}", command.name());
             run(&mut s, command);
-            assert!(!get(&s), "{}", command.name());
+            assert_eq!(get(&s), !starts_on, "{}", command.name());
             run(&mut s, command);
-            assert!(get(&s));
+            assert_eq!(get(&s), starts_on);
         }
     }
 

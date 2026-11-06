@@ -64,6 +64,8 @@ pub struct Theme {
     pub text_weak: Color32,
     pub text_disabled: Color32,
     pub text_on_accent: Color32,
+    /// Line colours for plot series, in order.
+    pub series: [Color32; 8],
 }
 
 impl Theme {
@@ -106,6 +108,51 @@ impl Theme {
             text_weak: rgb(0xB4B4B4),
             text_disabled: rgb(0x646464),
             text_on_accent: rgb(0xFFFFFF),
+            series: [
+                rgb(0xFF7B7B),
+                rgb(0x4FC3F7),
+                rgb(0x81C784),
+                rgb(0xFFB74D),
+                rgb(0xBA68C8),
+                rgb(0x4DB6AC),
+                rgb(0xFFD54F),
+                rgb(0xA1887F),
+            ],
+        }
+    }
+
+    /// The palette of a page: black on white, whatever the app theme, as a printed
+    /// page would be. Everything drawn on a worksheet page (maths, text, results,
+    /// plots, errors) uses this, not the window theme.
+    pub fn paper() -> Theme {
+        Theme {
+            base: rgb(0xFFFFFF),
+            surface: rgb(0xFFFFFF),
+            raised: rgb(0xEEEEEE),
+            raised_high: rgb(0xE0E0E0),
+            border: rgb(0xC4C4C4),
+            border_strong: rgb(0x8E8E8E),
+            pressed: rgb(0xD0D0D0),
+            accent: rgb(0xC62828),
+            accent_hover: rgb(0xD32F2F),
+            accent_pressed: rgb(0xB71C1C),
+            accent_text: rgb(0xB71C1C),
+            warning: rgb(0x8A5300),
+            error: rgb(0xB71C1C),
+            text: rgb(0x1A1A1A),
+            text_weak: rgb(0x555555),
+            text_disabled: rgb(0x9A9A9A),
+            text_on_accent: rgb(0xFFFFFF),
+            series: [
+                rgb(0xC62828),
+                rgb(0x1565C0),
+                rgb(0x2E7D32),
+                rgb(0xE65100),
+                rgb(0x6A1B9A),
+                rgb(0x00695C),
+                rgb(0x827717),
+                rgb(0x5D4037),
+            ],
         }
     }
 
@@ -270,6 +317,49 @@ mod tests {
     use super::*;
 
     const KEYS: [PaletteKey; 2] = [PaletteKey::Neutral, PaletteKey::Slate];
+
+    /// A page is read like print: body text, weak text, errors and warnings need
+    /// 4.5:1 on the white page, and each plot line 3:1 (lines are not text).
+    #[test]
+    fn the_paper_palette_is_readable_on_white() {
+        let p = Theme::paper();
+        for (name, colour) in [
+            ("text", p.text),
+            ("text_weak", p.text_weak),
+            ("error", p.error),
+            ("warning", p.warning),
+            ("accent_text", p.accent_text),
+        ] {
+            assert!(
+                contrast(colour, p.base) >= 4.5,
+                "{name}: {:.2}",
+                contrast(colour, p.base)
+            );
+        }
+        for (k, colour) in p.series.iter().enumerate() {
+            assert!(
+                contrast(*colour, p.base) >= 3.0,
+                "series {k}: {:.2}",
+                contrast(*colour, p.base)
+            );
+        }
+        // Lines must also be told apart from each other.
+        for (a, ca) in p.series.iter().enumerate() {
+            for cb in &p.series[a + 1..] {
+                assert_ne!(ca, cb);
+            }
+        }
+    }
+
+    #[test]
+    fn the_dark_series_colours_are_readable_on_the_dark_surface() {
+        for key in KEYS {
+            let t = Theme::palette(key);
+            for (k, colour) in t.series.iter().enumerate() {
+                assert!(contrast(*colour, t.surface) >= 3.0, "{key:?} series {k}");
+            }
+        }
+    }
 
     #[test]
     fn contrast_of_black_on_white_is_21() {

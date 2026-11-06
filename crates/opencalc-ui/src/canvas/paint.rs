@@ -92,10 +92,10 @@ pub fn region(
     };
     match &r.kind {
         RegionKind::Math(m) => math(ui, painter, env, r, m, place),
-        RegionKind::Text { text } => self::text(painter, env.theme, r, text, place),
+        RegionKind::Text { text } => self::text(painter, env.paper, r, text, place),
         RegionKind::Area { title } => {
             if !skip_content {
-                area(painter, env.theme, r, title, top_left, zoom);
+                area(painter, env.paper, r, title, top_left, zoom);
             }
             vec(r.size)
         }
@@ -107,7 +107,7 @@ pub fn region(
         }
         RegionKind::Table | RegionKind::Picture => {
             if !skip_content {
-                placeholder(painter, env.theme, r, top_left, zoom);
+                placeholder(painter, env.paper, r, top_left, zoom);
             }
             vec(r.size)
         }
@@ -121,7 +121,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
         skip_content,
     } = place;
     let (source, expr) = (m.source(), m.expr());
-    let theme = env.theme;
+    let theme = env.paper;
     let size = MATH_SIZE * zoom;
     let blank = source.trim().is_empty();
     let result = env.output.values.get(&r.id);

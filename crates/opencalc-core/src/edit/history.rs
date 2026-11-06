@@ -39,6 +39,7 @@ impl RunKey {
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetUnitSystem(_)
+            | Edit::SetPageSetup(_)
             | Edit::SetCustomUnits(_) => None,
         }
     }

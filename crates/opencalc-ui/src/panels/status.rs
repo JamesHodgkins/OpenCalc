@@ -84,6 +84,15 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                 .color(colour)
                 .size(type_size::BODY),
         );
+        if state.active.is_some() {
+            ui.add_space(10.0);
+            let (page, pages) = state.page;
+            ui.label(
+                RichText::new(format!("Page {page} of {pages}"))
+                    .color(theme.text_weak)
+                    .size(type_size::BODY),
+            );
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let zoom = egui::Button::new(format!("{:.0}%", state.zoom_percent())).frame(false);
             if ui.add(zoom).on_hover_text("Reset zoom").clicked() {

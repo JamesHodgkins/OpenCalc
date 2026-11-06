@@ -243,6 +243,54 @@ fn a_long_value_in_the_names_panel_does_not_push_the_canvas_aside() {
     );
 }
 
+#[test]
+fn a_worksheet_opens_on_one_white_page_fitted_to_the_window_and_grows_with_content() {
+    let mut h = Harness::new();
+    h.settle();
+    for _ in 0..3 {
+        h.frame();
+    }
+    // The sample fits on one page, which is shown in full width.
+    assert_eq!(h.app.state.page, (1, 1));
+    let view = h.sheet().view;
+    assert!(view.zoom > 0.25 && view.zoom <= 1.0, "zoom {}", view.zoom);
+    let (page_w, _) = h.sheet().doc.page().size();
+    let canvas = h.app.state.viewport;
+    let left = canvas.min.x + view.offset.x;
+    let right = left + page_w * view.zoom;
+    assert!(
+        left >= canvas.min.x && right <= canvas.max.x + 0.5,
+        "page {left}..{right} in {canvas:?}"
+    );
+
+    // A region far below adds pages; moving it back removes them again.
+    let id = h.sheet().doc.regions()[0].id;
+    let i = h.app.state.active.expect("a sheet");
+    let far = |y: f32| {
+        vec![crate::canvas::CanvasCmd::Edit(Edit::MoveRegions {
+            moves: vec![(id, Point::new(40.0, y))],
+        })]
+    };
+    crate::app::dispatch::apply_canvas(&mut h.app.state, i, far(2500.0));
+    h.frame();
+    h.frame();
+    let pages = h.app.state.page.1;
+    assert!(
+        pages >= 3,
+        "a region at y = 2500 needs 3 pages, got {pages}"
+    );
+    crate::app::dispatch::apply_canvas(&mut h.app.state, i, far(40.0));
+    h.frame();
+    h.frame();
+    assert_eq!(h.app.state.page.1, 1);
+}
+
+#[test]
+fn the_grid_starts_off() {
+    let h = Harness::new();
+    assert!(!h.app.state.show_grid);
+}
+
 /// The sample sheet's plot region.
 fn plot_id(h: &Harness) -> RegionId {
     h.sheet()

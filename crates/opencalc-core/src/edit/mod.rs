@@ -10,7 +10,7 @@
 
 mod history;
 
-use crate::document::{PlotSpec, Point, Region, RegionId, RegionKind, Size, Worksheet};
+use crate::document::{PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, Size, Worksheet};
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
 
@@ -50,6 +50,9 @@ pub enum Edit {
     },
     /// Display results in another unit system. Does not change any value.
     SetUnitSystem(UnitSystem),
+    /// Change the paper size, orientation or margins. Moves nothing; it only
+    /// changes where page edges fall.
+    SetPageSetup(PageSetup),
     /// Replace the worksheet's own unit definitions.
     SetCustomUnits(Vec<UnitDef>),
 }
@@ -146,6 +149,10 @@ impl Worksheet {
                 let old = std::mem::replace(&mut region.size, *size);
                 Ok(Edit::SetRegionSize { id: *id, size: old })
             }
+            Edit::SetPageSetup(page) => Ok(Edit::SetPageSetup(std::mem::replace(
+                &mut self.page,
+                page.sanitised(),
+            ))),
             Edit::SetUnitSystem(system) => Ok(Edit::SetUnitSystem(std::mem::replace(
                 &mut self.unit_system,
                 *system,
@@ -239,6 +246,41 @@ mod tests {
             dimension: crate::units::Dimension::LENGTH,
             to_si_scale: 201.168,
         }
+    }
+
+    #[test]
+    fn page_setup_changes_by_edit_without_touching_results_and_undoes() {
+        let mut w = Worksheet::new("t");
+        let eval = w.eval_revision();
+        let landscape = PageSetup {
+            landscape: true,
+            ..PageSetup::default()
+        };
+        let applied = w.apply(Edit::SetPageSetup(landscape)).unwrap();
+        assert_eq!(w.page(), landscape);
+        assert_eq!(applied.inverse, Edit::SetPageSetup(PageSetup::default()));
+        // Pages are a background: nothing needs recalculating.
+        assert_eq!(w.eval_revision(), eval);
+        w.apply(applied.inverse).unwrap();
+        assert_eq!(w.page(), PageSetup::default());
+        assert!(
+            !w.apply(Edit::SetPageSetup(PageSetup::default()))
+                .unwrap()
+                .changed
+        );
+    }
+
+    #[test]
+    fn an_out_of_range_margin_is_kept_in_range_and_undoes_exactly() {
+        let mut w = Worksheet::new("t");
+        let wild = PageSetup {
+            margin_mm: 9999.0,
+            ..PageSetup::default()
+        };
+        let applied = w.apply(Edit::SetPageSetup(wild)).unwrap();
+        assert_eq!(w.page().margin_mm, 60.0);
+        w.apply(applied.inverse).unwrap();
+        assert_eq!(w.page().margin_mm, 20.0);
     }
 
     #[test]
