@@ -217,6 +217,20 @@ pub const FUNCTIONS: &[FunctionDef] = &[
     }),
 ];
 
+/// The group a function is listed under (the Functions window and its search).
+pub fn category(name: &str) -> &'static str {
+    match name {
+        "sin" | "cos" | "tan" => "Trigonometry",
+        "ln" | "exp" | "sqrt" => "Powers and logarithms",
+        "abs" | "re" | "im" | "conj" | "arg" => "Complex numbers",
+        "vec" | "mat" | "transpose" | "det" | "norm" | "dot" | "rows" | "cols" => {
+            "Vectors and matrices"
+        }
+        "sum" | "mean" | "stdev" | "stdev_sample" | "min" | "max" | "length" => "Statistics",
+        _ => "Other",
+    }
+}
+
 pub fn lookup(name: &str) -> Option<&'static FunctionDef> {
     FUNCTIONS.iter().find(|f| f.name == name)
 }
@@ -348,6 +362,13 @@ fn count(v: &Value) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_function_has_a_real_category() {
+        for f in FUNCTIONS {
+            assert_ne!(category(f.name), "Other", "{} has no category", f.name);
+        }
+    }
 
     #[test]
     fn names_are_unique_and_every_entry_is_documented() {

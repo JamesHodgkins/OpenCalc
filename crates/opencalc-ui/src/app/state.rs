@@ -36,7 +36,8 @@ pub struct AppState {
     pub page: (usize, usize),
     pub snap: bool,
     pub live_recalc: bool,
-    pub show_names: bool,
+    /// The optional Functions window.
+    pub show_functions: bool,
     pub show_props: bool,
     /// Bumped by "Reset layout" so dock panels forget their saved widths.
     pub layout_gen: u32,
@@ -53,7 +54,7 @@ impl AppState {
         AppState {
             theme: Theme::palette(palette),
             palette,
-            sheets: vec![OpenSheet::sample()],
+            sheets: vec![OpenSheet::new("Untitled")],
             active: Some(0),
             untitled: 1,
             output: Output::default(),
@@ -66,13 +67,21 @@ impl AppState {
             page: (1, 1),
             snap: true,
             live_recalc: true,
-            show_names: true,
-            show_props: true,
+            show_functions: false,
+            show_props: false,
             layout_gen: 0,
             dock_basis: crate::INITIAL_WIDTH,
             viewport: Rect::from_min_size(Pos2::ZERO, eframe::egui::vec2(800.0, 600.0)),
             about_open: false,
         }
+    }
+
+    /// A state that opens the example worksheet (for tests that need its regions).
+    #[cfg(test)]
+    pub fn with_sample(palette: PaletteKey) -> AppState {
+        let mut s = AppState::new(palette);
+        s.sheets = vec![OpenSheet::sample()];
+        s
     }
 
     pub fn active_sheet(&self) -> Option<&OpenSheet> {
@@ -96,7 +105,7 @@ impl AppState {
             (self.show_grid, CommandId::ViewGrid),
             (self.snap, CommandId::ViewSnap),
             (self.live_recalc, CommandId::ViewLive),
-            (self.show_names, CommandId::ViewNames),
+            (self.show_functions, CommandId::ViewFunctions),
             (self.show_props, CommandId::ViewProperties),
         ]
         .into_iter()
@@ -134,10 +143,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_new_state_shows_the_sample_sheet_and_is_not_calculating() {
+    fn a_new_state_opens_one_blank_untitled_worksheet_and_is_not_calculating() {
         let s = AppState::new(PaletteKey::Neutral);
         assert_eq!(s.active, Some(0));
         assert_eq!(s.sheets.len(), 1);
+        assert_eq!(s.sheets[0].title(), "Untitled");
+        assert!(s.sheets[0].doc.regions().is_empty());
         assert_eq!(s.calc.revision, s.calc.applied);
         assert!(s.status_text().contains("up to date"));
     }
@@ -153,7 +164,7 @@ mod tests {
 
     #[test]
     fn the_command_context_follows_the_active_sheet() {
-        let mut s = AppState::new(PaletteKey::Neutral);
+        let mut s = AppState::with_sample(PaletteKey::Neutral);
         let c = s.command_context();
         assert!(c.has_sheet && !c.has_selection && !c.can_undo && !c.can_redo);
         let first = s.sheets[0].doc.regions()[0].id;
@@ -167,15 +178,16 @@ mod tests {
     #[test]
     fn active_toggles_list_exactly_the_switched_on_ones() {
         let mut s = AppState::new(PaletteKey::Neutral);
-        // The grid starts off, as on a page; the other four toggles and the unit
-        // system are on.
-        assert_eq!(s.active_toggles().len(), 5);
+        // The grid and both optional panels start off; snapping, live recalculation
+        // and the unit system are on.
+        assert_eq!(s.active_toggles().len(), 3);
         assert!(!s.active_toggles().contains(&CommandId::ViewGrid));
         s.show_grid = true;
         s.snap = false;
-        s.show_names = false;
+        s.show_functions = true;
         let on = s.active_toggles();
-        assert!(!on.contains(&CommandId::ViewSnap) && !on.contains(&CommandId::ViewNames));
+        assert!(!on.contains(&CommandId::ViewSnap) && !on.contains(&CommandId::ViewProperties));
+        assert!(on.contains(&CommandId::ViewFunctions));
         assert!(on.contains(&CommandId::ViewGrid) && on.contains(&CommandId::ViewLive));
     }
 

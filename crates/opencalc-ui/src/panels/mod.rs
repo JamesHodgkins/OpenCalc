@@ -3,8 +3,9 @@
 
 pub mod about;
 pub mod doc_tabs;
+pub mod functions;
 pub mod home;
-pub mod names;
+pub mod plot_window;
 pub mod properties;
 pub mod slots;
 pub mod status;

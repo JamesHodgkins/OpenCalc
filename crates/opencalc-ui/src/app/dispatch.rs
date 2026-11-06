@@ -34,7 +34,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
     match command {
         FileNew => {
             state.untitled += 1;
-            let title = format!("Worksheet {}", state.untitled);
+            let title = format!("Untitled {}", state.untitled);
             add_sheet(state, OpenSheet::new(&title));
             fx.push(Effect::Recalculate);
         }
@@ -119,11 +119,11 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         ViewGrid => state.show_grid = !state.show_grid,
         ViewSnap => state.snap = !state.snap,
         ViewLive => state.live_recalc = !state.live_recalc,
-        ViewNames => state.show_names = !state.show_names,
+        ViewFunctions => state.show_functions = !state.show_functions,
         ViewProperties => state.show_props = !state.show_props,
         ViewResetLayout => {
-            state.show_names = true;
-            state.show_props = true;
+            state.show_functions = false;
+            state.show_props = false;
             state.layout_gen += 1;
             fx.push(Effect::ResetDockWidths);
         }
@@ -220,7 +220,7 @@ mod tests {
     use opencalc_core::edit::Edit;
 
     fn state() -> AppState {
-        AppState::new(PaletteKey::Neutral)
+        AppState::with_sample(PaletteKey::Neutral)
     }
 
     fn run(s: &mut AppState, c: CommandId) -> Vec<Effect> {
@@ -258,8 +258,8 @@ mod tests {
             ),
             (CommandId::ViewSnap, |s| s.snap, true),
             (CommandId::ViewLive, |s| s.live_recalc, true),
-            (CommandId::ViewNames, |s| s.show_names, true),
-            (CommandId::ViewProperties, |s| s.show_props, true),
+            (CommandId::ViewFunctions, |s| s.show_functions, false),
+            (CommandId::ViewProperties, |s| s.show_props, false),
         ] {
             assert_eq!(get(&s), starts_on, "{}", command.name());
             run(&mut s, command);
@@ -272,14 +272,17 @@ mod tests {
     #[test]
     fn reset_layout_restores_the_panels_and_asks_for_new_widths() {
         let mut s = state();
-        s.show_names = false;
-        s.show_props = false;
+        s.show_functions = true;
+        s.show_props = true;
         let gen = s.layout_gen;
         assert_eq!(
             run(&mut s, CommandId::ViewResetLayout),
             vec![Effect::ResetDockWidths]
         );
-        assert!(s.show_names && s.show_props);
+        assert!(
+            !s.show_functions && !s.show_props,
+            "the panels are closed by default"
+        );
         assert_eq!(s.layout_gen, gen + 1);
     }
 
@@ -312,9 +315,9 @@ mod tests {
         let mut s = state();
         assert_eq!(run(&mut s, CommandId::FileNew), vec![Effect::Recalculate]);
         assert_eq!((s.sheets.len(), s.active), (2, Some(1)));
-        assert_eq!(s.sheets[1].title(), "Worksheet 2");
+        assert_eq!(s.sheets[1].title(), "Untitled 2");
         run(&mut s, CommandId::FileNew);
-        assert_eq!(s.sheets[2].title(), "Worksheet 3");
+        assert_eq!(s.sheets[2].title(), "Untitled 3");
         run(&mut s, CommandId::FileExample);
         assert_eq!((s.sheets.len(), s.active), (4, Some(3)));
     }

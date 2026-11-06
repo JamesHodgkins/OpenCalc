@@ -128,7 +128,7 @@ commands! {
     ViewSnap: "view.snap", "Snap", icons::SNAP;
     ViewGuides: "view.guides", "Guides", icons::GUIDES;
     ViewLive: "view.live", "Live recalculation", icons::ZAP;
-    ViewNames: "view.names", "Names", icons::NAMES;
+    ViewFunctions: "view.functions", "Functions", icons::NAMES;
     ViewProperties: "view.properties", "Properties", icons::PROPERTIES;
     ViewResetLayout: "view.reset_layout", "Reset layout", icons::RESET;
     ViewTheme: "view.theme", "Switch palette", icons::THEME;
@@ -181,7 +181,7 @@ impl CommandId {
             FileNew | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
             | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
             | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
-            | ViewGrid | ViewSnap | ViewLive | ViewNames | ViewProperties | ViewResetLayout
+            | ViewGrid | ViewSnap | ViewLive | ViewFunctions | ViewProperties | ViewResetLayout
             | ViewTheme | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
             | SelectSheet(_) | CloseSheet(_) => true,
             FileOpen | FileSave | ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind

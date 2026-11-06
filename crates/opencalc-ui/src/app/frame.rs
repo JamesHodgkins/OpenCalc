@@ -76,18 +76,18 @@ impl App {
             .show(ctx, |ui| panels::status::show(ui, &self.state, &mut cmds));
 
         let dock = Frame::new().fill(theme.surface).inner_margin(8);
-        // Edits the properties panel asks for (it only reads the document).
+        // Edits that panels and the plot window ask for (they only read the document).
         let mut panel_edits: Vec<canvas::CanvasCmd> = Vec::new();
-        if self.state.show_names {
-            egui::SidePanel::left(egui::Id::new(("names", self.state.layout_gen)))
-                .default_width(width * 0.13)
-                .width_range(120.0..=400.0)
+        if self.state.show_functions {
+            egui::SidePanel::left(egui::Id::new(("functions", self.state.layout_gen)))
+                .default_width(width * 0.20)
+                .width_range(180.0..=420.0)
                 .frame(dock)
                 .show(ctx, |ui| {
                     // A panel is saved at its frame's width, and a frame shrinks to its
                     // content, so claim the full width or the panel collapses.
                     ui.set_min_width(ui.available_width());
-                    panels::names::show(ui, &self.state);
+                    panels::functions::show(ui, &self.state, &mut panel_edits);
                 });
         }
         if self.state.show_props {
@@ -97,7 +97,7 @@ impl App {
                 .frame(dock)
                 .show(ctx, |ui| {
                     ui.set_min_width(ui.available_width());
-                    panels::properties::show(ui, &self.state, &mut panel_edits);
+                    panels::properties::show(ui, &self.state);
                 });
         }
 
@@ -108,6 +108,7 @@ impl App {
                 None => panels::home::show(ui, &self.state, &mut cmds),
             });
 
+        panels::plot_window::show(ctx, &self.state, &mut panel_edits);
         if let (Some(i), false) = (self.state.active, panel_edits.is_empty()) {
             let effects = super::dispatch::apply_canvas(&mut self.state, i, panel_edits);
             self.run_effects(ctx, effects);

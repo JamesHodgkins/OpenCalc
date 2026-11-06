@@ -108,7 +108,7 @@ values next to definitions", off by default.
 | Phase | Content |
 |---|---|
 | P1 | **Paper pages** (section 8): page setup in the document, white pages on a grey desk, paper palette for page content, page numbers. **Done** (page setup has no dialog yet: that is P2) |
-| U1 | Remove default docks and the Names pane; blank Untitled worksheet at startup (Home tab stays); grid off by default; add the Functions window. Properties opens only for a selected plot |
+| U1 | Remove default docks and the Names pane; blank Untitled worksheet at startup (Home tab stays); grid off by default; add the Functions window. Properties opens only for a selected plot. **Done**: the Names pane is gone; the Functions window is optional (View tab); a small floating Plot window replaces the plot fields in the side pane; the Properties pane is optional and closed by default and is kept only for error details until U3 puts errors on the regions |
 | U2 | Ribbon rebuilt to the tabs above (commands unchanged, rearranged and renamed) |
 | U3 | Results only on `=` regions (if B is agreed); three-decimal default; errors on the region |
 | U4 | Status bar to Mathcad's items, with a zoom slider |

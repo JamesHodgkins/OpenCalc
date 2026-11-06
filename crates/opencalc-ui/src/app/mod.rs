@@ -30,7 +30,10 @@ pub struct App {
 
 impl App {
     pub fn new(ctx: egui::Context, palette: PaletteKey) -> App {
-        let state = AppState::new(palette);
+        App::with_state(ctx, AppState::new(palette))
+    }
+
+    pub fn with_state(ctx: egui::Context, state: AppState) -> App {
         crate::fonts::install(&ctx);
         theme::apply(&ctx, &state.theme);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);

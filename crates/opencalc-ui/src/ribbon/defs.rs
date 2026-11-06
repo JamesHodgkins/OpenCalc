@@ -231,7 +231,7 @@ fn view() -> Tab {
             panel(
                 "Panels",
                 vec![Column::Stack(vec![
-                    it(CommandId::ViewNames),
+                    it(CommandId::ViewFunctions),
                     it(CommandId::ViewProperties),
                     it(CommandId::ViewResetLayout),
                 ])],

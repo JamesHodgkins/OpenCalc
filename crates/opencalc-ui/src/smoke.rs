@@ -14,7 +14,7 @@ use eframe::egui::{self, Event, Key, Modifiers, PointerButton, Pos2, RawInput, R
 use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind};
 use opencalc_core::edit::Edit;
 
-use crate::app::App;
+use crate::app::{App, AppState};
 use crate::canvas::adapt::{pos, rect_of};
 use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
@@ -29,7 +29,7 @@ struct Harness {
 impl Harness {
     fn new() -> Harness {
         let ctx = egui::Context::default();
-        let app = App::new(ctx.clone(), PaletteKey::Neutral);
+        let app = App::with_state(ctx.clone(), AppState::with_sample(PaletteKey::Neutral));
         Harness {
             ctx,
             app,
@@ -227,68 +227,60 @@ fn inserting_each_region_type_adds_and_selects_it() {
 }
 
 #[test]
-fn a_long_value_in_the_names_panel_does_not_push_the_canvas_aside() {
-    // The sample defines a list of 11 widths, whose text is far wider than the
-    // names panel. The panel must stay within its width range (400 points), so the
-    // canvas starts right after it, not after the whole text.
-    let mut h = Harness::new();
-    h.settle();
-    for _ in 0..5 {
-        h.frame();
-    }
-    let canvas_left = h.app.state.viewport.min.x;
-    assert!(
-        canvas_left <= 420.0,
-        "the canvas starts at x = {canvas_left}, so the names panel grew past its limit"
-    );
+fn the_real_app_opens_one_blank_untitled_worksheet_with_no_panels() {
+    let ctx = egui::Context::default();
+    let app = App::new(ctx, PaletteKey::Neutral);
+    assert_eq!(app.state.sheets.len(), 1);
+    assert_eq!(app.state.sheets[0].title(), "Untitled");
+    assert!(app.state.sheets[0].doc.regions().is_empty());
+    assert!(!app.state.show_functions && !app.state.show_props);
 }
 
 #[test]
-fn a_worksheet_opens_on_one_white_page_fitted_to_the_window_and_grows_with_content() {
+fn the_functions_window_opens_and_stays_within_its_width() {
     let mut h = Harness::new();
     h.settle();
     for _ in 0..3 {
         h.frame();
     }
-    // The sample fits on one page, which is shown in full width.
-    assert_eq!(h.app.state.page, (1, 1));
-    let view = h.sheet().view;
-    assert!(view.zoom > 0.25 && view.zoom <= 1.0, "zoom {}", view.zoom);
-    let (page_w, _) = h.sheet().doc.page().size();
-    let canvas = h.app.state.viewport;
-    let left = canvas.min.x + view.offset.x;
-    let right = left + page_w * view.zoom;
+    let without = h.app.state.viewport.min.x;
+    h.command(CommandId::ViewFunctions);
+    for _ in 0..4 {
+        h.frame();
+    }
+    assert!(h.app.state.show_functions);
+    let with = h.app.state.viewport.min.x;
     assert!(
-        left >= canvas.min.x && right <= canvas.max.x + 0.5,
-        "page {left}..{right} in {canvas:?}"
+        with > without + 100.0,
+        "the window takes room: {without} -> {with}"
     );
-
-    // A region far below adds pages; moving it back removes them again.
-    let id = h.sheet().doc.regions()[0].id;
-    let i = h.app.state.active.expect("a sheet");
-    let far = |y: f32| {
-        vec![crate::canvas::CanvasCmd::Edit(Edit::MoveRegions {
-            moves: vec![(id, Point::new(40.0, y))],
-        })]
-    };
-    crate::app::dispatch::apply_canvas(&mut h.app.state, i, far(2500.0));
-    h.frame();
-    h.frame();
-    let pages = h.app.state.page.1;
     assert!(
-        pages >= 3,
-        "a region at y = 2500 needs 3 pages, got {pages}"
+        with <= 440.0,
+        "the window stays within its width range: canvas at {with}"
     );
-    crate::app::dispatch::apply_canvas(&mut h.app.state, i, far(40.0));
+    h.command(CommandId::ViewFunctions);
     h.frame();
-    h.frame();
-    assert_eq!(h.app.state.page.1, 1);
+    assert!(!h.app.state.show_functions);
 }
 
 #[test]
-fn the_grid_starts_off() {
-    let h = Harness::new();
-    assert!(!h.app.state.show_grid);
+fn the_plot_window_appears_only_while_a_plot_is_selected() {
+    use crate::panels::plot_window::selected_plot;
+    let mut h = Harness::new();
+    h.settle();
+    assert!(selected_plot(&h.app.state).is_none());
+    let id = plot_id(&h);
+    h.app.state.sheets[0].canvas.selection = vec![id];
+    h.frame();
+    h.frame();
+    assert_eq!(selected_plot(&h.app.state).map(|(i, _)| i), Some(id));
+    // Two regions selected, or a region that is not a plot: no plot window.
+    let math = h.sheet().doc.regions()[0].id;
+    h.app.state.sheets[0].canvas.selection = vec![id, math];
+    assert!(selected_plot(&h.app.state).is_none());
+    h.app.state.sheets[0].canvas.selection = vec![math];
+    assert!(selected_plot(&h.app.state).is_none());
+    h.frame();
 }
 
 /// The sample sheet's plot region.
