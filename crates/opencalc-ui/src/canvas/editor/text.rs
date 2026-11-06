@@ -25,7 +25,9 @@ pub struct Field {
 impl Field {
     /// A field holding `source`, with the caret at the end.
     pub fn new(source: &str) -> Field {
-        let chars: Vec<char> = source.chars().take(MAX_CHARS).collect();
+        // Existing document content is authoritative. MAX_CHARS limits edits,
+        // not what may be loaded into the transient field.
+        let chars: Vec<char> = source.chars().collect();
         let end = chars.len();
         Field {
             chars,
@@ -68,7 +70,9 @@ impl Field {
     /// end, so text added at the end leaves it after the addition.
     pub fn sync(&mut self, source: &str) {
         let old = self.chars.len();
-        self.chars = source.chars().take(MAX_CHARS).collect();
+        // Never drop document text when synchronizing after undo or an external
+        // edit. The editor activation path handles sources above MAX_CHARS.
+        self.chars = source.chars().collect();
         let len = self.chars.len();
         let keep = |at: usize| len.saturating_sub(old.saturating_sub(at));
         self.caret = keep(self.caret);

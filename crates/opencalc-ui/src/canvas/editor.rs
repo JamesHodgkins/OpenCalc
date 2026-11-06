@@ -10,8 +10,8 @@ mod complete;
 mod text;
 
 use eframe::egui::{
-    self, Event, EventFilter, Id, Key, Modifiers, Order, Pos2, Rect, RichText, Sense, Stroke, Ui,
-    Vec2,
+    self, Align2, Event, EventFilter, FontId, Id, Key, Modifiers, Order, Pos2, Rect, RichText,
+    Sense, Stroke, Ui, Vec2,
 };
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::edit::Edit;
@@ -77,6 +77,28 @@ pub(super) fn math(
     let popup_id = id.with("popup");
 
     let source = m.source();
+    let source_len = source.chars().count();
+    if source_len > text::MAX_CHARS {
+        // Keep the complete source in the worksheet. This editor currently has
+        // no windowed-buffer model, so don't activate a truncated Field.
+        st.field = None;
+        st.focus_edit = false;
+        ui.painter().text(
+            text_origin,
+            Align2::LEFT_TOP,
+            format!(
+                "Cannot edit: expression has {source_len} characters (limit {}).",
+                text::MAX_CHARS
+            ),
+            FontId::proportional(12.0 * zoom),
+            env.theme.error,
+        );
+        if ui.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Enter)) {
+            st.editing = None;
+            cmds.push(CanvasCmd::Seal);
+        }
+        return;
+    }
     let fresh = st.focus_edit || st.field.is_none();
     let field = st.field.get_or_insert_with(|| Field::new(source));
     if fresh {

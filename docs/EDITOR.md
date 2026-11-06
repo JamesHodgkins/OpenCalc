@@ -7,9 +7,9 @@ Status: **approved** (hybrid editor, `lpha` Greek entry, underscore subscripts)
 - A Math region saves its **source text** (decision D5). The parsed `Expr` is
   derived from it, and every change is `Edit::SetMathSource` (merged while typing,
   one undo step per run).
-- While you edit, the canvas shows a plain **monospace text box** (`edit_overlay`
-  in `canvas/mod.rs`). When you stop, the region is typeset from the parsed `Expr`.
-  So you type `a/b` as text and only see a fraction afterwards.
+- While you edit, the canvas shows the expression typeset from the current source,
+  including incomplete input. `canvas/editor.rs` maps the source caret and
+  selection onto that layout, so `a/b` is displayed as a fraction during editing.
 - Typesetting (`layout.rs`) turns an `Expr` into positioned draw operations. It keeps
   no link from a drawn piece back to the source text, so a click cannot be mapped
   to a character and a character cannot be mapped to a position on screen.
@@ -17,6 +17,10 @@ Status: **approved** (hybrid editor, `lpha` Greek entry, underscore subscripts)
   (`ParseError`), evaluation errors carry a path into the tree (`error_paths`,
   `Expr::at_path`), the printer round-trips (`Expr` to source and back), and
   `FUNCTIONS` lists every built-in with its signature.
+
+The UI editor accepts up to 8,192 Unicode scalar values. Existing math source above
+that limit is preserved and shown, but in-place editing is refused with a visible
+message. The field must never truncate source on activation or synchronization.
 
 ## 2. Goals
 
