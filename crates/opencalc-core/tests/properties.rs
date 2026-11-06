@@ -276,6 +276,12 @@ proptest! {
                 prop_assert!(q.is_finite(), "{:?} gave a non-finite value from {:?}", id, lines);
             }
         }
+        // Every error location resolves to a real part of that region's expression.
+        for (id, path) in &out.error_paths {
+            let expr = &regions.iter().find(|(rid, _)| rid == id).expect("region").1;
+            prop_assert!(expr.at_path(path).is_some(), "{:?} {:?} in {:?}", id, path, lines);
+            prop_assert!(out.values[id].is_err());
+        }
         // Deterministic: evaluating again gives exactly the same answers.
         prop_assert_eq!(evaluate(&regions).values, out.values);
     }
@@ -482,6 +488,15 @@ fn reference(t: &Tree) -> Ref {
 }
 
 proptest! {
+    /// Printing an expression and parsing it again gives the same tree, for any
+    /// shape of arithmetic (the error display depends on this).
+    #[test]
+    fn printed_expressions_parse_back_identically(t in tree()) {
+        let parsed = parse(&render(&t));
+        prop_assume!(!matches!(parsed, Expr::Error(_)));
+        prop_assert_eq!(parse(&parsed.to_string()), parsed);
+    }
+
     /// The engine agrees exactly with the reference on every generated
     /// expression, and answers `NotFinite` precisely when a step is not finite.
     /// A step that overflows and then comes back (`1 / (1e308 * 10)`) must still
@@ -524,8 +539,11 @@ fn parts(src: &str) -> (f64, f64) {
     }
 }
 
+/// Equal within rounding. The absolute part matters for a determinant that is
+/// exactly zero in theory: elimination leaves noise of about 1e-9 there, because
+/// the intermediate products are around 1e5 in size.
 fn near(a: f64, b: f64) -> bool {
-    (a - b).abs() <= 1e-9 * (1.0 + a.abs().max(b.abs()))
+    (a - b).abs() <= 1e-6 + 1e-9 * a.abs().max(b.abs())
 }
 
 fn small() -> impl Strategy<Value = i32> {

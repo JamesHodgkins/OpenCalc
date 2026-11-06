@@ -11,6 +11,7 @@
 //! - A number followed by another name or `(` is implicit multiplication (`2x`).
 //! - `sqrt(x)` is typeset as a radical.
 
+use crate::expr::ParseError;
 use crate::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
 use crate::units::builtin_unit;
 
@@ -44,19 +45,27 @@ const MAX_SOURCE_CHARS: usize = 4096;
 
 /// Parse one region's source text.
 pub fn parse(src: &str) -> Expr {
-    if src.len() > MAX_SOURCE_CHARS {
-        return Expr::Error(too_long());
+    let chars = src.chars().count();
+    if chars > MAX_SOURCE_CHARS {
+        return Expr::Error(ParseError::new(too_long(), MAX_SOURCE_CHARS, chars));
     }
-    let parsed = tokenize(src).and_then(|toks| {
-        if toks.len() > MAX_SYMBOLS {
-            Err(too_long())
-        } else {
-            Parser { toks, pos: 0 }.parse_all()
-        }
-    });
-    match parsed {
+    let (toks, spans) = match tokenize(src) {
+        Ok(t) => t,
+        Err((message, start, end)) => return Expr::Error(ParseError::new(message, start, end)),
+    };
+    if toks.len() > MAX_SYMBOLS {
+        let start = spans[MAX_SYMBOLS].0;
+        return Expr::Error(ParseError::new(too_long(), start, chars));
+    }
+    let mut parser = Parser { toks, pos: 0 };
+    match parser.parse_all() {
         Ok(e) => e,
-        Err(msg) => Expr::Error(msg),
+        Err(message) => {
+            // The parser stops on the token it could not use; past the last token
+            // the problem is the end of the input.
+            let (start, end) = spans.get(parser.pos).copied().unwrap_or((chars, chars));
+            Expr::Error(ParseError::new(message, start, end))
+        }
     }
 }
 
@@ -64,11 +73,16 @@ fn too_long() -> String {
     format!("expression is too long (limit {MAX_SYMBOLS} symbols)")
 }
 
-fn tokenize(src: &str) -> Result<Vec<Tok>, String> {
+/// Tokens with the character range each came from.
+type Tokens = (Vec<Tok>, Vec<(usize, usize)>);
+
+fn tokenize(src: &str) -> Result<Tokens, (String, usize, usize)> {
     let chars: Vec<char> = src.chars().collect();
     let mut toks = Vec::new();
+    let mut spans = Vec::new();
     let mut i = 0;
     while i < chars.len() {
+        let (before, begin) = (toks.len(), i);
         let c = chars[i];
         match c {
             c if c.is_whitespace() => i += 1,
@@ -93,7 +107,7 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, String> {
                 let text: String = chars[start..i].iter().collect();
                 let v = text
                     .parse::<f64>()
-                    .map_err(|_| format!("bad number '{text}'"))?;
+                    .map_err(|_| (format!("bad number '{text}'"), start, i))?;
                 toks.push(Tok::Num(v));
             }
             c if c.is_alphabetic() || c == '_' => {
@@ -143,10 +157,13 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, String> {
                 toks.push(Tok::Equals);
                 i += 1;
             }
-            other => return Err(format!("unexpected '{other}'")),
+            other => return Err((format!("unexpected '{other}'"), i, i + 1)),
+        }
+        if toks.len() > before {
+            spans.push((begin, i));
         }
     }
-    Ok(toks)
+    Ok((toks, spans))
 }
 
 struct Parser {
@@ -174,22 +191,29 @@ impl Parser {
         }
     }
 
-    fn parse_all(mut self) -> Result<Expr, String> {
+    fn parse_all(&mut self) -> Result<Expr, String> {
         if self.toks.is_empty() {
             return Err("empty".into());
         }
         let lhs = self.expr(0)?;
         let result = match self.peek() {
             Some(Tok::Define) => {
+                // Checked first, while the position is still on the `:=`.
+                let target = target_name(&lhs)?;
                 self.pos += 1;
                 let value = self.expr(0)?;
                 Expr::Assign {
                     kind: AssignKind::Define,
-                    target: target_name(&lhs)?,
+                    target,
                     value: Box::new(value),
                 }
             }
             Some(Tok::Equals) => {
+                let target = if self.toks.len() > self.pos + 1 {
+                    Some(target_name(&lhs)?)
+                } else {
+                    None
+                };
                 self.pos += 1;
                 if self.peek().is_none() {
                     // `x =` shows the value of the expression on the left.
@@ -205,7 +229,7 @@ impl Parser {
                     let value = self.expr(0)?;
                     Expr::Assign {
                         kind: AssignKind::Evaluate,
-                        target: target_name(&lhs)?,
+                        target: target.unwrap_or_default(),
                         value: Box::new(value),
                     }
                 }
@@ -263,8 +287,15 @@ impl Parser {
                 arg: Box::new(self.expr(25)?),
             }),
             Some(Tok::Plus) => self.expr(25),
-            Some(t) => Err(format!("unexpected {}", describe(&t))),
-            None => Err("expression ends early".into()),
+            // `next` stepped past the token; step back so the error is on it.
+            Some(t) => {
+                self.pos -= 1;
+                Err(format!("unexpected {}", describe(&t)))
+            }
+            None => {
+                self.pos -= 1;
+                Err("expression ends early".into())
+            }
         }
     }
 
@@ -490,7 +521,7 @@ mod tests {
     #[test]
     fn absurdly_deep_input_is_rejected_not_a_crash() {
         let src = format!("{}1{}", "(".repeat(100_000), ")".repeat(100_000));
-        assert!(matches!(parse(&src), Expr::Error(m) if m.contains("too long")));
+        assert!(matches!(parse(&src), Expr::Error(m) if m.message.contains("too long")));
         assert!(matches!(parse(&"1+".repeat(1_000_000)), Expr::Error(_)));
         assert!(matches!(parse(&"-".repeat(50_000)), Expr::Error(_)));
     }
@@ -523,5 +554,55 @@ mod tests {
         assert_eq!(run(&["-3 + 5"], 0), 2.0);
         assert!(matches!(parse("a - b"), Expr::Binary { op: Sub, .. }));
         assert!(matches!(parse("a / b"), Expr::Binary { op: Div, .. }));
+    }
+
+    /// The text a parse error points at, for the cases below.
+    fn error_at(src: &str) -> (String, String) {
+        let Expr::Error(e) = parse(src) else {
+            panic!("{src:?} should not parse");
+        };
+        assert!(e.start <= e.end, "{src:?}: {e:?}");
+        let chars: Vec<char> = src.chars().collect();
+        assert!(e.end <= chars.len(), "{src:?}: {e:?}");
+        (e.message, chars[e.start..e.end].iter().collect())
+    }
+
+    #[test]
+    fn parse_errors_point_at_the_offending_source() {
+        let cases = [
+            ("1 + * 2", "unexpected '*'", "*"),
+            ("(1 + 2", "missing ')'", ""),
+            ("1 + 2)", "unexpected ')'", ")"),
+            ("1 + ", "expression ends early", ""),
+            ("2 $ 3", "unexpected '$'", "$"),
+            ("1.2.3 + 1", "bad number '1.2.3'", "1.2.3"),
+            ("2 + 3 = 4", "left of '=' must be a name", "="),
+            ("f(1 2)", "missing ')'", "2"),
+            ("a := b := 2", "unexpected ':='", ":="),
+        ];
+        for (src, message, text) in cases {
+            assert_eq!(
+                error_at(src),
+                (message.to_owned(), text.to_owned()),
+                "{src}"
+            );
+        }
+    }
+
+    #[test]
+    fn error_ranges_count_characters_not_bytes() {
+        // Greek letters are two bytes each; the range must still land on the `$`.
+        let (_, text) = error_at("\u{3b1} + \u{3b2} $ 2");
+        assert_eq!(text, "$");
+    }
+
+    #[test]
+    fn an_over_long_expression_is_flagged_from_where_it_becomes_too_long() {
+        let src = "1+".repeat(MAX_SYMBOLS);
+        let Expr::Error(e) = parse(&src) else {
+            panic!("should be too long");
+        };
+        assert_eq!(e.start, MAX_SYMBOLS);
+        assert_eq!(e.end, src.chars().count());
     }
 }

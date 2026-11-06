@@ -8,3 +8,4 @@ cc 77c10c59fe0d4e5e60417a2d3a5b9caef70b6b1f4c7cd27bc7b2189ab0071e87 # shrinks to
 cc 6afa490af3eecf922100888e9a203458ceb3de10dcb73cee508b126adf00a45e # shrinks to a = -44, b = -85
 cc 30f7e6d342f137dc5cf0cec7f71695c60a5d27144050b3bb6e123e8f249dc94b # shrinks to t = Bin(Neg(Num("1", 1.0)), "^", Num("2", 2.0))
 cc 2dbe08ee8248609047a8eca8632ab1bccaaefe2dfce6070cd3a32d55eb046f1b # shrinks to t = Bin(Num("0", 0.0), "+", Call("sqrt", Bin(Num("1", 1.0), "/", Num("1e155", 1e155))))
+cc 6394b6dd1bfab867b1c914ba852dba0ff219059837fd5478ac7245cb6ceb9ebe # shrinks to a = [10, -3, -16, -11, -12, -2, -1, -15, -18], b = [3, -2, 0, -1, -3, -9, -14, -18, -1]

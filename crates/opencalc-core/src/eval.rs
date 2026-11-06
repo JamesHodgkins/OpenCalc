@@ -70,6 +70,10 @@ pub enum Warning {
 pub struct Output {
     pub values: HashMap<RegionId, Result<Value, EvalError>>,
     pub warnings: Vec<Warning>,
+    /// For a region that failed inside its expression, the path to the failing
+    /// sub-expression (see [`Expr::at_path`]). Absent when the whole expression
+    /// failed at its root, or for a cycle.
+    pub error_paths: HashMap<RegionId, Vec<u16>>,
 }
 
 /// An output where every region failed with an internal error. Used by the
@@ -147,10 +151,17 @@ pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Outp
         for &i in &component {
             let (id, expr) = &regions[i];
             let result = if cyclic {
-                Err(EvalError::Cycle)
+                Err(Located::here(EvalError::Cycle))
             } else {
                 eval_region(expr, &cx)
             };
+            let result = result.map_err(|l| {
+                if !l.rev_path.is_empty() {
+                    out.error_paths
+                        .insert(*id, l.rev_path.iter().rev().copied().collect());
+                }
+                l.error
+            });
             if let Expr::Assign {
                 kind: AssignKind::Define,
                 target,
@@ -167,56 +178,121 @@ pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Outp
     out
 }
 
-fn eval_region(expr: &Expr, cx: &Cx) -> Result<Value, EvalError> {
+/// An evaluation error and where in the expression it happened. The path is
+/// built from the inside out as the error propagates, so it is stored reversed.
+struct Located {
+    error: EvalError,
+    rev_path: Vec<u16>,
+}
+
+impl Located {
+    fn here(error: impl Into<EvalError>) -> Located {
+        Located {
+            error: error.into(),
+            rev_path: Vec::new(),
+        }
+    }
+
+    /// The error came from child number `index` of the current node.
+    fn under(mut self, index: usize) -> Located {
+        // Expressions have at most `MAX_SYMBOLS` symbols, far below `u16::MAX`.
+        self.rev_path.push(u16::try_from(index).unwrap_or(u16::MAX));
+        self
+    }
+}
+
+impl<E: Into<EvalError>> From<E> for Located {
+    fn from(error: E) -> Located {
+        Located::here(error)
+    }
+}
+
+type Evaluated = Result<Value, Located>;
+
+fn eval_region(expr: &Expr, cx: &Cx) -> Evaluated {
     match expr {
-        Expr::Assign { value, .. } => eval(value, cx),
+        Expr::Assign { value, .. } => eval(value, cx).map_err(|l| l.under(0)),
         other => eval(other, cx),
     }
 }
 
 /// Evaluate one expression. The single choke point that rejects non-finite
 /// results, so they cannot reach a displayed value.
-fn eval(expr: &Expr, cx: &Cx) -> Result<Value, EvalError> {
+fn eval(expr: &Expr, cx: &Cx) -> Evaluated {
     let v = eval_node(expr, cx)?;
     if v.is_finite() {
         Ok(v)
     } else {
-        Err(EvalError::NotFinite)
+        Err(Located::here(EvalError::NotFinite))
     }
 }
 
-fn eval_node(expr: &Expr, cx: &Cx) -> Result<Value, EvalError> {
+/// Evaluate child `index` of the current node. Inlined even in debug builds: an
+/// extra stack frame per nesting level eats the stack margin (see the parser tests).
+#[inline(always)]
+fn child(expr: &Expr, index: usize, cx: &Cx) -> Evaluated {
+    eval(expr, cx).map_err(|l| l.under(index))
+}
+
+/// A thin dispatcher: every arm with real work is its own function, so the frame
+/// this recursion pays for per nesting level stays small. (In a debug build a
+/// frame holds the locals of all arms, and the parser tests bound the stack use.)
+fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
     match expr {
         Expr::Number(v) => Ok(Value::dimensionless(*v)),
         Expr::Quantity { value, unit } => Ok(cx.units.quantity(*value, unit)?.into()),
-        // A defined variable shadows a unit of the same name, and a unit shadows
-        // the imaginary unit `i`.
-        Expr::Name(n) => match cx.env.get(n) {
-            Some(r) => r.clone(),
-            None => cx
-                .units
-                .quantity(1.0, n)
-                .map(Value::from)
-                .or_else(|_| constant(n))
-                .map_err(|_| EvalError::Undefined(n.clone())),
-        },
+        Expr::Name(n) => name(n, cx),
         Expr::Unary {
             op: UnaryOp::Neg,
             arg,
-        } => Ok(eval(arg, cx)?.negated()),
-        Expr::Binary { op, lhs, rhs } => binary(*op, &eval(lhs, cx)?, &eval(rhs, cx)?),
-        Expr::Fraction { num, den } => binary(BinaryOp::Div, &eval(num, cx)?, &eval(den, cx)?),
-        Expr::Root { radicand } => functions::call("sqrt", &[eval(radicand, cx)?]),
-        Expr::Call { name, args } => {
-            let values = args
-                .iter()
-                .map(|a| eval(a, cx))
-                .collect::<Result<Vec<_>, _>>()?;
-            functions::call(name, &values)
-        }
-        Expr::Assign { value, .. } => eval(value, cx),
-        Expr::Error(msg) => Err(EvalError::Invalid(msg.clone())),
+        } => negate(arg, cx),
+        Expr::Binary { op, lhs, rhs } => operate(*op, lhs, rhs, cx),
+        Expr::Fraction { num, den } => operate(BinaryOp::Div, num, den, cx),
+        Expr::Root { radicand } => root(radicand, cx),
+        Expr::Call { name, args } => apply(name, args, cx),
+        Expr::Assign { value, .. } => child(value, 0, cx),
+        Expr::Error(e) => Err(Located::here(EvalError::Invalid(e.message.clone()))),
     }
+}
+
+/// A defined variable shadows a unit of the same name, and a unit shadows the
+/// imaginary unit `i`.
+#[inline(never)]
+fn name(n: &str, cx: &Cx) -> Evaluated {
+    match cx.env.get(n) {
+        Some(r) => r.clone().map_err(Located::here),
+        None => cx
+            .units
+            .quantity(1.0, n)
+            .map(Value::from)
+            .or_else(|_| constant(n))
+            .map_err(|_| Located::here(EvalError::Undefined(n.to_owned()))),
+    }
+}
+
+#[inline(never)]
+fn negate(arg: &Expr, cx: &Cx) -> Evaluated {
+    Ok(child(arg, 0, cx)?.negated())
+}
+
+#[inline(never)]
+fn operate(op: BinaryOp, lhs: &Expr, rhs: &Expr, cx: &Cx) -> Evaluated {
+    Ok(binary(op, &child(lhs, 0, cx)?, &child(rhs, 1, cx)?)?)
+}
+
+#[inline(never)]
+fn root(radicand: &Expr, cx: &Cx) -> Evaluated {
+    Ok(functions::call("sqrt", &[child(radicand, 0, cx)?])?)
+}
+
+#[inline(never)]
+fn apply(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
+    let values = args
+        .iter()
+        .enumerate()
+        .map(|(i, a)| child(a, i, cx))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(functions::call(name, &values)?)
 }
 
 /// Built-in named constants, used when no variable or unit has the name.
@@ -227,7 +303,7 @@ fn constant(name: &str) -> Result<Value, ()> {
     }
 }
 
-fn binary(op: BinaryOp, a: &Value, b: &Value) -> Result<Value, EvalError> {
+fn binary(op: BinaryOp, a: &Value, b: &Value) -> Result<Value, ValueError> {
     Ok(match op {
         BinaryOp::Add => a.add(b)?,
         BinaryOp::Sub => a.sub(b)?,
@@ -551,6 +627,55 @@ mod tests {
         ];
         let out = evaluate_with(&regions, &units);
         assert_eq!(si(&out, 2), 6.0);
+    }
+
+    /// Source text of the sub-expression an error points at, via its path.
+    fn failing_part(lines: &[&str], which: u64) -> Option<String> {
+        let regions: Vec<_> = lines
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (id(i as u64 + 1), crate::parser::parse(s)))
+            .collect();
+        let out = evaluate(&regions);
+        assert!(out.values[&id(which)].is_err(), "{lines:?} should fail");
+        let path = out.error_paths.get(&id(which))?;
+        let expr = &regions[which as usize - 1].1;
+        let part = expr
+            .at_path(path)
+            .expect("a path from the evaluator resolves");
+        Some(format!("{part:?}"))
+    }
+
+    #[test]
+    fn an_error_points_at_the_part_of_the_expression_that_failed() {
+        let part = |lines: &[&str], which| failing_part(lines, which).unwrap();
+        // The whole sum fails (mismatch); it is the value of the definition.
+        assert!(part(&["x := 1 m + 2 kg"], 1).starts_with("Binary { op: Add"));
+        // The division inside the root, not the root.
+        assert!(part(&["x := sqrt(1 / 0)"], 1).starts_with("Binary { op: Div"));
+        // The right operand of the product.
+        assert!(part(&["y := 2 * (3 m + 1 s)"], 1).starts_with("Binary { op: Add"));
+        // A name that is undefined is itself the failing part.
+        assert_eq!(part(&["z := 1 + nope"], 1), "Name(\"nope\")");
+        // A region using a failed region points at the name that carries the error.
+        assert_eq!(part(&["a := 1 / 0", "b := a + 1"], 2), "Name(\"a\")");
+    }
+
+    #[test]
+    fn a_failure_at_the_root_or_in_a_cycle_has_no_path() {
+        let regions = vec![
+            (id(1), crate::parser::parse("a := b")),
+            (id(2), crate::parser::parse("b := a")),
+            (id(3), crate::parser::parse("1 +")),
+        ];
+        let out = evaluate(&regions);
+        assert!(out.error_paths.is_empty(), "{:?}", out.error_paths);
+    }
+
+    #[test]
+    fn a_successful_region_has_no_error_path() {
+        let out = evaluate(&[(id(1), crate::parser::parse("x := 1 m"))]);
+        assert!(out.error_paths.is_empty());
     }
 
     #[test]

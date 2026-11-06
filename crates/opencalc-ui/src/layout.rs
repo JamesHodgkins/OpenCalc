@@ -109,7 +109,7 @@ impl<'a> Typesetter<'a> {
                     self.layout(value, size),
                 ])
             }
-            Expr::Error(msg) => self.text(&format!("? {msg}"), size),
+            Expr::Error(e) => self.text(&format!("? {e}"), size),
         }
     }
 

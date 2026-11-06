@@ -41,29 +41,12 @@ pub enum RegistryError {
     BadScale(String),
 }
 
-/// Names a unit may not take: the constants and functions the evaluator knows.
-const RESERVED: &[&str] = &[
-    "i",
-    "sqrt",
-    "abs",
-    "re",
-    "im",
-    "conj",
-    "arg",
-    "sin",
-    "cos",
-    "tan",
-    "ln",
-    "exp",
-    "vec",
-    "mat",
-    "transpose",
-    "det",
-    "norm",
-    "dot",
-    "rows",
-    "cols",
-];
+/// The imaginary unit is the only constant; functions are in `functions`.
+const CONSTANTS: &[&str] = &["i"];
+
+fn reserved(symbol: &str) -> bool {
+    CONSTANTS.contains(&symbol) || crate::functions::lookup(symbol).is_some()
+}
 
 const MAX_SYMBOL_CHARS: usize = 32;
 
@@ -94,7 +77,7 @@ impl UnitRegistry {
             if !valid_symbol(s) {
                 return Err(RegistryError::BadSymbol(s.to_owned()));
             }
-            if builtin_unit(s).is_some() || RESERVED.contains(&s) {
+            if builtin_unit(s).is_some() || reserved(s) {
                 return Err(RegistryError::Reserved(s.to_owned()));
             }
             if custom[..k].iter().any(|d| d.symbol == def.symbol) {
