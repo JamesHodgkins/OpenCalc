@@ -711,3 +711,27 @@ fn perf_frame_time_with_200_visible_regions() {
         max.as_secs_f64() * 1e3
     );
 }
+
+/// The ribbon is a fixed size: no tab, however full, makes it taller or shorter.
+#[test]
+fn the_ribbon_has_the_same_height_on_every_tab() {
+    let mut h = Harness::new();
+    h.settle();
+    let height = |h: &Harness| {
+        egui::containers::panel::PanelState::load(&h.ctx, egui::Id::new("ribbon"))
+            .expect("the ribbon panel")
+            .rect
+            .height()
+    };
+    let first = height(&h);
+    for tab in 0..h.app.ribbon.tabs.len() {
+        h.app.ribbon_state.active_tab = tab;
+        h.frame();
+        h.frame();
+        assert!(
+            (height(&h) - first).abs() < 0.5,
+            "tab {tab} is {} high, not {first}",
+            height(&h)
+        );
+    }
+}

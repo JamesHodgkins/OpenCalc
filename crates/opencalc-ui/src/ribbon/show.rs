@@ -112,22 +112,31 @@ impl Ribbon {
 fn panel_ui(ui: &mut Ui, cx: &mut Cx, panel: &Panel, key: (usize, usize)) {
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing = Vec2::new(2.0, 0.0);
-        ui.horizontal_top(|ui| {
+        let body = ui.horizontal_top(|ui| {
             for (ci, col) in panel.columns.iter().enumerate() {
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(2.0, 0.0);
                     ui.set_min_height(w::LARGE_H);
+                    ui.set_max_height(w::LARGE_H);
                     column_ui(ui, cx, col, (key, ci));
                 });
             }
         });
-        title_row(ui, cx, panel, key);
+        title_row(ui, cx, panel, key, body.response.rect.width());
     });
 }
 
-fn title_row(ui: &mut Ui, cx: &mut Cx, panel: &Panel, key: (usize, usize)) {
-    ui.horizontal(|ui| {
+/// Height of a panel's title row: the same on every panel.
+pub const TITLE_H: f32 = 16.0;
+
+/// The panel title, centred under the panel (with the flyout arrow, if any).
+fn title_row(ui: &mut Ui, cx: &mut Cx, panel: &Panel, key: (usize, usize), width: f32) {
+    let layout = egui::Layout::left_to_right(egui::Align::Center);
+    ui.allocate_ui_with_layout(Vec2::new(width, TITLE_H), layout, |ui| {
         ui.spacing_mut().item_spacing = Vec2::new(2.0, 0.0);
+        let label = w::text_width(ui, panel.title, type_size::RIBBON_TITLE);
+        let arrow_w = if panel.extra.is_empty() { 0.0 } else { 14.0 };
+        ui.add_space(((width - label - arrow_w) / 2.0).max(0.0));
         ui.label(
             egui::RichText::new(panel.title)
                 .size(type_size::RIBBON_TITLE)
@@ -140,7 +149,8 @@ fn title_row(ui: &mut Ui, cx: &mut Cx, panel: &Panel, key: (usize, usize)) {
             enabled: true,
             active: cx.state.open_panel == Some(key),
         };
-        let arrow = w::small_button(ui, cx.theme, look, None, None, 12.0);
+        let (rect, arrow) = ui.allocate_exact_size(Vec2::new(12.0, TITLE_H), look.sense());
+        w::paint_state(ui, rect, &arrow, cx.theme, look);
         w::paint_arrow(ui, arrow.rect, cx.theme, look);
         if arrow.clicked() {
             cx.state.open_panel = if look.active { None } else { Some(key) };
@@ -255,7 +265,9 @@ fn rows_ui(ui: &mut Ui, cx: &mut Cx, rows: &[Vec<Cell>], id: ((usize, usize), us
         .map(|r| r.iter().sum::<f32>() + 2.0 * r.len().saturating_sub(1) as f32)
         .fold(0.0, f32::max);
     for (ri, row) in rows.iter().enumerate() {
-        ui.horizontal(|ui| {
+        // Every row is exactly one small-button high, whatever it holds.
+        let layout = egui::Layout::left_to_right(egui::Align::Center);
+        ui.allocate_ui_with_layout(Vec2::new(col_w, w::SMALL_H), layout, |ui| {
             ui.spacing_mut().item_spacing = Vec2::new(2.0, 0.0);
             let used: f32 =
                 widths[ri].iter().sum::<f32>() + 2.0 * row.len().saturating_sub(1) as f32;

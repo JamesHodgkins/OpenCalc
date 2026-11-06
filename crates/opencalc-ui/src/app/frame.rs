@@ -46,6 +46,7 @@ impl App {
             });
 
         egui::TopBottomPanel::top("ribbon")
+            .exact_height(metrics::RIBBON)
             .frame(bar(theme.raised, 6, 4))
             .show_separator_line(false)
             .show(ctx, |ui| {

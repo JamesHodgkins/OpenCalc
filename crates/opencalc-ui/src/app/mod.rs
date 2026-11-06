@@ -22,8 +22,8 @@ pub use state::AppState;
 pub struct App {
     pub state: AppState,
     worker: Worker,
-    ribbon: Ribbon,
-    ribbon_state: RibbonState,
+    pub(crate) ribbon: Ribbon,
+    pub(crate) ribbon_state: RibbonState,
     /// Commands raised outside a frame (tests, startup), handled in the next one.
     pub queue: Vec<CommandId>,
 }

@@ -167,6 +167,8 @@ pub mod metrics {
     pub const TITLE_BAR: f32 = 32.0;
     pub const TAB_STRIP: f32 = 25.0;
     pub const DOC_TAB: f32 = 26.0;
+    /// The ribbon body: a large button, a title row and the frame's margins.
+    pub const RIBBON: f32 = 66.0 + 16.0 + 8.0;
     pub const STATUS_BAR: f32 = 24.0;
 }
 
