@@ -1,6 +1,8 @@
-//! The OpenCalc ribbon as data (spec section 4.8, "OpenCalc ribbon").
+//! The OpenCalc ribbon as data (`docs/RIBBON_MAP.md`): Mathcad-style tabs.
 //!
 //! Items name a command only; their label and icon come from the command table.
+//! Tab names follow PTC's public guides; which commands sit where is our own
+//! grouping (see `docs/UI_ALIGNMENT.md`).
 
 use crate::commands::{greek_symbols, CommandId};
 
@@ -18,24 +20,40 @@ fn panel(title: &'static str, columns: Vec<Column>) -> Panel {
     }
 }
 
+fn stack(commands: &[CommandId]) -> Column {
+    Column::Stack(commands.iter().map(|c| it(*c)).collect())
+}
+
 pub fn opencalc_ribbon() -> Ribbon {
     Ribbon {
         tabs: vec![
-            home(),
-            insert(),
-            format(),
-            units(),
-            calculate(),
-            view(),
+            math(),
+            functions(),
+            matrices(),
+            plots(),
+            math_formatting(),
+            calculation(),
+            document(),
             help(),
         ],
     }
 }
 
-fn home() -> Tab {
+/// Regions, clipboard, symbols and units.
+fn math() -> Tab {
+    let greek: Vec<Item> = greek_symbols()
+        .map(|c| it(CommandId::InsertSymbol(c)))
+        .collect();
     Tab {
-        title: "Home",
+        title: "Math",
         panels: vec![
+            panel(
+                "Regions",
+                vec![
+                    Column::Large(it(CommandId::InsertMath)),
+                    Column::Large(it(CommandId::InsertText)),
+                ],
+            ),
             panel(
                 "Clipboard",
                 vec![
@@ -43,104 +61,26 @@ fn home() -> Tab {
                         label: Some("Paste"),
                         items: vec![it(CommandId::ClipboardPaste)],
                     }),
-                    Column::Stack(vec![
-                        it(CommandId::ClipboardCut),
-                        it(CommandId::ClipboardCopy),
-                    ]),
+                    stack(&[CommandId::ClipboardCut, CommandId::ClipboardCopy]),
                 ],
             ),
             panel(
                 "Edit",
-                vec![
-                    Column::Stack(vec![it(CommandId::EditUndo), it(CommandId::EditRedo)]),
-                    Column::Stack(vec![it(CommandId::EditFind), it(CommandId::EditReplace)]),
-                ],
+                vec![stack(&[CommandId::EditFind, CommandId::EditReplace])],
             ),
             panel(
                 "Region",
-                vec![Column::Stack(vec![
-                    it(CommandId::RegionDelete),
-                    it(CommandId::RegionLock),
-                    it(CommandId::RegionTag),
+                vec![stack(&[
+                    CommandId::RegionDelete,
+                    CommandId::RegionLock,
+                    CommandId::RegionTag,
                 ])],
-            ),
-        ],
-    }
-}
-
-fn insert() -> Tab {
-    let greek: Vec<Item> = greek_symbols()
-        .map(|c| it(CommandId::InsertSymbol(c)))
-        .collect();
-    Tab {
-        title: "Insert",
-        panels: vec![
-            panel("Math", vec![Column::Large(it(CommandId::InsertMath))]),
-            panel("Text", vec![Column::Large(it(CommandId::InsertText))]),
-            panel(
-                "Layout",
-                vec![
-                    Column::Stack(vec![
-                        it(CommandId::InsertArea),
-                        it(CommandId::InsertPlot),
-                        it(CommandId::InsertTable),
-                    ]),
-                    Column::Stack(vec![it(CommandId::InsertPicture)]),
-                ],
             ),
             Panel {
                 title: "Symbols",
                 columns: vec![Column::Large(it(CommandId::InsertGreek))],
                 extra: greek,
             },
-        ],
-    }
-}
-
-fn format() -> Tab {
-    Tab {
-        title: "Format",
-        panels: vec![
-            panel(
-                "Font",
-                vec![Column::Rows(vec![vec![
-                    Cell::Icon(it(CommandId::FormatBold)),
-                    Cell::Icon(it(CommandId::FormatItalic)),
-                    Cell::Slot {
-                        id: "font_size",
-                        width: 60.0,
-                    },
-                ]])],
-            ),
-            panel(
-                "Number",
-                vec![
-                    Column::Stack(vec![
-                        it(CommandId::FormatDecimalsMore),
-                        it(CommandId::FormatDecimalsLess),
-                    ]),
-                    Column::Stack(vec![
-                        it(CommandId::FormatScientific),
-                        it(CommandId::FormatEngineering),
-                    ]),
-                ],
-            ),
-            panel(
-                "Arrange",
-                vec![Column::Stack(vec![
-                    it(CommandId::ArrangeAlignH),
-                    it(CommandId::ArrangeAlignV),
-                    it(CommandId::ArrangeSeparate),
-                ])],
-            ),
-        ],
-    }
-}
-
-fn units() -> Tab {
-    Tab {
-        title: "Units",
-        panels: vec![
             panel(
                 "Unit System",
                 vec![Column::LargeSplit(Split {
@@ -153,7 +93,7 @@ fn units() -> Tab {
                 })],
             ),
             panel(
-                "Convert",
+                "Display In",
                 vec![Column::Rows(vec![
                     vec![Cell::Split(Split {
                         label: Some("Length"),
@@ -171,72 +111,130 @@ fn units() -> Tab {
                 ])],
             ),
             panel(
-                "Custom",
-                vec![Column::Stack(vec![
-                    it(CommandId::UnitsDefine),
-                    it(CommandId::UnitsManage),
-                ])],
+                "Custom Units",
+                vec![stack(&[CommandId::UnitsDefine, CommandId::UnitsManage])],
             ),
         ],
     }
 }
 
-fn calculate() -> Tab {
+fn functions() -> Tab {
     Tab {
-        title: "Calculate",
+        title: "Functions",
+        panels: vec![panel(
+            "Insert",
+            vec![Column::Large(it(CommandId::ViewFunctions))],
+        )],
+    }
+}
+
+fn matrices() -> Tab {
+    Tab {
+        title: "Matrices/Tables",
         panels: vec![
             panel(
-                "Recalculate",
+                "Matrix",
+                vec![
+                    Column::Large(it(CommandId::InsertMatrix)),
+                    Column::Large(it(CommandId::InsertRange)),
+                ],
+            ),
+            panel("Table", vec![Column::Large(it(CommandId::InsertTable))]),
+        ],
+    }
+}
+
+fn plots() -> Tab {
+    Tab {
+        title: "Plots",
+        panels: vec![panel(
+            "Insert",
+            vec![Column::Large(it(CommandId::InsertPlot))],
+        )],
+    }
+}
+
+fn math_formatting() -> Tab {
+    Tab {
+        title: "Math Formatting",
+        panels: vec![
+            panel(
+                "Result",
+                vec![
+                    stack(&[CommandId::FormatDecimalsMore, CommandId::FormatDecimalsLess]),
+                    stack(&[CommandId::FormatScientific, CommandId::FormatEngineering]),
+                ],
+            ),
+            panel(
+                "Font",
+                vec![Column::Rows(vec![vec![
+                    Cell::Icon(it(CommandId::FormatBold)),
+                    Cell::Icon(it(CommandId::FormatItalic)),
+                ]])],
+            ),
+        ],
+    }
+}
+
+fn calculation() -> Tab {
+    Tab {
+        title: "Calculation",
+        panels: vec![
+            panel(
+                "Calculate",
                 vec![
                     Column::Large(it(CommandId::CalcAll)),
-                    Column::Stack(vec![it(CommandId::CalcChanged)]),
+                    stack(&[CommandId::CalcAuto]),
                 ],
             ),
             panel("Check", vec![Column::Large(it(CommandId::CalcCheck))]),
             panel(
-                "Warnings",
-                vec![Column::Stack(vec![
-                    it(CommandId::WarnList),
-                    it(CommandId::WarnNext),
-                    it(CommandId::WarnPrev),
-                ])],
+                "Errors",
+                vec![stack(&[CommandId::WarnNext, CommandId::WarnPrev])],
             ),
         ],
     }
 }
 
-fn view() -> Tab {
+fn document() -> Tab {
     Tab {
-        title: "View",
+        title: "Document",
         panels: vec![
             panel(
                 "Zoom",
                 vec![
-                    Column::Stack(vec![
-                        it(CommandId::ViewZoomIn),
-                        it(CommandId::ViewZoomOut),
-                        it(CommandId::ViewZoomFit),
+                    stack(&[
+                        CommandId::ViewZoomIn,
+                        CommandId::ViewZoomOut,
+                        CommandId::ViewZoomFit,
                     ]),
-                    Column::Stack(vec![it(CommandId::ViewZoom100)]),
+                    stack(&[CommandId::ViewZoom100]),
                 ],
             ),
+            panel("Page", vec![Column::Large(it(CommandId::DocPageSetup))]),
             panel(
                 "Show",
-                vec![Column::Stack(vec![
-                    it(CommandId::ViewGrid),
-                    it(CommandId::ViewSnap),
-                    it(CommandId::ViewGuides),
+                vec![stack(&[CommandId::ViewGrid, CommandId::ViewSnap])],
+            ),
+            panel(
+                "Arrange",
+                vec![stack(&[
+                    CommandId::ArrangeAlignH,
+                    CommandId::ArrangeAlignV,
+                    CommandId::ArrangeSeparate,
                 ])],
             ),
             panel(
-                "Panels",
-                vec![Column::Stack(vec![
-                    it(CommandId::ViewFunctions),
-                    it(CommandId::ViewProperties),
-                    it(CommandId::ViewResetLayout),
+                "Insert",
+                vec![stack(&[CommandId::InsertArea, CommandId::InsertPicture])],
+            ),
+            panel(
+                "Window",
+                vec![stack(&[
+                    CommandId::ViewProperties,
+                    CommandId::ViewResetLayout,
                 ])],
             ),
-            panel("Theme", vec![Column::Stack(vec![it(CommandId::ViewTheme)])]),
         ],
     }
 }
@@ -274,7 +272,6 @@ mod tests {
                             match cell {
                                 Cell::Button(i) | Cell::Icon(i) => v.push(i),
                                 Cell::Split(s) | Cell::IconSplit(s) => v.extend(s.items.iter()),
-                                Cell::Slot { .. } => {}
                             }
                         }
                     }
@@ -284,20 +281,56 @@ mod tests {
         v
     }
 
+    fn panel_titles(tab: &str) -> Vec<&'static str> {
+        let r = opencalc_ribbon();
+        let tab = r.tabs.iter().find(|t| t.title == tab).expect(tab);
+        tab.panels.iter().map(|p| p.title).collect()
+    }
+
     #[test]
-    fn has_the_seven_confirmed_tabs() {
+    fn the_tabs_are_mathcads() {
         let titles: Vec<_> = opencalc_ribbon().tabs.iter().map(|t| t.title).collect();
         assert_eq!(
             titles,
             [
-                "Home",
-                "Insert",
-                "Format",
-                "Units",
-                "Calculate",
-                "View",
+                "Math",
+                "Functions",
+                "Matrices/Tables",
+                "Plots",
+                "Math Formatting",
+                "Calculation",
+                "Document",
                 "Help"
             ]
+        );
+    }
+
+    #[test]
+    fn the_panels_are_as_documented_in_the_ribbon_map() {
+        assert_eq!(
+            panel_titles("Math"),
+            [
+                "Regions",
+                "Clipboard",
+                "Edit",
+                "Region",
+                "Symbols",
+                "Unit System",
+                "Display In",
+                "Custom Units"
+            ]
+        );
+        assert_eq!(panel_titles("Functions"), ["Insert"]);
+        assert_eq!(panel_titles("Matrices/Tables"), ["Matrix", "Table"]);
+        assert_eq!(panel_titles("Plots"), ["Insert"]);
+        assert_eq!(panel_titles("Math Formatting"), ["Result", "Font"]);
+        assert_eq!(
+            panel_titles("Calculation"),
+            ["Calculate", "Check", "Errors"]
+        );
+        assert_eq!(
+            panel_titles("Document"),
+            ["Zoom", "Page", "Show", "Arrange", "Insert", "Window"]
         );
     }
 
@@ -311,6 +344,31 @@ mod tests {
                 "duplicate command id {:?}",
                 i.command
             );
+        }
+    }
+
+    /// Nothing may exist without a way to reach it: every command is on the
+    /// ribbon, the application menu or the quick access toolbar, or is raised by a
+    /// window, a tab, the Home page or a key (listed here).
+    #[test]
+    fn every_command_can_be_reached_from_somewhere() {
+        use crate::panels::title::{MENU, QUICK_ACCESS};
+        let ribbon = opencalc_ribbon();
+        let mut reachable: HashSet<CommandId> =
+            all_items(&ribbon).iter().map(|i| i.command).collect();
+        reachable.extend(MENU);
+        reachable.extend(QUICK_ACCESS);
+        reachable.extend([
+            CommandId::FileClose,       // the worksheet tab's close button, Ctrl+W
+            CommandId::FileExample,     // the Home page
+            CommandId::TabHome,         // the Home tab
+            CommandId::HelpAboutClose,  // the About window
+            CommandId::AppOptionsClose, // the Options window
+            CommandId::ThemeNeutral,    // the Options window
+            CommandId::ThemeSlate,      // the Options window
+        ]);
+        for command in CommandId::ALL {
+            assert!(reachable.contains(command), "{command:?} cannot be reached");
         }
     }
 
@@ -330,8 +388,24 @@ mod tests {
     #[test]
     fn greek_flyout_commands_are_all_distinct() {
         let r = opencalc_ribbon();
-        let symbols = &r.tabs[1].panels[3];
+        let symbols = r
+            .tabs
+            .iter()
+            .flat_map(|t| &t.panels)
+            .find(|p| p.title == "Symbols")
+            .expect("a Symbols panel");
         let ids: HashSet<_> = symbols.extra.iter().map(|i| i.command).collect();
         assert_eq!(ids.len(), 16);
+    }
+
+    #[test]
+    fn the_new_controls_that_are_not_built_yet_are_dimmed_not_live() {
+        for command in [
+            CommandId::DocPageSetup,
+            CommandId::InsertMatrix,
+            CommandId::InsertRange,
+        ] {
+            assert!(!command.is_implemented(), "{command:?}");
+        }
     }
 }

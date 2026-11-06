@@ -12,8 +12,13 @@ use crate::ribbon::widgets::{self as w, Look};
 use crate::ribbon::CommandSource;
 use crate::theme::{metrics, type_size};
 
-const MENU: [CommandId; 3] = [CommandId::FileNew, CommandId::HelpAbout, CommandId::AppQuit];
-const QUICK_ACCESS: [CommandId; 5] = [
+pub(crate) const MENU: [CommandId; 4] = [
+    CommandId::FileNew,
+    CommandId::AppOptions,
+    CommandId::HelpAbout,
+    CommandId::AppQuit,
+];
+pub(crate) const QUICK_ACCESS: [CommandId; 5] = [
     CommandId::FileNew,
     CommandId::FileOpen,
     CommandId::FileSave,

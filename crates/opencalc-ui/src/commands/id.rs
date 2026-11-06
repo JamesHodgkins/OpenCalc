@@ -70,6 +70,10 @@ commands! {
     FileClose: "file.close", "Close worksheet", icons::CLOSE;
     FileExample: "file.example", "Open example", icons::BOOK;
     AppQuit: "app.quit", "Quit", icons::CLOSE;
+    AppOptions: "app.options", "Options", icons::PROPERTIES;
+    AppOptionsClose: "app.options_close", "Close Options", icons::CLOSE;
+    ThemeNeutral: "theme.neutral", "Neutral", icons::THEME;
+    ThemeSlate: "theme.slate", "Slate", icons::THEME;
     TabHome: "tab.home", "Home", icons::HOME;
     // Clipboard and editing.
     ClipboardPaste: "clipboard.paste", "Paste", icons::PASTE;
@@ -90,6 +94,8 @@ commands! {
     InsertTable: "insert.table", "Table", icons::TABLE;
     InsertPicture: "insert.picture", "Picture", icons::PICTURE;
     InsertGreek: "insert.greek", "Greek letters", icons::GREEK;
+    InsertMatrix: "insert.matrix", "Matrix", icons::TABLE;
+    InsertRange: "insert.range", "Range", icons::LIST;
     // Format.
     FormatBold: "format.bold", "Bold", icons::BOLD;
     FormatItalic: "format.italic", "Italic", icons::ITALIC;
@@ -114,9 +120,8 @@ commands! {
     UnitsManage: "units.manage", "Manage units", icons::LIST;
     // Calculate.
     CalcAll: "calc.all", "Recalculate all", icons::REFRESH;
-    CalcChanged: "calc.changed", "Changed only", icons::PLAY;
+    CalcAuto: "calc.auto", "Automatic calculation", icons::ZAP;
     CalcCheck: "calc.check", "Run checks", icons::CHECK;
-    WarnList: "warn.list", "List", icons::LIST;
     WarnNext: "warn.next", "Next", icons::ARROW_DOWN;
     WarnPrev: "warn.prev", "Previous", icons::ARROW_UP;
     // View.
@@ -126,12 +131,10 @@ commands! {
     ViewZoom100: "view.zoom_100", "100%", icons::ZOOM_100;
     ViewGrid: "view.grid", "Grid", icons::GRID;
     ViewSnap: "view.snap", "Snap", icons::SNAP;
-    ViewGuides: "view.guides", "Guides", icons::GUIDES;
-    ViewLive: "view.live", "Live recalculation", icons::ZAP;
+    DocPageSetup: "doc.page_setup", "Page setup", icons::FIT;
     ViewFunctions: "view.functions", "Functions", icons::NAMES;
     ViewProperties: "view.properties", "Properties", icons::PROPERTIES;
     ViewResetLayout: "view.reset_layout", "Reset layout", icons::RESET;
-    ViewTheme: "view.theme", "Switch palette", icons::THEME;
     // Help.
     HelpShortcuts: "help.shortcuts", "Shortcuts", icons::KEYBOARD;
     HelpGuide: "help.guide", "User guide", icons::BOOK;
@@ -181,16 +184,16 @@ impl CommandId {
             FileNew | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
             | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
             | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
-            | ViewGrid | ViewSnap | ViewLive | ViewFunctions | ViewProperties | ViewResetLayout
-            | ViewTheme | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
-            | SelectSheet(_) | CloseSheet(_) => true,
+            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewProperties | ViewResetLayout
+            | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs
+            | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) => true,
             FileOpen | FileSave | ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind
             | EditReplace | RegionLock | RegionTag | InsertGreek | InsertSymbol(_) | FormatBold
             | FormatItalic | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
             | FormatEngineering | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate
             | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
-            | UnitsDisplayReset | UnitsDefine | UnitsManage | CalcChanged | CalcCheck
-            | WarnList | WarnNext | WarnPrev | ViewGuides | HelpShortcuts | HelpGuide => false,
+            | UnitsDisplayReset | UnitsDefine | UnitsManage | CalcCheck | WarnNext | WarnPrev
+            | DocPageSetup | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
         }
     }
 

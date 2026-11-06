@@ -18,14 +18,14 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
             (CommandId::ViewGrid, state.show_grid, "Show grid"),
             (CommandId::ViewSnap, state.snap, "Snap to grid"),
             (
-                CommandId::ViewLive,
+                CommandId::CalcAuto,
                 state.live_recalc,
                 "Recalculate as you type",
             ),
         ];
         for (command, on, tip) in toggles {
             let label = match command {
-                CommandId::ViewLive => "Live",
+                CommandId::CalcAuto => "Live",
                 other => other.label(),
             };
             let width = w::small_width(ui, true, Some(label));

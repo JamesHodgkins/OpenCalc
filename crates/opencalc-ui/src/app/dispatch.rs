@@ -12,7 +12,7 @@ use super::state::AppState;
 use crate::canvas::CanvasCmd;
 use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
-use crate::theme::Theme;
+use crate::theme::{PaletteKey, Theme};
 
 /// Something a command needs done that state alone cannot do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -118,7 +118,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         }
         ViewGrid => state.show_grid = !state.show_grid,
         ViewSnap => state.snap = !state.snap,
-        ViewLive => state.live_recalc = !state.live_recalc,
+        CalcAuto => state.live_recalc = !state.live_recalc,
         ViewFunctions => state.show_functions = !state.show_functions,
         ViewProperties => state.show_props = !state.show_props,
         ViewResetLayout => {
@@ -127,11 +127,10 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             state.layout_gen += 1;
             fx.push(Effect::ResetDockWidths);
         }
-        ViewTheme => {
-            state.palette = state.palette.other();
-            state.theme = Theme::palette(state.palette);
-            fx.push(Effect::ApplyTheme);
-        }
+        ThemeNeutral => set_palette(state, &mut fx, PaletteKey::Neutral),
+        ThemeSlate => set_palette(state, &mut fx, PaletteKey::Slate),
+        AppOptions => state.options_open = true,
+        AppOptionsClose => state.options_open = false,
         HelpAbout => state.about_open = true,
         HelpAboutClose => state.about_open = false,
 
@@ -186,6 +185,15 @@ fn with_eval_check(state: &mut AppState, fx: &mut Vec<Effect>, f: impl FnOnce(&m
     f(&mut state.sheets[i]);
     if state.sheets[i].doc.eval_revision() != before {
         fx.push(Effect::Recalculate);
+    }
+}
+
+/// Switch the colour theme (persisted by the app on exit).
+fn set_palette(state: &mut AppState, fx: &mut Vec<Effect>, key: PaletteKey) {
+    if state.palette != key {
+        state.palette = key;
+        state.theme = Theme::palette(key);
+        fx.push(Effect::ApplyTheme);
     }
 }
 
@@ -257,7 +265,7 @@ mod tests {
                 false,
             ),
             (CommandId::ViewSnap, |s| s.snap, true),
-            (CommandId::ViewLive, |s| s.live_recalc, true),
+            (CommandId::CalcAuto, |s| s.live_recalc, true),
             (CommandId::ViewFunctions, |s| s.show_functions, false),
             (CommandId::ViewProperties, |s| s.show_props, false),
         ] {
@@ -287,12 +295,29 @@ mod tests {
     }
 
     #[test]
-    fn the_theme_command_switches_palette_and_asks_egui_to_apply_it() {
+    fn the_theme_commands_switch_the_palette_and_ask_egui_to_apply_it() {
         let mut s = state();
-        let before = s.palette;
-        assert_eq!(run(&mut s, CommandId::ViewTheme), vec![Effect::ApplyTheme]);
-        assert_ne!(s.palette, before);
-        assert_eq!(s.theme.base, Theme::palette(s.palette).base);
+        assert_eq!(s.palette, PaletteKey::Neutral);
+        assert_eq!(run(&mut s, CommandId::ThemeSlate), vec![Effect::ApplyTheme]);
+        assert_eq!(s.palette, PaletteKey::Slate);
+        assert_eq!(s.theme.base, Theme::palette(PaletteKey::Slate).base);
+        // Choosing the theme already in use changes nothing.
+        assert_eq!(run(&mut s, CommandId::ThemeSlate), vec![]);
+        assert_eq!(
+            run(&mut s, CommandId::ThemeNeutral),
+            vec![Effect::ApplyTheme]
+        );
+        assert_eq!(s.palette, PaletteKey::Neutral);
+    }
+
+    #[test]
+    fn options_opens_and_closes() {
+        let mut s = state();
+        assert!(!s.options_open);
+        run(&mut s, CommandId::AppOptions);
+        assert!(s.options_open);
+        run(&mut s, CommandId::AppOptionsClose);
+        assert!(!s.options_open);
     }
 
     #[test]

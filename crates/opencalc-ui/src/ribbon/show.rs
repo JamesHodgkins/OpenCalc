@@ -234,7 +234,6 @@ fn cell_width(ui: &Ui, cell: &Cell) -> f32 {
         Cell::Icon(_) => w::SMALL_H,
         Cell::Split(s) => w::small_width(ui, true, Some(split_label(s, None))) + w::ARROW_W,
         Cell::IconSplit(_) => w::SMALL_H + w::ARROW_W,
-        Cell::Slot { width, .. } => *width,
     }
 }
 
@@ -276,11 +275,6 @@ fn rows_ui(ui: &mut Ui, cx: &mut Cx, rows: &[Vec<Cell>], id: ((usize, usize), us
                     Cell::Icon(item) => small_item(ui, cx, item, None, width),
                     Cell::Split(s) => small_split(ui, cx, s, true, width, (id, ri, ci)),
                     Cell::IconSplit(s) => small_split(ui, cx, s, false, width, (id, ri, ci)),
-                    Cell::Slot { id, width } => {
-                        let (rect, _) =
-                            ui.allocate_exact_size(Vec2::new(*width, w::SMALL_H), Sense::hover());
-                        cx.out.slots.push((id, rect));
-                    }
                 }
             }
         });

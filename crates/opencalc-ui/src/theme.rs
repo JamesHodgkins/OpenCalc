@@ -24,13 +24,6 @@ impl PaletteKey {
         }
     }
 
-    pub fn other(self) -> PaletteKey {
-        match self {
-            PaletteKey::Neutral => PaletteKey::Slate,
-            PaletteKey::Slate => PaletteKey::Neutral,
-        }
-    }
-
     pub fn from_key(k: &str) -> PaletteKey {
         if k == "slate" {
             PaletteKey::Slate

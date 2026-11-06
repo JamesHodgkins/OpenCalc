@@ -283,6 +283,27 @@ fn the_plot_window_appears_only_while_a_plot_is_selected() {
     h.frame();
 }
 
+#[test]
+fn options_opens_a_window_and_the_theme_choice_changes_the_application_colours() {
+    let mut h = Harness::new();
+    h.settle();
+    h.command(CommandId::AppOptions);
+    h.frame();
+    assert!(h.app.state.options_open);
+    let before = h.app.state.theme.base;
+    h.command(CommandId::ThemeSlate);
+    h.frame();
+    assert_ne!(
+        h.app.state.theme.base, before,
+        "the application theme changed"
+    );
+    // Pages stay white whatever the theme.
+    assert_eq!(crate::theme::Theme::paper().base, egui::Color32::WHITE);
+    h.command(CommandId::AppOptionsClose);
+    h.frame();
+    assert!(!h.app.state.options_open);
+}
+
 /// The sample sheet's plot region.
 fn plot_id(h: &Harness) -> RegionId {
     h.sheet()

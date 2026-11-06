@@ -53,9 +53,6 @@ impl App {
                     .ribbon
                     .show(ui, &theme, &mut self.ribbon_state, &registry);
                 cmds.extend(out.clicked);
-                for (_, rect) in &out.slots {
-                    panels::slots::font_size(ui, &theme, *rect);
-                }
             });
 
         egui::TopBottomPanel::top("doc-tabs")
@@ -115,6 +112,7 @@ impl App {
         }
 
         panels::about::show(ctx, &self.state, &mut cmds);
+        panels::options::show(ctx, &self.state, &mut cmds);
 
         let mut pending = std::mem::take(&mut self.queue);
         pending.extend(cmds);

@@ -47,6 +47,8 @@ pub struct AppState {
     /// Screen rectangle of the canvas on the last frame.
     pub viewport: Rect,
     pub about_open: bool,
+    /// The Options window (settings such as the theme).
+    pub options_open: bool,
 }
 
 impl AppState {
@@ -73,6 +75,7 @@ impl AppState {
             dock_basis: crate::INITIAL_WIDTH,
             viewport: Rect::from_min_size(Pos2::ZERO, eframe::egui::vec2(800.0, 600.0)),
             about_open: false,
+            options_open: false,
         }
     }
 
@@ -104,13 +107,17 @@ impl AppState {
         [
             (self.show_grid, CommandId::ViewGrid),
             (self.snap, CommandId::ViewSnap),
-            (self.live_recalc, CommandId::ViewLive),
+            (self.live_recalc, CommandId::CalcAuto),
             (self.show_functions, CommandId::ViewFunctions),
             (self.show_props, CommandId::ViewProperties),
         ]
         .into_iter()
         .filter_map(|(on, command)| on.then_some(command))
         .chain(self.unit_system_command())
+        .chain(Some(match self.palette {
+            PaletteKey::Neutral => CommandId::ThemeNeutral,
+            PaletteKey::Slate => CommandId::ThemeSlate,
+        }))
         .collect()
     }
 
@@ -178,9 +185,9 @@ mod tests {
     #[test]
     fn active_toggles_list_exactly_the_switched_on_ones() {
         let mut s = AppState::new(PaletteKey::Neutral);
-        // The grid and both optional panels start off; snapping, live recalculation
-        // and the unit system are on.
-        assert_eq!(s.active_toggles().len(), 3);
+        // The grid and both optional panels start off; snapping, automatic
+        // calculation, the unit system and the theme choice are on.
+        assert_eq!(s.active_toggles().len(), 4);
         assert!(!s.active_toggles().contains(&CommandId::ViewGrid));
         s.show_grid = true;
         s.snap = false;
@@ -188,7 +195,7 @@ mod tests {
         let on = s.active_toggles();
         assert!(!on.contains(&CommandId::ViewSnap) && !on.contains(&CommandId::ViewProperties));
         assert!(on.contains(&CommandId::ViewFunctions));
-        assert!(on.contains(&CommandId::ViewGrid) && on.contains(&CommandId::ViewLive));
+        assert!(on.contains(&CommandId::ViewGrid) && on.contains(&CommandId::CalcAuto));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # Ribbon map: today's commands to Mathcad-style tabs (U2)
 
-Status: **proposed**, for review before the ribbon is rebuilt.
+Status: **built (U2)**. Owner decisions: the start-page Home tab stays (recent files, release news later; there is no ribbon Home tab); Units sit on the Math tab; the theme moved to an Options window opened from the application menu. Also removed with the old tabs: the placeholder font-size slot.
 
 Tab names come from PTC's public guides (Math, Input/Output, Matrices/Tables, Plots,
 Math Formatting, Calculation, Document, and a Functions tab). Which commands sit

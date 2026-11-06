@@ -12,8 +12,6 @@ pub mod defs;
 
 use std::collections::HashMap;
 
-use eframe::egui::Rect;
-
 use crate::commands::CommandId;
 
 pub struct Item {
@@ -49,8 +47,6 @@ pub enum Cell {
     Split(Split),
     /// Small icon and arrow.
     IconSplit(Split),
-    /// Room for a control the app draws.
-    Slot { id: &'static str, width: f32 },
 }
 
 pub enum Column {
@@ -103,5 +99,4 @@ pub trait CommandSource {
 #[derive(Default)]
 pub struct RibbonOutput {
     pub clicked: Option<CommandId>,
-    pub slots: Vec<(&'static str, Rect)>,
 }
