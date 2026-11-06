@@ -1284,3 +1284,88 @@ fn typing_without_a_blank_click_creates_nothing() {
     h.frame_with(vec![Event::Text("x".into())]);
     assert_eq!(h.sheet().doc.regions().len(), count);
 }
+
+#[test]
+fn deleting_the_region_being_edited_closes_the_editor() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x + 1");
+    h.command(CommandId::RegionDelete);
+    h.frame();
+    assert!(h.sheet().doc.region(id).is_none());
+    assert!(
+        h.sheet().canvas.editing.is_none(),
+        "no editor on a gone region"
+    );
+    h.type_text("zzz");
+    h.press_key(Key::ArrowLeft, Modifiers::NONE);
+    h.command(CommandId::EditUndo);
+    h.settle();
+    assert!(
+        h.sheet().doc.region(id).is_some(),
+        "undo restores the region"
+    );
+}
+
+#[test]
+fn undoing_the_creation_of_the_region_being_edited_closes_the_editor() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("abc");
+    h.key(Key::Enter, Modifiers::NONE);
+    h.frame_with(vec![Event::PointerMoved(h.screen_centre(id))]);
+    h.click(id);
+    h.frame();
+    for _ in 0..3 {
+        h.command(CommandId::EditUndo);
+        h.frame();
+    }
+    assert!(
+        h.sheet().doc.region(id).is_none(),
+        "undo removed the region"
+    );
+    assert!(h.sheet().canvas.editing.is_none(), "and the editor with it");
+}
+
+#[test]
+fn a_new_sheet_has_no_editor_and_the_first_keeps_its_own() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("ab");
+    h.command(CommandId::FileNew);
+    h.frame();
+    assert!(h.sheet().canvas.editing.is_none());
+    assert!(h.sheet().canvas.field.is_none());
+    h.type_text("zzz");
+    h.command(CommandId::SelectSheet(0));
+    h.frame();
+    assert_eq!(
+        h.source_of(id),
+        "ab",
+        "keystrokes on the new sheet never reach sheet 0"
+    );
+}
+
+#[test]
+fn zooming_while_editing_keeps_the_caret_and_clicks_consistent() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("a / b");
+    let caret = h.caret();
+    for c in [
+        CommandId::ViewZoomIn,
+        CommandId::ViewZoomIn,
+        CommandId::ViewZoomOut,
+    ] {
+        h.command(c);
+        h.frame();
+        assert_eq!(h.caret(), caret, "zoom never moves the caret in the source");
+        assert_eq!(h.source_of(id), "a / b");
+    }
+    h.type_text("c");
+    assert_eq!(h.source_of(id), "a / bc");
+}
