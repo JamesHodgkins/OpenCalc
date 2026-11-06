@@ -255,7 +255,7 @@ pub fn properties_panel(ui: &mut Ui, app: &App) {
     };
     let sheet = &app.sheets[i];
     ui.label(format!("{} regions", sheet.regions.len()));
-    ui.label(format!("Unit system: {}", app.unit_system.label()));
+    ui.label("Unit system: SI");
     ui.add_space(8.0);
     for w in &app.output.warnings {
         let opencalc_core::eval::Warning::Redefinition { name, regions } = w;
@@ -327,15 +327,15 @@ pub fn status_bar(ui: &mut Ui, app: &mut App) {
         ) {
             app.live_recalc = !app.live_recalc;
         }
-        if toggle(
-            ui,
-            icons::RULER,
-            app.unit_system.label(),
-            false,
-            "Unit system (click to change)",
-        ) {
-            app.queue.push(app.unit_system.next().command());
-        }
+        // Shown but disabled: per-worksheet unit systems are not built yet (TD-09).
+        // A control that looks live but does nothing is worse than an honest stub.
+        let units = Look {
+            enabled: false,
+            active: false,
+        };
+        let width = w::small_width(ui, true, Some("SI"));
+        w::small_button(ui, &theme, units, Some(icons::RULER), Some("SI"), width)
+            .on_hover_text("Unit systems are not available yet. All values are SI internally.");
         let n = app.output.warnings.len();
         let colour = if n > 0 {
             theme.warning

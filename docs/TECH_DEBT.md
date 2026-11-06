@@ -25,7 +25,7 @@ context is in `ARCHITECTURE.md`.
 |---|---|---|---|---|
 | TD-06 | A Math region holds both `source` and `expr`; the AST is not the single truth (SPEC 3.3). | The file format cannot be fixed until decided (D5). | Decide now; resolve with M2 editor | M |
 | TD-08 | `Quantity` is a real `f64`. No `Value` enum: no vectors, matrices, complex, text, booleans. | Blocks ranges, vectors, `sqrt(-4) = 2i`. | Phase C, before M2 vectors | M |
-| TD-09 | Units are a hard-coded `match` (`builtin_unit`). No `UnitRegistry`, custom units, per-worksheet unit system, or temperature offsets. The SI/USCS/CGS selector is clickable but does nothing. | Core feature (SPEC 2.3) missing; misleading control. | Phase C; disable the control now (owner decision 4) | M |
+| TD-09 | Units are a hard-coded `match` (`builtin_unit`). No `UnitRegistry`, custom units, per-worksheet unit system, or temperature offsets. The SI/USCS/CGS selector is now shown disabled in the status bar and unhandled in the ribbon (was clickable and did nothing). | Core feature (SPEC 2.3) missing; misleading control. | Phase C; disable the control now (owner decision 4) | M |
 | TD-10 | Errors carry no source position (`Expr::Error(String)`, `EvalError`). | SPEC "error tracing" cannot highlight the failing sub-expression. | With spans in phase C | M |
 | TD-07 | Evaluator recomputes the whole sheet on every edit; no dirty propagation; no benchmark for the 200-region / 500-region targets (SPEC 5.6). | Unknown until measured. | Add benchmark in phase C; build incremental recalculation if over budget | M |
 | TD-20 | No cancellation (`AtomicBool`) for long computations. | Needed once integrals or root-finding exist. | When those land | S |

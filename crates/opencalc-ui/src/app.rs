@@ -13,39 +13,6 @@ use crate::sheet::{Region, RegionKind, Sheet};
 use crate::shell;
 use crate::theme::{self, PaletteKey, Theme};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum UnitSystem {
-    Si,
-    Uscs,
-    Cgs,
-}
-
-impl UnitSystem {
-    pub fn label(self) -> &'static str {
-        match self {
-            UnitSystem::Si => "SI",
-            UnitSystem::Uscs => "USCS",
-            UnitSystem::Cgs => "CGS",
-        }
-    }
-
-    pub fn command(self) -> &'static str {
-        match self {
-            UnitSystem::Si => "units.si",
-            UnitSystem::Uscs => "units.uscs",
-            UnitSystem::Cgs => "units.cgs",
-        }
-    }
-
-    pub fn next(self) -> UnitSystem {
-        match self {
-            UnitSystem::Si => UnitSystem::Uscs,
-            UnitSystem::Uscs => UnitSystem::Cgs,
-            UnitSystem::Cgs => UnitSystem::Si,
-        }
-    }
-}
-
 pub struct App {
     pub theme: Theme,
     pub palette: PaletteKey,
@@ -63,7 +30,6 @@ pub struct App {
     pub show_grid: bool,
     pub snap: bool,
     pub live_recalc: bool,
-    pub unit_system: UnitSystem,
     show_names: bool,
     show_props: bool,
     /// Bumped by "Reset layout" so dock panels forget their saved widths.
@@ -100,7 +66,6 @@ impl App {
             show_grid: true,
             snap: true,
             live_recalc: true,
-            unit_system: UnitSystem::Si,
             show_names: true,
             show_props: true,
             layout_gen: 0,
@@ -114,7 +79,7 @@ impl App {
     }
 
     pub fn registry(&self) -> Registry {
-        let mut on = vec![self.unit_system.command()];
+        let mut on = Vec::new();
         for (flag, cmd) in [
             (self.show_grid, "view.grid"),
             (self.snap, "view.snap"),
@@ -294,9 +259,6 @@ impl App {
                 }
             }
             "calc.all" => self.recalculate(),
-            "units.si" => self.unit_system = UnitSystem::Si,
-            "units.uscs" => self.unit_system = UnitSystem::Uscs,
-            "units.cgs" => self.unit_system = UnitSystem::Cgs,
             "view.zoom_in" => self.zoom_by(1.25),
             "view.zoom_out" => self.zoom_by(1.0 / 1.25),
             "view.zoom_100" => {
@@ -483,22 +445,5 @@ impl App {
         for command in std::mem::take(&mut self.queue) {
             self.run(ctx, command);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn unit_system_cycles_through_all_three() {
-        let mut u = UnitSystem::Si;
-        let mut seen = vec![u];
-        for _ in 0..2 {
-            u = u.next();
-            seen.push(u);
-        }
-        assert_eq!(seen, [UnitSystem::Si, UnitSystem::Uscs, UnitSystem::Cgs]);
-        assert_eq!(u.next(), UnitSystem::Si);
     }
 }
