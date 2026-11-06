@@ -238,6 +238,9 @@ pub(super) fn math(
         ],
         Stroke::new(1.5_f32, env.theme.accent),
     );
+    if field.clipped {
+        super::overlay::clip_notice(painter, text_origin, lay.layout.h, zoom, env);
+    }
     st.sizes.insert(
         r.id,
         Vec2::new(lay.layout.w + 2.0 * pad, lay.layout.h + 2.0 * pad) / zoom,
@@ -319,10 +322,12 @@ fn key_down(
         Key::ArrowUp | Key::ArrowDown => {
             let c = lay.caret_rect(field.caret);
             let dy = c.height() * if key == Key::ArrowUp { -1.0 } else { 1.0 };
-            let o = lay.offset_at(Pos2::new(c.min.x, c.center().y + dy));
+            let x = field.goal_x.unwrap_or(c.min.x);
+            let o = lay.offset_at(Pos2::new(x, c.center().y + dy));
             if o != field.caret {
                 field.set_caret(o, shift);
             }
+            field.goal_x = Some(x);
         }
         _ => {}
     }

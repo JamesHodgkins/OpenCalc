@@ -6,7 +6,7 @@
 /// (`MAX_SOURCE_CHARS`, which the parser reports); this one only stops a runaway paste.
 pub const MAX_CHARS: usize = 8192;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Field {
     chars: Vec<char>,
     /// Where typing goes (a character offset, `0..=len`).
@@ -20,6 +20,10 @@ pub struct Field {
     pub pick: usize,
     /// The word whose autocomplete list was closed with Escape.
     pub dismissed: Option<String>,
+    /// The x (in layout space) Up/Down aim for, kept across repeated vertical moves.
+    pub goal_x: Option<f32>,
+    /// The last insertion dropped characters because the editor is full.
+    pub clipped: bool,
 }
 
 impl Field {
@@ -36,6 +40,8 @@ impl Field {
             typing: false,
             pick: 0,
             dismissed: None,
+            goal_x: None,
+            clipped: false,
         }
     }
 
@@ -82,6 +88,8 @@ impl Field {
     /// Move the caret to `offset`; `extend` keeps the anchor, so the selection grows.
     pub fn set_caret(&mut self, offset: usize, extend: bool) {
         self.typing = false;
+        self.goal_x = None;
+        self.clipped = false;
         self.pick = 0;
         self.caret = offset.min(self.chars.len());
         if !extend {
@@ -114,9 +122,12 @@ impl Field {
                 }
             })
             .filter(|c| !c.is_control())
-            .take(room)
             .collect();
+        let wanted = new.len();
+        let new: Vec<char> = new.into_iter().take(room).collect();
         let end = a + new.len();
+        self.clipped = new.len() < wanted;
+        self.goal_x = None;
         self.chars.splice(a..b, new);
         self.caret = end;
         self.anchor = end;
@@ -225,6 +236,20 @@ fn is_word(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn paste_over_the_cap_is_flagged_and_a_caret_move_clears_it() {
+        let mut f = Field::new("");
+        f.insert(&"x".repeat(MAX_CHARS + 5));
+        assert!(f.clipped);
+        f.set_caret(0, false);
+        assert!(!f.clipped);
+        f.insert("y");
+        assert!(f.clipped, "full again");
+        f.select_all();
+        f.insert("y");
+        assert!(!f.clipped);
+    }
+
     use super::*;
 
     fn greek(name: &str) -> Option<char> {

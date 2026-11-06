@@ -1,7 +1,7 @@
 //! The in-place editor for the region being edited: the math editor for math
 //! regions, a text box for text regions.
 
-use eframe::egui::{FontId, Id, Key, Pos2, Rect, TextEdit, Ui, Vec2};
+use eframe::egui::{Align2, FontId, Id, Key, Painter, Pos2, Rect, Stroke, TextEdit, Ui, Vec2};
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::edit::Edit;
 
@@ -64,4 +64,31 @@ pub(super) fn edit_overlay(
         st.editing = None;
         cmds.push(CanvasCmd::Seal);
     }
+}
+
+/// The worksheet insertion point: a crosshair where the next region goes. Drawn only
+/// when no region is being edited, so it never competes with the text caret.
+pub(super) fn crosshair(
+    painter: &Painter,
+    view: &CanvasView,
+    origin: Pos2,
+    st: &CanvasUi,
+    env: &Env,
+) {
+    let c = view.doc_to_screen(st.insert_at, origin);
+    let arm = 7.0;
+    let stroke = Stroke::new(1.0_f32, env.theme.accent);
+    painter.line_segment([c - Vec2::new(arm, 0.0), c + Vec2::new(arm, 0.0)], stroke);
+    painter.line_segment([c - Vec2::new(0.0, arm), c + Vec2::new(0.0, arm)], stroke);
+}
+
+/// Tell the user that a paste or insertion was cut short by the editor's size limit.
+pub(super) fn clip_notice(painter: &Painter, origin: Pos2, height: f32, zoom: f32, env: &Env) {
+    painter.text(
+        origin + Vec2::new(0.0, height + 6.0 * zoom),
+        Align2::LEFT_TOP,
+        "Input was cut off: the expression is at its size limit.",
+        FontId::proportional(12.0 * zoom),
+        env.theme.warning,
+    );
 }

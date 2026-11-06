@@ -173,3 +173,17 @@ E1 to E3 are pure and fully testable before any widget exists, so the riskiest p
 3. **Subscript syntax:** underscore in names (`F_x`), as proposed?
 
 Everything else in this note follows from those, or can be changed at review time.
+
+## 8. Cursor conformance (see `private/cursor_specification.md`)
+
+The cursor specification is implemented as follows. The caret is transient UI state
+(`Field`), never saved and never an `Edit`.
+
+- Worksheet crosshair at `insert_at`, drawn only when no region is being edited.
+- Up/Down keep a goal x across repeated presses (`Field::goal_x`).
+- An insertion cut short by the 8,192-character limit shows a notice under the region.
+- Sources over the limit are never truncated; editing is refused with a message.
+
+Deferred, as in the specification: structural term selection and operator-aware
+deletion, cross-region keyboard traversal, placeholder traversal, text-region caret,
+IME verification, and validation against a named Mathcad Prime release.

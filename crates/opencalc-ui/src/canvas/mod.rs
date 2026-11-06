@@ -187,6 +187,9 @@ pub fn show(
     }
 
     overlay::edit_overlay(ui, env, regions, view, origin, st, &mut cmds);
+    if st.editing.is_none() {
+        overlay::crosshair(&painter, view, origin, st, env);
+    }
     let scene = Scene {
         env,
         regions,
