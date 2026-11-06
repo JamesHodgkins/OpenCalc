@@ -12,9 +12,11 @@
 //! - `sqrt(x)` is typeset as a radical.
 
 mod forms;
+mod lenient;
 mod lexer;
 mod spans;
 
+pub use lenient::parse_lenient;
 use lexer::{describe, tokenize, Tok};
 pub use spans::{Span, SpanNode};
 
@@ -35,7 +37,7 @@ const MAX_SOURCE_CHARS: usize = 4096;
 
 /// Parse one region's source text.
 pub fn parse(src: &str) -> Expr {
-    parse_inner(src).0
+    parse_inner(src, false).0
 }
 
 /// Parse, and also say which characters each node came from. The span tree has the
@@ -43,7 +45,7 @@ pub fn parse(src: &str) -> Expr {
 /// expression is `Expr::Error` and the span tree is a single node over the whole
 /// source.
 pub fn parse_with_spans(src: &str) -> (Expr, SpanNode) {
-    let (expr, log) = parse_inner(src);
+    let (expr, log) = parse_inner(src, false);
     let chars = src.chars().count();
     let whole = || SpanNode::leaf(0, chars);
     if matches!(expr, Expr::Error(_)) {
@@ -64,13 +66,13 @@ pub fn parse_with_spans(src: &str) -> (Expr, SpanNode) {
 }
 
 /// The expression and the log of node spans, in the order nodes were completed.
-fn parse_inner(src: &str) -> (Expr, Vec<spans::Entry>) {
+fn parse_inner(src: &str, lenient: bool) -> (Expr, Vec<spans::Entry>) {
     let chars = src.chars().count();
     let failed = |error: ParseError| (Expr::Error(error), Vec::new());
     if chars > MAX_SOURCE_CHARS {
         return failed(ParseError::new(too_long(), MAX_SOURCE_CHARS, chars));
     }
-    let (toks, spans) = match tokenize(src) {
+    let (toks, spans) = match tokenize(src, lenient) {
         Ok(t) => t,
         Err((message, start, end)) => return failed(ParseError::new(message, start, end)),
     };
@@ -83,6 +85,13 @@ fn parse_inner(src: &str) -> (Expr, Vec<spans::Entry>) {
         spans: spans.iter().map(|(s, e)| Span::new(*s, *e)).collect(),
         pos: 0,
         log: Vec::new(),
+        lenient,
+        text: if lenient {
+            src.chars().collect()
+        } else {
+            Vec::new()
+        },
+        end: chars,
     };
     match parser.parse_all() {
         Ok(e) => (e, parser.log),
@@ -106,6 +115,12 @@ struct Parser {
     pos: usize,
     /// One entry per node, pushed when the node is complete (children first).
     log: Vec<spans::Entry>,
+    /// Display parse (`parse_lenient`): recover instead of failing.
+    lenient: bool,
+    /// The source characters, kept only when lenient (for `Garbage` text).
+    text: Vec<char>,
+    /// The length of the source in characters.
+    end: usize,
 }
 
 impl Parser {
@@ -156,6 +171,9 @@ impl Parser {
 
     fn parse_all(&mut self) -> Result<Expr, String> {
         if self.toks.is_empty() {
+            if self.lenient {
+                return Ok(self.hole());
+            }
             return Err("empty".into());
         }
         let mark = self.log.len();
@@ -165,32 +183,46 @@ impl Parser {
             Some(Tok::Define) if matches!(lhs, Expr::Call { .. }) => {
                 // `f(x, y) := body`. Checked first, while the position is still
                 // on the `:=`.
-                let (name, params) = forms::function_signature(&lhs)?;
-                self.pos += 1;
-                let body_mark = self.log.len();
-                let body = self.range_expr(true)?;
-                // The signature is not a child: only the body is.
-                self.log.drain(mark..body_mark);
-                self.done(from, self.last_node().end);
-                Expr::FunctionDef {
-                    name,
-                    params,
-                    body: Box::new(body),
+                match forms::function_signature(&lhs) {
+                    Err(message) => self.keep_or_fail(message, lhs)?,
+                    Ok((name, params)) => {
+                        self.pos += 1;
+                        let body_mark = self.log.len();
+                        let body = self.range_expr(true)?;
+                        // The signature is not a child: only the body is.
+                        self.log.drain(mark..body_mark);
+                        self.done(from, self.last_node().end);
+                        Expr::FunctionDef {
+                            name,
+                            params,
+                            body: Box::new(body),
+                        }
+                    }
                 }
             }
             Some(Tok::Define) => {
                 // Checked first, while the position is still on the `:=`.
-                let target = forms::target_name(&lhs)?;
-                self.pos += 1;
-                let body_mark = self.log.len();
-                let value = self.range_expr(true)?;
-                self.log.drain(mark..body_mark);
-                self.done(from, self.last_node().end);
-                Expr::Assign {
-                    kind: AssignKind::Define,
-                    target,
-                    value: Box::new(value),
+                match forms::target_name(&lhs) {
+                    Err(message) => self.keep_or_fail(message, lhs)?,
+                    Ok(target) => {
+                        self.pos += 1;
+                        let body_mark = self.log.len();
+                        let value = self.range_expr(true)?;
+                        self.log.drain(mark..body_mark);
+                        self.done(from, self.last_node().end);
+                        Expr::Assign {
+                            kind: AssignKind::Define,
+                            target,
+                            value: Box::new(value),
+                        }
+                    }
                 }
+            }
+            Some(Tok::Equals)
+                if self.toks.len() > self.pos + 1 && forms::target_name(&lhs).is_err() =>
+            {
+                let message = "left of '=' must be a name".to_owned();
+                self.keep_or_fail(message, lhs)?
             }
             Some(Tok::Equals) => {
                 let target = if self.toks.len() > self.pos + 1 {
@@ -227,6 +259,7 @@ impl Parser {
         };
         match self.peek() {
             None => Ok(result),
+            Some(_) if self.lenient => Ok(self.garbage_tail(result)),
             Some(t) => Err(format!("unexpected {}", describe(t))),
         }
     }
@@ -267,7 +300,7 @@ impl Parser {
             Some(Tok::Ident(name)) => {
                 let e = if self.eat(&Tok::LParen) {
                     let args = self.args()?;
-                    self.done(self.start_of(first), self.last_end());
+                    self.done(self.start_of(first), self.close_end());
                     forms::call(name, args)
                 } else {
                     self.done_token();
@@ -277,9 +310,9 @@ impl Parser {
             }
             Some(Tok::LParen) => {
                 let e = self.range_expr(true)?;
-                if self.eat(&Tok::RParen) {
+                if self.eat(&Tok::RParen) || self.lenient {
                     // The brackets belong to the node they wrap.
-                    let (open, close) = (self.start_of(first), self.last_end());
+                    let (open, close) = (self.start_of(first), self.close_end());
                     if let Some(entry) = self.log.last_mut() {
                         entry.outer = Span::new(open, close);
                     }
@@ -301,13 +334,23 @@ impl Parser {
                 })
             }
             Some(Tok::Plus) => self.expr(25),
+            Some(Tok::Bad(text)) if self.lenient => {
+                self.done_token();
+                Ok(Expr::Garbage { head: None, text })
+            }
             // `next` stepped past the token; step back so the error is on it.
             Some(t) => {
                 self.pos -= 1;
+                if self.lenient {
+                    return Ok(self.hole());
+                }
                 Err(format!("unexpected {}", describe(&t)))
             }
             None => {
                 self.pos -= 1;
+                if self.lenient {
+                    return Ok(self.hole());
+                }
                 Err("expression ends early".into())
             }
         }

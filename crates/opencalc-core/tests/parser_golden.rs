@@ -87,6 +87,9 @@ fn sexp(e: &Expr) -> String {
         Expr::Fraction { num, den } => format!("(frac {} {})", sexp(num), sexp(den)),
         Expr::Root { radicand } => format!("(root {})", sexp(radicand)),
         Expr::Error(e) => format!("(error {}..{} {})", e.start, e.end, e.message),
+        // Display-tree nodes come only from `parse_lenient`, which has its own tests.
+        Expr::Hole => "(hole)".to_owned(),
+        Expr::Garbage { text, .. } => format!("(garbage {text})"),
     }
 }
 

@@ -146,6 +146,11 @@ impl std::fmt::Display for Expr {
                 write!(f, "{name}({}) := {body}", params.join(", "))
             }
             Expr::Error(e) => write!(f, "? {e}"),
+            Expr::Hole => f.write_str("\u{25a1}"),
+            Expr::Garbage { head, text } => match head {
+                Some(head) => write!(f, "{head} {text}"),
+                None => f.write_str(text),
+            },
         }
     }
 }

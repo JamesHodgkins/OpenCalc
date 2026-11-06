@@ -133,6 +133,17 @@ impl<'a> Typesetter<'a> {
                 ])
             }
             Expr::Error(e) => self.text(&format!("? {e}"), size),
+            // Display-tree nodes (`parse_lenient`): the editor draws them (E3/E4).
+            Expr::Hole => self.text("\u{25a1}", size),
+            Expr::Garbage { head, text } => {
+                let mut parts = Vec::new();
+                if let Some(head) = head {
+                    parts.push(self.layout(head, size));
+                    parts.push(self.gap(size * 0.3));
+                }
+                parts.push(self.text(text, size));
+                self.row(parts)
+            }
         }
     }
 

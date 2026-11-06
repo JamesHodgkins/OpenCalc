@@ -7,7 +7,8 @@
 
 use opencalc_core::eval::RegionId;
 use opencalc_core::expr::Expr;
-use opencalc_core::parser::parse;
+use opencalc_core::parser::{parse, SpanNode};
+use std::path::PathBuf;
 
 /// A small deterministic random number generator (an LCG), so failures and
 /// benchmark numbers are reproducible without an extra dependency.
@@ -170,4 +171,81 @@ pub fn regions(lines: &[String], order: &[usize]) -> Vec<(RegionId, Expr)> {
 
 pub fn identity(n: usize) -> Vec<usize> {
     (0..n).collect()
+}
+
+// ---- source spans, shared by the span and lenient-parse tests
+
+pub fn crate_path(rel: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(rel)
+}
+
+/// Why `spans` does not describe `expr` over a source of `chars`, if it does not.
+pub fn problem(expr: &Expr, spans: &SpanNode, chars: &[char]) -> Option<String> {
+    let kids = expr.children();
+    if kids.len() != spans.kids.len() {
+        return Some(format!(
+            "{} children but {} kid spans in {expr}",
+            kids.len(),
+            spans.kids.len()
+        ));
+    }
+    if !spans.outer.contains_span(spans.inner) {
+        return Some(format!(
+            "inner {:?} outside outer {:?}",
+            spans.inner, spans.outer
+        ));
+    }
+    if spans.outer.end > chars.len() || spans.outer.start > spans.outer.end {
+        return Some(format!("span {:?} is not inside the source", spans.outer));
+    }
+    let mut previous_end = spans.inner.start;
+    for kid in &spans.kids {
+        if !spans.inner.contains_span(kid.outer) {
+            return Some(format!(
+                "kid {:?} is not inside its parent's inner span {:?}",
+                kid.outer, spans.inner
+            ));
+        }
+        if kid.outer.start < previous_end {
+            return Some(format!("kid {:?} overlaps the one before it", kid.outer));
+        }
+        previous_end = kid.outer.end;
+    }
+    kids.iter()
+        .zip(&spans.kids)
+        .find_map(|(e, s)| problem(e, s, chars))
+}
+
+/// Every source the project already has: the golden inputs, the corpus lines and the
+/// expressions its expectations are written as.
+pub fn known_sources() -> Vec<String> {
+    let mut out = Vec::new();
+    let golden = std::fs::read_to_string(crate_path("tests/golden/parser.golden")).unwrap();
+    out.extend(
+        golden
+            .replace("\r\n", "\n")
+            .lines()
+            .filter(|l| !l.starts_with("  "))
+            .map(str::to_owned),
+    );
+    let dir = crate_path("../../tests/corpus");
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "calc") {
+            for line in std::fs::read_to_string(&path).unwrap().lines() {
+                if let Some(rest) = line.strip_prefix("=> ") {
+                    if let Some((_, expr)) = rest.split_once(" = ") {
+                        out.push(expr.to_owned());
+                    }
+                } else if !(line.starts_with('#')
+                    || line.starts_with("!>")
+                    || line.starts_with('@'))
+                {
+                    out.push(line.to_owned());
+                }
+            }
+        }
+    }
+    out.retain(|s| !s.trim().is_empty());
+    out
 }

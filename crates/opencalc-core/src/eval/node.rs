@@ -101,6 +101,13 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
             "a function can only be defined at the top of a region".into(),
         ))),
         Expr::Error(e) => Err(Located::here(EvalError::Invalid(e.message.clone()))),
+        // Display-tree nodes (`parse_lenient`); the evaluator is only given `parse`.
+        Expr::Hole => Err(Located::here(EvalError::Invalid(
+            "the expression is incomplete".into(),
+        ))),
+        Expr::Garbage { text, .. } => Err(Located::here(EvalError::Invalid(format!(
+            "unexpected '{text}'"
+        )))),
     }
 }
 

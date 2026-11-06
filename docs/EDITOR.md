@@ -1,6 +1,6 @@
 # Math editor design (Milestone 2.5)
 
-Status: **approved** (hybrid editor, `lpha` Greek entry, underscore subscripts). Progress: **E1 done** (spans); E2 to E6 not started.
+Status: **approved** (hybrid editor, `lpha` Greek entry, underscore subscripts). Progress: **E1 done** (spans), **E2 done** (`parse_lenient`); E3 to E6 not started.
 
 ## 1. What exists today
 

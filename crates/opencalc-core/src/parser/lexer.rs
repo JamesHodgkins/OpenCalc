@@ -24,12 +24,17 @@ pub(super) enum Tok {
     LessEq,
     GreaterEq,
     DotDot,
+    /// Text that is not a token (`parse_lenient` only): kept so the display can
+    /// show it as typed.
+    Bad(String),
 }
 
 /// Tokens with the character range each came from.
 pub(super) type Tokens = (Vec<Tok>, Vec<(usize, usize)>);
 
-pub(super) fn tokenize(src: &str) -> Result<Tokens, (String, usize, usize)> {
+/// With `lenient`, a character or number that is not valid becomes a `Tok::Bad`
+/// instead of an error.
+pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usize, usize)> {
     let chars: Vec<char> = src.chars().collect();
     let mut toks = Vec::new();
     let mut spans = Vec::new();
@@ -65,10 +70,11 @@ pub(super) fn tokenize(src: &str) -> Result<Tokens, (String, usize, usize)> {
                     }
                 }
                 let text: String = chars[start..i].iter().collect();
-                let v = text
-                    .parse::<f64>()
-                    .map_err(|_| (format!("bad number '{text}'"), start, i))?;
-                toks.push(Tok::Num(v));
+                match text.parse::<f64>() {
+                    Ok(v) => toks.push(Tok::Num(v)),
+                    Err(_) if lenient => toks.push(Tok::Bad(text)),
+                    Err(_) => return Err((format!("bad number '{text}'"), start, i)),
+                }
             }
             c if c.is_alphabetic() || c == '_' => {
                 let start = i;
@@ -165,6 +171,10 @@ pub(super) fn tokenize(src: &str) -> Result<Tokens, (String, usize, usize)> {
                 toks.push(Tok::Semicolon);
                 i += 1;
             }
+            other if lenient => {
+                toks.push(Tok::Bad(other.to_string()));
+                i += 1;
+            }
             other => return Err((format!("unexpected '{other}'"), i, i + 1)),
         }
         if toks.len() > before {
@@ -198,5 +208,6 @@ pub(super) fn describe(t: &Tok) -> String {
         Tok::LessEq => "'<='".into(),
         Tok::GreaterEq => "'>='".into(),
         Tok::DotDot => "'..'".into(),
+        Tok::Bad(text) => format!("'{text}'"),
     }
 }

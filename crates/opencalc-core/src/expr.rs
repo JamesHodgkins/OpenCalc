@@ -131,6 +131,15 @@ pub enum Expr {
     },
     /// Parse errors are kept in the tree so the UI can show them.
     Error(ParseError),
+    /// A missing operand. Only `parse_lenient` makes these (the editor's display
+    /// tree); `parse` never does, so saved data and the evaluator never see one.
+    Hole,
+    /// Text the lenient parser could not use, drawn as plain text after `head`
+    /// (the part before it that did parse, if any). Display tree only, like `Hole`.
+    Garbage {
+        head: Option<Box<Expr>>,
+        text: String,
+    },
 }
 
 impl Expr {
@@ -196,7 +205,12 @@ impl Expr {
             } => vec![cond, then, otherwise],
             Expr::Assign { value, .. } => vec![value],
             Expr::FunctionDef { body, .. } => vec![body],
-            Expr::Number(_) | Expr::Name(_) | Expr::Quantity { .. } | Expr::Error(_) => vec![],
+            Expr::Garbage { head, .. } => head.as_deref().into_iter().collect(),
+            Expr::Number(_)
+            | Expr::Name(_)
+            | Expr::Quantity { .. }
+            | Expr::Error(_)
+            | Expr::Hole => vec![],
         }
     }
 
@@ -289,7 +303,12 @@ impl Expr {
                 den.collect_names(out);
             }
             Expr::Root { radicand } => radicand.collect_names(out),
-            Expr::Number(_) | Expr::Quantity { .. } | Expr::Error(_) => {}
+            Expr::Garbage { head, .. } => {
+                if let Some(head) = head {
+                    head.collect_names(out);
+                }
+            }
+            Expr::Number(_) | Expr::Quantity { .. } | Expr::Error(_) | Expr::Hole => {}
         }
     }
 }

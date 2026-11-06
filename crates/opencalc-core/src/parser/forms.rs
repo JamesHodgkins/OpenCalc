@@ -69,11 +69,12 @@ impl Parser {
         if allow_step && self.peek() == Some(&Tok::Comma) {
             self.pos += 1;
             step = Some(self.expr(0)?);
-            if self.peek() != Some(&Tok::DotDot) {
+            if self.peek() != Some(&Tok::DotDot) && !self.lenient {
                 return Err("a step needs '..' and an end value, as in 0, 2..10".into());
             }
         }
-        if !self.eat(&Tok::DotDot) {
+        // While typing, `0, 2` is a range still missing its end.
+        if !self.eat(&Tok::DotDot) && !(self.lenient && step.is_some()) {
             return Ok(first);
         }
         let end = self.expr(0)?;
@@ -93,10 +94,10 @@ impl Parser {
             while self.eat(&Tok::Comma) {
                 indices.push(self.expr(0)?);
             }
-            if !self.eat(&Tok::RBracket) {
+            if !self.eat(&Tok::RBracket) && !self.lenient {
                 return Err("missing ']'".into());
             }
-            self.done(from, self.last_end());
+            self.done(from, self.close_end());
             base = Expr::Index {
                 base: Box::new(base),
                 indices,
@@ -122,6 +123,12 @@ impl Parser {
             }
             if rows == 0 {
                 cols = in_row;
+            } else if in_row < cols && self.lenient {
+                // A row still being typed: the missing cells show as holes.
+                for _ in in_row..cols {
+                    let hole = self.hole();
+                    cells.push(hole);
+                }
             } else if in_row != cols {
                 return Err(format!(
                     "every row needs {cols} cell(s), this one has {in_row}"
@@ -131,8 +138,8 @@ impl Parser {
             if self.eat(&Tok::Semicolon) {
                 continue;
             }
-            if self.eat(&Tok::RBracket) {
-                self.done(open, self.last_end());
+            if self.eat(&Tok::RBracket) || self.lenient {
+                self.done(open, self.close_end());
                 return Ok(Expr::Matrix { rows, cols, cells });
             }
             return Err("missing ']'".into());
@@ -151,7 +158,7 @@ impl Parser {
             if self.eat(&Tok::Comma) {
                 continue;
             }
-            if self.eat(&Tok::RParen) {
+            if self.eat(&Tok::RParen) || self.lenient {
                 return Ok(args);
             }
             return Err("missing ')'".into());
