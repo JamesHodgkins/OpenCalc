@@ -21,6 +21,10 @@ const DISPLAY: &[(&str, Dimension, f64)] = &[
     ("MPa", Dimension::PRESSURE, 1e6),
 ];
 
+/// Relative slack when deciding whether a value reaches a unit. Arithmetic like
+/// 10 kN / (0.1 m)^2 gives 999999.9999999998 Pa, which is 1 MPa to anyone reading it.
+const ROUNDING: f64 = 1e-9;
+
 /// Show a quantity in the largest unit of its dimension that gives a value of
 /// at least 1 (so 5 N stays "5 N" and 10 000 N becomes "10 kN"), or the
 /// smallest unit if the value is below 1 in all of them.
@@ -31,7 +35,7 @@ pub fn format_quantity(q: Quantity) -> String {
     let candidates = DISPLAY.iter().filter(|(_, d, _)| *d == q.dim);
     let chosen = candidates
         .clone()
-        .rfind(|(_, _, scale)| q.si.abs() >= *scale)
+        .rfind(|(_, _, scale)| q.si.abs() >= scale * (1.0 - ROUNDING))
         .or_else(|| candidates.min_by(|a, b| a.2.total_cmp(&b.2)));
     match chosen {
         Some((label, _, scale)) => format!("{:.4} {label}", q.si / scale),
@@ -91,6 +95,22 @@ mod tests {
         assert_eq!(show(2.0, "m"), "2.0000 m");
         assert_eq!(show(0.1, "m"), "100.0000 mm");
         assert_eq!(show(100.0, "mm"), "100.0000 mm");
+    }
+
+    #[test]
+    fn floating_point_error_does_not_push_a_value_into_the_smaller_unit() {
+        // The worked example in the app: 10 kN over (100 mm)^2 is exactly 1 MPa.
+        let force = Quantity::from_unit(10.0, "kN").unwrap();
+        let side = Quantity::from_unit(100.0, "mm").unwrap();
+        let area = side.pow(Quantity::dimensionless(2.0)).unwrap();
+        let stress = force.over(area).unwrap();
+        assert_ne!(
+            stress.si, 1e6,
+            "the point of this test: it is not exactly 1e6"
+        );
+        assert_eq!(format_quantity(stress), "1.0000 MPa");
+        // But a genuinely smaller value still steps down.
+        assert_eq!(show(999.0, "kPa"), "999.0000 kPa");
     }
 
     #[test]

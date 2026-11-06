@@ -2,26 +2,26 @@
 //! All in document space, all pure, so tested without a window.
 
 use eframe::egui::{Pos2, Rect, Vec2};
-use opencalc_core::eval::RegionId;
+use opencalc_core::document::{Region, RegionId};
 
+use super::adapt::{rect_of, Sizes};
 use super::view::snap;
-use crate::sheet::Region;
 
 /// The topmost region containing `p`. Regions are stored back to front, so
 /// search from the end.
-pub fn hit_test(regions: &[Region], p: Pos2) -> Option<RegionId> {
+pub fn hit_test(regions: &[Region], sizes: &Sizes, p: Pos2) -> Option<RegionId> {
     regions
         .iter()
         .rev()
-        .find(|r| r.rect().contains(p))
+        .find(|r| rect_of(r, sizes).contains(p))
         .map(|r| r.id)
 }
 
 /// Regions touched by a marquee rectangle, in back-to-front order.
-pub fn in_marquee(regions: &[Region], marquee: Rect) -> Vec<RegionId> {
+pub fn in_marquee(regions: &[Region], sizes: &Sizes, marquee: Rect) -> Vec<RegionId> {
     regions
         .iter()
-        .filter(|r| r.rect().intersects(marquee))
+        .filter(|r| rect_of(r, sizes).intersects(marquee))
         .map(|r| r.id)
         .collect()
 }
@@ -69,50 +69,82 @@ pub fn click_selection(current: &[RegionId], hit: Option<RegionId>, extend: bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sheet::{RegionKind, Sheet};
+    use opencalc_core::document::{Point, RegionKind};
 
-    fn sheet() -> (Sheet, RegionId, RegionId, RegionId) {
-        let mut s = Sheet::new("t");
-        // Plot and Table are 260x170. `top` overlaps the lower right of `back`.
-        let back = s.add(RegionKind::Plot, Pos2::new(0.0, 0.0));
-        let top = s.add(RegionKind::Table, Pos2::new(200.0, 100.0));
-        let far = s.add(RegionKind::Picture, Pos2::new(1000.0, 1000.0));
-        (s, back, top, far)
+    fn region(id: u64, x: f32, y: f32, kind: RegionKind) -> Region {
+        let size = kind.default_size();
+        Region {
+            id: RegionId(id),
+            pos: Point::new(x, y),
+            size,
+            kind,
+        }
+    }
+
+    /// Plot and Table are 260x170. `top` overlaps the lower right of `back`.
+    fn regions() -> (Vec<Region>, RegionId, RegionId, RegionId) {
+        let v = vec![
+            region(1, 0.0, 0.0, RegionKind::Plot),
+            region(2, 200.0, 100.0, RegionKind::Table),
+            region(3, 1000.0, 1000.0, RegionKind::Picture),
+        ];
+        (v, RegionId(1), RegionId(2), RegionId(3))
     }
 
     #[test]
     fn click_on_overlap_picks_the_topmost() {
-        let (s, back, top, _) = sheet();
-        assert_eq!(hit_test(&s.regions, Pos2::new(230.0, 130.0)), Some(top));
-        assert_eq!(hit_test(&s.regions, Pos2::new(50.0, 50.0)), Some(back));
+        let (s, back, top, _) = regions();
+        let sizes = Sizes::new();
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(230.0, 130.0)), Some(top));
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(50.0, 50.0)), Some(back));
     }
 
     #[test]
     fn click_on_empty_space_hits_nothing() {
-        let (s, ..) = sheet();
-        assert_eq!(hit_test(&s.regions, Pos2::new(700.0, 700.0)), None);
-        assert_eq!(hit_test(&[], Pos2::ZERO), None);
+        let (s, ..) = regions();
+        let sizes = Sizes::new();
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(700.0, 700.0)), None);
+        assert_eq!(hit_test(&[], &sizes, Pos2::ZERO), None);
     }
 
     #[test]
     fn hit_test_includes_the_edge() {
-        let (s, back, ..) = sheet();
-        assert_eq!(hit_test(&s.regions, Pos2::new(0.0, 0.0)), Some(back));
+        let (s, back, ..) = regions();
+        let sizes = Sizes::new();
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(0.0, 0.0)), Some(back));
         // (260, 50) is on the right edge and clear of the overlapping table.
-        assert_eq!(hit_test(&s.regions, Pos2::new(260.0, 50.0)), Some(back));
-        assert_eq!(hit_test(&s.regions, Pos2::new(260.5, 50.0)), None);
-        assert_eq!(hit_test(&s.regions, Pos2::new(-0.5, 10.0)), None);
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(260.0, 50.0)), Some(back));
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(260.5, 50.0)), None);
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(-0.5, 10.0)), None);
+    }
+
+    #[test]
+    fn content_sized_regions_are_hit_by_their_measured_size() {
+        let math = region(1, 0.0, 0.0, RegionKind::math("x := 1"));
+        let id = math.id;
+        let mut sizes = Sizes::new();
+        // Default 160 wide: a point at x = 300 misses until a wider size is measured.
+        assert_eq!(
+            hit_test(std::slice::from_ref(&math), &sizes, Pos2::new(300.0, 10.0)),
+            None
+        );
+        sizes.insert(id, Vec2::new(400.0, 32.0));
+        assert_eq!(
+            hit_test(std::slice::from_ref(&math), &sizes, Pos2::new(300.0, 10.0)),
+            Some(id)
+        );
     }
 
     #[test]
     fn marquee_selects_everything_it_touches() {
-        let (s, back, top, far) = sheet();
+        let (s, back, top, far) = regions();
+        let sizes = Sizes::new();
         let m = Rect::from_min_max(Pos2::new(250.0, 150.0), Pos2::new(300.0, 200.0));
-        assert_eq!(in_marquee(&s.regions, m), vec![back, top]);
+        assert_eq!(in_marquee(&s, &sizes, m), vec![back, top]);
         let all = Rect::from_min_max(Pos2::new(-10.0, -10.0), Pos2::new(2000.0, 2000.0));
-        assert_eq!(in_marquee(&s.regions, all), vec![back, top, far]);
+        assert_eq!(in_marquee(&s, &sizes, all), vec![back, top, far]);
         let none = Rect::from_min_max(Pos2::new(600.0, 600.0), Pos2::new(700.0, 700.0));
-        assert!(in_marquee(&s.regions, none).is_empty());
+        assert!(in_marquee(&s, &sizes, none).is_empty());
     }
 
     #[test]
@@ -136,7 +168,6 @@ mod tests {
     #[test]
     fn drag_is_computed_from_the_start_so_error_does_not_accumulate() {
         let a = (RegionId(1), Pos2::new(0.0, 0.0));
-        // Many small steps must give the same answer as one big one.
         let mut total = Vec2::ZERO;
         for _ in 0..1000 {
             total += Vec2::new(0.1, 0.1);

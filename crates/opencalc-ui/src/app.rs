@@ -1,15 +1,15 @@
 //! Application state, command handling and per-frame orchestration.
 
 use eframe::egui::{self, Frame, Key, Margin, Modifiers, Pos2, Rect};
+use opencalc_core::document::RegionKind;
 use opencalc_core::eval::Output;
-use opencalc_core::parser::parse;
 use opencalc_core::worker::Worker;
 
-use crate::canvas::{self, DocCmd};
-use crate::commands::Registry;
+use crate::canvas::{self, CanvasCmd};
+use crate::commands::{CommandContext, Registry};
 use crate::ribbon::defs::opencalc_ribbon;
 use crate::ribbon::{Ribbon, RibbonState};
-use crate::sheet::{Region, RegionKind, Sheet};
+use crate::sheet::OpenSheet;
 use crate::shell;
 use crate::theme::{self, PaletteKey, Theme};
 
@@ -18,12 +18,14 @@ pub struct App {
     pub palette: PaletteKey,
     ribbon: Ribbon,
     ribbon_state: RibbonState,
-    pub sheets: Vec<Sheet>,
+    pub sheets: Vec<OpenSheet>,
     /// `None` shows the Home page.
     pub active: Option<usize>,
     untitled: u32,
     worker: Worker,
-    revision: u64,
+    /// How many recalculations have been requested. Tests watch it to prove that
+    /// edits which cannot change results do not trigger one.
+    pub(crate) revision: u64,
     applied: u64,
     pub output: Output,
     worker_ok: bool,
@@ -55,7 +57,7 @@ impl App {
             palette,
             ribbon: opencalc_ribbon(),
             ribbon_state: RibbonState::default(),
-            sheets: vec![Sheet::sample()],
+            sheets: vec![OpenSheet::sample()],
             active: Some(0),
             untitled: 1,
             worker: Worker::spawn(move || ctx.request_repaint()),
@@ -90,17 +92,21 @@ impl App {
                 on.push(cmd);
             }
         }
-        let has_selection = self
-            .active
-            .is_some_and(|i| !self.sheets[i].state.selection.is_empty());
-        Registry::new(self.active.is_some(), has_selection, &on)
+        let sheet = self.active.map(|i| &self.sheets[i]);
+        let ctx = CommandContext {
+            has_sheet: sheet.is_some(),
+            has_selection: sheet.is_some_and(|s| !s.canvas.selection.is_empty()),
+            can_undo: sheet.is_some_and(OpenSheet::can_undo),
+            can_redo: sheet.is_some_and(OpenSheet::can_redo),
+        };
+        Registry::new(&ctx, &on)
     }
 
     pub fn recalculate(&mut self) {
         self.revision += 1;
         let snapshot = self
             .active
-            .map(|i| self.sheets[i].snapshot())
+            .map(|i| self.sheets[i].doc.math_regions())
             .unwrap_or_default();
         self.worker_ok = self.worker.request(self.revision, snapshot);
     }
@@ -140,7 +146,7 @@ impl App {
         self.recalculate();
     }
 
-    fn add_sheet(&mut self, sheet: Sheet) {
+    fn add_sheet(&mut self, sheet: OpenSheet) {
         self.sheets.push(sheet);
         self.select_sheet(self.sheets.len() - 1);
     }
@@ -157,68 +163,54 @@ impl App {
         }
     }
 
-    /// Add a region at the sheet's insertion point and select it. Math and text
-    /// regions open for editing straight away.
-    fn insert_region(&mut self, kind: RegionKind) {
-        let Some(i) = self.active else { return };
-        let editable = kind.is_editable();
-        let sheet = &mut self.sheets[i];
-        let at = sheet.state.insert_at;
-        let id = sheet.add(kind, at);
-        let height = sheet.region(id).map_or(40.0, |r| r.size.y);
-        // The next insertion goes just below this one, on the grid.
-        sheet.state.insert_at =
-            canvas::view::snap(Pos2::new(at.x, at.y + height + 12.0), canvas::view::GRID);
-        sheet.state.selection = vec![id];
-        if editable {
-            sheet.state.editing = Some(id);
-            sheet.state.focus_edit = true;
+    /// Recalculate if the active sheet's evaluation inputs changed since `before`
+    /// (an `eval_revision`). Moving or resizing a region never triggers one.
+    fn recalc_if_changed(&mut self, sheet: usize, before: u64) {
+        if self.sheets[sheet].doc.eval_revision() != before {
+            self.recalculate();
         }
-        self.recalculate();
     }
 
-    /// Apply document edits the canvas asked for.
-    fn apply_doc_cmds(&mut self, sheet: usize, cmds: Vec<DocCmd>) {
-        let mut recalc = false;
+    /// Add a region at the sheet's insertion point (see `OpenSheet::insert`).
+    fn insert_region(&mut self, kind: RegionKind) {
+        let Some(i) = self.active else { return };
+        let before = self.sheets[i].doc.eval_revision();
+        self.sheets[i].insert(kind);
+        self.recalc_if_changed(i, before);
+    }
+
+    fn delete_selection(&mut self) {
+        let Some(i) = self.active else { return };
+        let before = self.sheets[i].doc.eval_revision();
+        self.sheets[i].delete_selection();
+        self.recalc_if_changed(i, before);
+    }
+
+    fn undo_redo(&mut self, undo: bool) {
+        let Some(i) = self.active else { return };
+        let before = self.sheets[i].doc.eval_revision();
+        let sheet = &mut self.sheets[i];
+        if undo {
+            sheet.undo();
+        } else {
+            sheet.redo();
+        }
+        self.recalc_if_changed(i, before);
+    }
+
+    /// Apply what the canvas asked for. Typing recalculates only in live mode.
+    fn apply_canvas_cmds(&mut self, sheet: usize, cmds: Vec<CanvasCmd>) {
+        let before = self.sheets[sheet].doc.eval_revision();
         for cmd in cmds {
-            let sheet = &mut self.sheets[sheet];
             match cmd {
-                DocCmd::Move(list) => {
-                    for (id, pos) in list {
-                        if let Some(r) = sheet.region_mut(id) {
-                            r.pos = pos;
-                        }
-                    }
+                CanvasCmd::Edit(edit) => {
+                    self.sheets[sheet].edit(edit);
                 }
-                DocCmd::Resize(id, size) => {
-                    if let Some(r) = sheet.region_mut(id) {
-                        r.size = size;
-                    }
-                }
-                DocCmd::SetSource(id, src) => {
-                    if let Some(Region {
-                        kind: RegionKind::Math { source, expr },
-                        ..
-                    }) = sheet.region_mut(id)
-                    {
-                        *expr = parse(&src);
-                        *source = src;
-                        recalc = true;
-                    }
-                }
-                DocCmd::SetText(id, new) => {
-                    if let Some(Region {
-                        kind: RegionKind::Text { text },
-                        ..
-                    }) = sheet.region_mut(id)
-                    {
-                        *text = new;
-                    }
-                }
+                CanvasCmd::Seal => self.sheets[sheet].seal(),
             }
         }
-        if recalc && self.live_recalc {
-            self.recalculate();
+        if self.live_recalc {
+            self.recalc_if_changed(sheet, before);
         }
     }
 
@@ -227,9 +219,9 @@ impl App {
             "file.new" => {
                 self.untitled += 1;
                 let title = format!("Worksheet {}", self.untitled);
-                self.add_sheet(Sheet::new(&title));
+                self.add_sheet(OpenSheet::new(&title));
             }
-            "file.example" => self.add_sheet(Sheet::sample()),
+            "file.example" => self.add_sheet(OpenSheet::sample()),
             "file.close" => {
                 if let Some(i) = self.active {
                     self.close_sheet(i);
@@ -250,14 +242,9 @@ impl App {
             "insert.plot" => self.insert_region(RegionKind::Plot),
             "insert.table" => self.insert_region(RegionKind::Table),
             "insert.picture" => self.insert_region(RegionKind::Picture),
-            "region.delete" => {
-                if let Some(i) = self.active {
-                    let ids = self.sheets[i].state.selection.clone();
-                    if self.sheets[i].remove(&ids) > 0 {
-                        self.recalculate();
-                    }
-                }
-            }
+            "region.delete" => self.delete_selection(),
+            "edit.undo" => self.undo_redo(true),
+            "edit.redo" => self.undo_redo(false),
             "calc.all" => self.recalculate(),
             "view.zoom_in" => self.zoom_by(1.25),
             "view.zoom_out" => self.zoom_by(1.0 / 1.25),
@@ -314,6 +301,23 @@ impl App {
         for (command, mods, key) in table {
             if registry_enabled(&registry, command) && ctx.input_mut(|i| i.consume_key(mods, key)) {
                 self.queue.push(command);
+            }
+        }
+        // Undo and redo only when no text field has the keyboard: a text field has
+        // its own undo for the characters being typed.
+        if !ctx.wants_keyboard_input() {
+            let redo_keys = [(ctrl | Modifiers::SHIFT, Key::Z), (ctrl, Key::Y)];
+            for (mods, key) in redo_keys {
+                if registry_enabled(&registry, "edit.redo")
+                    && ctx.input_mut(|i| i.consume_key(mods, key))
+                {
+                    self.queue.push("edit.redo");
+                }
+            }
+            if registry_enabled(&registry, "edit.undo")
+                && ctx.input_mut(|i| i.consume_key(ctrl, Key::Z))
+            {
+                self.queue.push("edit.undo");
             }
         }
         // Delete only when no text field has the keyboard, so it never eats a character.
@@ -433,10 +437,15 @@ impl App {
                         snap: self.snap,
                     };
                     let sheet = &mut self.sheets[i];
-                    let out =
-                        canvas::show(ui, &env, &sheet.regions, &mut sheet.view, &mut sheet.state);
+                    let out = canvas::show(
+                        ui,
+                        &env,
+                        sheet.doc.regions(),
+                        &mut sheet.view,
+                        &mut sheet.canvas,
+                    );
                     self.viewport = out.viewport;
-                    self.apply_doc_cmds(i, out.cmds);
+                    self.apply_canvas_cmds(i, out.cmds);
                 }
             });
 

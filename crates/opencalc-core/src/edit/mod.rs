@@ -67,6 +67,17 @@ pub struct Applied {
     pub changed: bool,
 }
 
+/// Whether an edit changes math content: new math source, or math regions added.
+fn touches_math(edit: &Edit) -> bool {
+    match edit {
+        Edit::SetMathSource { .. } => true,
+        Edit::InsertRegions { regions } => regions
+            .iter()
+            .any(|(_, r)| matches!(r.kind, RegionKind::Math(_))),
+        _ => false,
+    }
+}
+
 impl Worksheet {
     /// Apply an edit, all or nothing. On error the worksheet is unchanged.
     pub fn apply(&mut self, edit: Edit) -> Result<Applied, EditError> {
@@ -74,6 +85,11 @@ impl Worksheet {
         let changed = inverse != edit;
         if changed {
             self.revision += 1;
+            // Insert and delete are inverses of each other, so checking both the
+            // edit and its inverse covers "adds or removes a math region".
+            if touches_math(&edit) || touches_math(&inverse) {
+                self.eval_revision += 1;
+            }
         }
         Ok(Applied { inverse, changed })
     }
@@ -377,6 +393,50 @@ mod tests {
             source: "a := 1".into(),
         });
         assert!(!same.unwrap().changed);
+    }
+
+    #[test]
+    fn eval_revision_moves_only_for_edits_that_can_change_results() {
+        let (mut w, ids) = sheet(); // ids: math, text, plot, math, table
+        let e0 = w.eval_revision();
+        // Moving, resizing and editing text or deleting a plot never change results.
+        w.apply(Edit::MoveRegions {
+            moves: vec![(ids[0], Point::new(9.0, 9.0))],
+        })
+        .unwrap();
+        w.apply(Edit::SetRegionSize {
+            id: ids[2],
+            size: Size::new(5.0, 5.0),
+        })
+        .unwrap();
+        w.apply(Edit::SetText {
+            id: ids[1],
+            text: "new".into(),
+        })
+        .unwrap();
+        let plot = w.apply(Edit::DeleteRegions { ids: vec![ids[2]] }).unwrap();
+        assert_eq!(w.eval_revision(), e0, "layout-only edits");
+        w.apply(plot.inverse).unwrap(); // putting the plot back: still nothing
+        assert_eq!(w.eval_revision(), e0);
+        // Changing math source does.
+        w.apply(Edit::SetMathSource {
+            id: ids[0],
+            source: "a := 2".into(),
+        })
+        .unwrap();
+        assert_eq!(w.eval_revision(), e0 + 1);
+        // So does removing a math region, and undoing that.
+        let del = w.apply(Edit::DeleteRegions { ids: vec![ids[3]] }).unwrap();
+        assert_eq!(w.eval_revision(), e0 + 2);
+        w.apply(del.inverse).unwrap();
+        assert_eq!(w.eval_revision(), e0 + 3);
+        // A no-op source edit does not.
+        w.apply(Edit::SetMathSource {
+            id: ids[0],
+            source: "a := 2".into(),
+        })
+        .unwrap();
+        assert_eq!(w.eval_revision(), e0 + 3);
     }
 
     #[test]

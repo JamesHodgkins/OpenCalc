@@ -1,10 +1,12 @@
 //! The worksheet canvas (spec section 4.2): one custom widget that owns pan,
 //! zoom, painting, hit-testing, selection and drag.
 //!
-//! The pass reads the document and emits [`DocCmd`]s; the app applies them
+//! The pass reads the document and emits [`CanvasCmd`]s; the app applies them
 //! after the frame, so the document is never mutated while it is being
-//! iterated. Selection, editing and drag are UI state and live in [`CanvasUi`].
+//! iterated (rule R3). Selection, editing, drag and measured sizes are UI state
+//! and live in [`CanvasUi`], not in the document.
 
+pub mod adapt;
 pub mod hit;
 mod paint;
 pub mod view;
@@ -12,10 +14,12 @@ pub mod view;
 use eframe::egui::{
     self, FontId, Id, Key, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit, Ui, Vec2,
 };
-use opencalc_core::eval::{Output, RegionId};
+use opencalc_core::document::{Region, RegionId, RegionKind};
+use opencalc_core::edit::Edit;
+use opencalc_core::eval::Output;
 
-use crate::sheet::{Region, RegionKind};
 use crate::theme::{type_size, Theme};
+use adapt::{point, rect_of, Sizes};
 use hit::{click_selection, drag_positions, hit_test, in_marquee};
 pub use view::CanvasView;
 use view::{snap, GRID};
@@ -28,14 +32,14 @@ pub struct Env<'a> {
     pub snap: bool,
 }
 
-/// Document edits requested by the canvas.
+/// What the canvas asks the app to do after the frame.
 #[derive(Debug, PartialEq)]
-pub enum DocCmd {
-    Move(Vec<(RegionId, Pos2)>),
-    /// A measured content size for an auto-sized region.
-    Resize(RegionId, Vec2),
-    SetSource(RegionId, String),
-    SetText(RegionId, String),
+pub enum CanvasCmd {
+    /// A change to the document.
+    Edit(Edit),
+    /// A gesture ended (mouse released, in-place editing finished): the next
+    /// edit starts a new undo step.
+    Seal,
 }
 
 enum Drag {
@@ -59,6 +63,8 @@ pub struct CanvasUi {
     pub focus_edit: bool,
     /// Where the next inserted region goes (document space).
     pub insert_at: Pos2,
+    /// Content sizes measured by the last paint.
+    pub sizes: Sizes,
     drag: Option<Drag>,
 }
 
@@ -69,15 +75,42 @@ impl Default for CanvasUi {
             editing: None,
             focus_edit: false,
             insert_at: Pos2::new(40.0, 40.0),
+            sizes: Sizes::new(),
             drag: None,
         }
     }
 }
 
+impl CanvasUi {
+    /// Forget anything that refers to regions that no longer exist (after undo,
+    /// redo or delete).
+    pub fn retain_existing(&mut self, regions: &[Region]) {
+        let exists = |id: &RegionId| regions.iter().any(|r| r.id == *id);
+        self.selection.retain(exists);
+        if self.editing.is_some_and(|id| !exists(&id)) {
+            self.editing = None;
+        }
+        self.sizes.retain(|id, _| exists(id));
+    }
+
+    /// Drop any drag in progress (after undo or redo changed the document under it).
+    pub fn cancel_gesture(&mut self) {
+        self.drag = None;
+    }
+}
+
 pub struct CanvasOut {
-    pub cmds: Vec<DocCmd>,
+    pub cmds: Vec<CanvasCmd>,
     /// Screen rectangle the canvas occupied.
     pub viewport: Rect,
+}
+
+/// Everything the pointer logic reads, bundled so functions take one argument.
+struct Scene<'a> {
+    env: &'a Env<'a>,
+    regions: &'a [Region],
+    view: &'a CanvasView,
+    origin: Pos2,
 }
 
 pub fn show(
@@ -99,27 +132,35 @@ pub fn show(
     }
 
     for r in regions {
-        let screen = view.rect_to_screen(r.rect(), origin);
+        let screen = view.rect_to_screen(rect_of(r, &st.sizes), origin);
         if !screen.intersects(rect.expand(100.0)) {
             continue;
         }
         let editing_here = st.editing == Some(r.id);
         let size = paint::region(ui, &painter, env, r, screen.min, view.zoom, editing_here);
-        if r.kind.is_auto_sized() && (size - r.size).abs().max_elem() > 0.5 {
-            cmds.push(DocCmd::Resize(r.id, size));
+        if r.kind.is_auto_sized() {
+            st.sizes.insert(r.id, size);
         }
     }
 
     let outline = Stroke::new(1.5_f32, theme.accent);
     for id in &st.selection {
         if let Some(r) = regions.iter().find(|r| r.id == *id) {
-            let screen = view.rect_to_screen(r.rect(), origin).expand(2.0);
+            let screen = view
+                .rect_to_screen(rect_of(r, &st.sizes), origin)
+                .expand(2.0);
             painter.rect_stroke(screen, 2.0, outline, StrokeKind::Outside);
         }
     }
 
     edit_overlay(ui, regions, view, origin, st, &mut cmds);
-    pointer(ui, &resp, env, regions, view, origin, st, &mut cmds);
+    let scene = Scene {
+        env,
+        regions,
+        view,
+        origin,
+    };
+    pointer(ui, &resp, &scene, st, &mut cmds);
 
     if let Some(Drag::Marquee { start, current, .. }) = &st.drag {
         let m = view.rect_to_screen(Rect::from_two_pos(*start, *current), origin);
@@ -161,25 +202,28 @@ fn navigate(ui: &Ui, resp: &egui::Response, origin: Pos2, view: &mut CanvasView)
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn pointer(
     ui: &Ui,
     resp: &egui::Response,
-    env: &Env,
-    regions: &[Region],
-    view: &CanvasView,
-    origin: Pos2,
+    scene: &Scene,
     st: &mut CanvasUi,
-    cmds: &mut Vec<DocCmd>,
+    cmds: &mut Vec<CanvasCmd>,
 ) {
+    let Scene {
+        env,
+        regions,
+        view,
+        origin,
+    } = *scene;
     let mods = ui.input(|i| i.modifiers);
     let extend = mods.shift || mods.command;
     let to_doc = |p: Pos2| view.screen_to_doc(p, origin);
 
     if resp.drag_started_by(PointerButton::Primary) {
+        cmds.push(CanvasCmd::Seal);
         if let Some(press) = ui.input(|i| i.pointer.press_origin()) {
             let doc = to_doc(press);
-            match hit_test(regions, doc) {
+            match hit_test(regions, &st.sizes, doc) {
                 Some(id) => {
                     if !st.selection.contains(&id) {
                         st.selection = click_selection(&st.selection, Some(id), extend);
@@ -187,7 +231,7 @@ fn pointer(
                     let origins: Vec<_> = regions
                         .iter()
                         .filter(|r| st.selection.contains(&r.id))
-                        .map(|r| (r.id, r.pos))
+                        .map(|r| (r.id, adapt::pos(r.pos)))
                         .collect();
                     st.drag = Some(Drag::Move {
                         origins,
@@ -217,7 +261,11 @@ fn pointer(
             Some(Drag::Move { origins, total }) => {
                 *total += delta;
                 let grid = (env.snap && !mods.alt).then_some(GRID);
-                cmds.push(DocCmd::Move(drag_positions(origins, *total, grid)));
+                let moves = drag_positions(origins, *total, grid)
+                    .into_iter()
+                    .map(|(id, p)| (id, point(p)))
+                    .collect();
+                cmds.push(CanvasCmd::Edit(Edit::MoveRegions { moves }));
             }
             Some(Drag::Marquee { current, .. }) => {
                 if let Some(p) = pos {
@@ -228,6 +276,7 @@ fn pointer(
         }
     }
     if resp.drag_stopped_by(PointerButton::Primary) {
+        cmds.push(CanvasCmd::Seal);
         if let Some(Drag::Marquee {
             start,
             current,
@@ -235,7 +284,7 @@ fn pointer(
         }) = st.drag.take()
         {
             let mut sel = base;
-            for id in in_marquee(regions, Rect::from_two_pos(start, current)) {
+            for id in in_marquee(regions, &st.sizes, Rect::from_two_pos(start, current)) {
                 if !sel.contains(&id) {
                     sel.push(id);
                 }
@@ -249,7 +298,8 @@ fn pointer(
         return;
     };
     if resp.double_clicked() {
-        if let Some(id) = hit_test(regions, to_doc(pos)) {
+        cmds.push(CanvasCmd::Seal);
+        if let Some(id) = hit_test(regions, &st.sizes, to_doc(pos)) {
             if regions.iter().any(|r| r.id == id && r.kind.is_editable()) {
                 st.selection = vec![id];
                 st.editing = Some(id);
@@ -257,8 +307,9 @@ fn pointer(
             }
         }
     } else if resp.clicked() {
+        cmds.push(CanvasCmd::Seal);
         let doc = to_doc(pos);
-        let hit = hit_test(regions, doc);
+        let hit = hit_test(regions, &st.sizes, doc);
         st.selection = click_selection(&st.selection, hit, extend);
         if hit != st.editing {
             st.editing = None;
@@ -276,41 +327,43 @@ fn edit_overlay(
     view: &CanvasView,
     origin: Pos2,
     st: &mut CanvasUi,
-    cmds: &mut Vec<DocCmd>,
+    cmds: &mut Vec<CanvasCmd>,
 ) {
     let Some(id) = st.editing else { return };
     let Some(r) = regions.iter().find(|r| r.id == id) else {
         st.editing = None;
         return;
     };
-    let screen = view.rect_to_screen(r.rect(), origin);
+    let screen = view.rect_to_screen(rect_of(r, &st.sizes), origin);
     let zoom = view.zoom;
     let widget_id = Id::new(("region", id.0));
     let width = screen.width().max(220.0 * zoom);
     let (resp, change) = match &r.kind {
-        RegionKind::Math { source, .. } => {
-            let mut buf = source.clone();
+        RegionKind::Math(m) => {
+            let mut buf = m.source().to_owned();
             let rect = Rect::from_min_size(screen.min, Vec2::new(width, 28.0 * zoom));
             let edit = TextEdit::singleline(&mut buf)
                 .id(widget_id)
                 .font(FontId::monospace(14.0 * zoom))
                 .desired_width(width);
             let resp = ui.put(rect, edit);
-            let change = resp.changed().then_some(DocCmd::SetSource(id, buf));
+            let change = resp
+                .changed()
+                .then_some(Edit::SetMathSource { id, source: buf });
             (resp, change)
         }
         RegionKind::Text { text } => {
             let mut buf = text.clone();
             let rect = Rect::from_min_size(
                 screen.min,
-                Vec2::new(r.size.x * zoom, screen.height().max(40.0 * zoom)),
+                Vec2::new(r.size.w * zoom, screen.height().max(40.0 * zoom)),
             );
             let edit = TextEdit::multiline(&mut buf)
                 .id(widget_id)
                 .font(FontId::proportional(14.0 * zoom))
                 .desired_width(rect.width());
             let resp = ui.put(rect, edit);
-            let change = resp.changed().then_some(DocCmd::SetText(id, buf));
+            let change = resp.changed().then_some(Edit::SetText { id, text: buf });
             (resp, change)
         }
         _ => {
@@ -318,11 +371,12 @@ fn edit_overlay(
             return;
         }
     };
-    cmds.extend(change);
+    cmds.extend(change.map(CanvasCmd::Edit));
     if st.focus_edit {
         resp.request_focus();
         st.focus_edit = false;
     } else if resp.lost_focus() || ui.input(|i| i.key_pressed(Key::Escape)) {
         st.editing = None;
+        cmds.push(CanvasCmd::Seal);
     }
 }

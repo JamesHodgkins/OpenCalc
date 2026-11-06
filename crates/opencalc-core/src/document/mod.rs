@@ -25,6 +25,10 @@ pub struct Worksheet {
     /// Bumped by every applied edit. Not saved; lets caches notice change.
     #[serde(skip)]
     pub(crate) revision: u64,
+    /// Bumped only by edits that can change what the evaluator computes (math
+    /// source, or adding or removing a math region). Moving a region does not.
+    #[serde(skip)]
+    pub(crate) eval_revision: u64,
 }
 
 /// Two worksheets are equal if they have the same content. `next_id` is
@@ -42,6 +46,7 @@ impl Worksheet {
             regions: Vec::new(),
             next_id: 1,
             revision: 0,
+            eval_revision: 0,
         }
     }
 
@@ -64,6 +69,12 @@ impl Worksheet {
     /// Increases with every applied edit.
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    /// Increases only when an edit could change evaluation results. The UI
+    /// recalculates when this changes, not on every move or resize.
+    pub fn eval_revision(&self) -> u64 {
+        self.eval_revision
     }
 
     /// Make a region with a fresh ID, not yet part of the worksheet. Add it with

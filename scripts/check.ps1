@@ -15,7 +15,8 @@ Step "cargo fmt --all --check" { cargo fmt --all --check }
 Step "cargo clippy (warnings are errors)" { cargo clippy --workspace --all-targets -- -D warnings }
 Step "cargo test" { cargo test --workspace }
 
-# File-size rule: about 400 production lines per file (lines before #[cfg(test)]).
+# File-size rule: about 400 production lines per file (lines before #[cfg(test)],
+# or before a file-level #![cfg(test)] for files that are entirely tests).
 # Files that already exceed it are listed in scripts/line_limit_exceptions.txt with
 # their current size. They may shrink but never grow: a ratchet, so the debt
 # cannot get worse while it waits for its refactor (see docs/TECH_DEBT.md).
@@ -30,7 +31,7 @@ $bad = @()
 Get-ChildItem crates -Recurse -Filter *.rs | ForEach-Object {
     $rel = (Resolve-Path -Relative $_.FullName).TrimStart(".\").Replace("\", "/")
     $lines = Get-Content $_.FullName
-    $test = ($lines | Select-String -Pattern '^#\[cfg\(test\)\]' | Select-Object -First 1).LineNumber
+    $test = ($lines | Select-String -Pattern '^#!?\[cfg\(test\)\]' | Select-Object -First 1).LineNumber
     $prod = if ($test) { $test - 1 } else { $lines.Count }
     $allowed = if ($exceptions.ContainsKey($rel)) { $exceptions[$rel] } else { $limit }
     if ($prod -gt $allowed) { $bad += "{0}: {1} production lines (allowed {2})" -f $rel, $prod, $allowed }

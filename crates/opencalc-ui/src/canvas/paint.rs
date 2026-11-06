@@ -7,12 +7,13 @@ use eframe::egui::{
 };
 use opencalc_core::expr::Expr;
 
+use super::adapt::{kind_icon, vec};
 use super::view::{CanvasView, GRID};
 use super::Env;
 use crate::format::format_quantity;
 use crate::layout::{Layout, Typesetter};
-use crate::sheet::{Region, RegionKind};
 use crate::theme::{metrics, type_size, Theme};
+use opencalc_core::document::{MathRegion, Region, RegionKind};
 
 /// Typeset size of a math region at 100% zoom.
 const MATH_SIZE: f32 = 20.0;
@@ -57,6 +58,15 @@ pub fn grid(painter: &Painter, rect: Rect, view: &CanvasView, origin: Pos2, them
     }
 }
 
+/// Where and how to draw one region.
+#[derive(Clone, Copy)]
+struct Place {
+    top_left: Pos2,
+    zoom: f32,
+    /// Measure only: used while the region is being edited in place.
+    skip_content: bool,
+}
+
 fn plain(fonts: &eframe::egui::epaint::text::Fonts, s: &str, colour: Color32, size: f32) -> Layout {
     Typesetter::new(fonts, colour).layout(&Expr::Name(s.to_owned()), size)
 }
@@ -74,48 +84,36 @@ pub fn region(
     zoom: f32,
     skip_content: bool,
 ) -> Vec2 {
+    let place = Place {
+        top_left,
+        zoom,
+        skip_content,
+    };
     match &r.kind {
-        RegionKind::Math { source, expr } => math(
-            ui,
-            painter,
-            env,
-            r,
-            source,
-            expr,
-            top_left,
-            zoom,
-            skip_content,
-        ),
-        RegionKind::Text { text } => {
-            self::text(painter, env.theme, r, text, top_left, zoom, skip_content)
-        }
+        RegionKind::Math(m) => math(ui, painter, env, r, m, place),
+        RegionKind::Text { text } => self::text(painter, env.theme, r, text, place),
         RegionKind::Area { title } => {
             if !skip_content {
                 area(painter, env.theme, r, title, top_left, zoom);
             }
-            r.size
+            vec(r.size)
         }
         RegionKind::Plot | RegionKind::Table | RegionKind::Picture => {
             if !skip_content {
                 placeholder(painter, env.theme, r, top_left, zoom);
             }
-            r.size
+            vec(r.size)
         }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn math(
-    ui: &Ui,
-    painter: &Painter,
-    env: &Env,
-    r: &Region,
-    source: &str,
-    expr: &Expr,
-    top_left: Pos2,
-    zoom: f32,
-    skip_content: bool,
-) -> Vec2 {
+fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place: Place) -> Vec2 {
+    let Place {
+        top_left,
+        zoom,
+        skip_content,
+    } = place;
+    let (source, expr) = (m.source(), m.expr());
     let theme = env.theme;
     let size = MATH_SIZE * zoom;
     let blank = source.trim().is_empty();
@@ -178,15 +176,12 @@ fn math(
     Vec2::new(content_w + 2.0 * pad, content_h + 2.0 * pad) / zoom
 }
 
-fn text(
-    painter: &Painter,
-    theme: &Theme,
-    r: &Region,
-    text: &str,
-    top_left: Pos2,
-    zoom: f32,
-    skip_content: bool,
-) -> Vec2 {
+fn text(painter: &Painter, theme: &Theme, r: &Region, text: &str, place: Place) -> Vec2 {
+    let Place {
+        top_left,
+        zoom,
+        skip_content,
+    } = place;
     let pad = PAD * zoom;
     let (shown, colour) = if text.is_empty() {
         ("Text", theme.text_disabled)
@@ -197,16 +192,16 @@ fn text(
         shown.to_owned(),
         FontId::proportional(TEXT_SIZE * zoom),
         colour,
-        (r.size.x * zoom - 2.0 * pad).max(10.0),
+        (r.size.w * zoom - 2.0 * pad).max(10.0),
     );
     if !skip_content {
         painter.galley(top_left + Vec2::splat(pad), galley.clone(), colour);
     }
-    Vec2::new(r.size.x, galley.size().y / zoom + 2.0 * PAD)
+    Vec2::new(r.size.w, galley.size().y / zoom + 2.0 * PAD)
 }
 
 fn area(painter: &Painter, theme: &Theme, r: &Region, title: &str, top_left: Pos2, zoom: f32) {
-    let rect = Rect::from_min_size(top_left, r.size * zoom);
+    let rect = Rect::from_min_size(top_left, vec(r.size) * zoom);
     let stroke = Stroke::new(1.0_f32, theme.border_strong);
     let corners = [
         rect.left_top(),
@@ -227,7 +222,7 @@ fn area(painter: &Painter, theme: &Theme, r: &Region, title: &str, top_left: Pos
 }
 
 fn placeholder(painter: &Painter, theme: &Theme, r: &Region, top_left: Pos2, zoom: f32) {
-    let rect = Rect::from_min_size(top_left, r.size * zoom);
+    let rect = Rect::from_min_size(top_left, vec(r.size) * zoom);
     let radius = CornerRadius::same(metrics::RADIUS);
     painter.rect_filled(rect, radius, theme.surface);
     painter.rect_stroke(
@@ -239,7 +234,7 @@ fn placeholder(painter: &Painter, theme: &Theme, r: &Region, top_left: Pos2, zoo
     painter.text(
         rect.center() - Vec2::new(0.0, 8.0 * zoom),
         Align2::CENTER_CENTER,
-        r.kind.icon(),
+        kind_icon(&r.kind),
         FontId::proportional(32.0 * zoom),
         theme.text_weak,
     );

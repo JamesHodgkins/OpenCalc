@@ -13,14 +13,14 @@ use crate::format::format_quantity;
 use crate::icons;
 use crate::ribbon::widgets::{self as w, Look};
 use crate::ribbon::CommandSource;
-use crate::sheet::RegionKind;
 use crate::theme::{metrics, type_size};
+use opencalc_core::document::RegionKind;
 
 /// Square logo button (opens the application menu) and the Quick Access Toolbar.
 pub fn title_row(ui: &mut Ui, app: &mut App) {
     let theme = app.theme;
     let title = match app.active {
-        Some(i) => format!("{} \u{2013} OpenCalc", app.sheets[i].title),
+        Some(i) => format!("{} \u{2013} OpenCalc", app.sheets[i].title()),
         None => "OpenCalc".to_owned(),
     };
     // Centred worksheet title, painted first so controls sit on top.
@@ -149,7 +149,7 @@ pub fn doc_tabs(ui: &mut Ui, app: &mut App) {
     let mut close = None;
     let mut select = None;
     for i in 0..app.sheets.len() {
-        let label = app.sheets[i].title.clone();
+        let label = app.sheets[i].title().to_owned();
         let width = w::text_width(ui, &label, type_size::TAB) + 48.0;
         let (rect, resp) = tab(ui, &label, width, app.active == Some(i));
         let x = Rect::from_center_size(
@@ -198,15 +198,15 @@ pub fn names_panel(ui: &mut Ui, app: &App) {
         return;
     };
     let mut any = false;
-    for r in &app.sheets[i].regions {
-        let RegionKind::Math { expr, .. } = &r.kind else {
+    for r in app.sheets[i].doc.regions() {
+        let RegionKind::Math(m) = &r.kind else {
             continue;
         };
         let Expr::Assign {
             kind: AssignKind::Define,
             target,
             ..
-        } = expr
+        } = m.expr()
         else {
             continue;
         };
@@ -254,7 +254,7 @@ pub fn properties_panel(ui: &mut Ui, app: &App) {
         return;
     };
     let sheet = &app.sheets[i];
-    ui.label(format!("{} regions", sheet.regions.len()));
+    ui.label(format!("{} regions", sheet.doc.regions().len()));
     ui.label("Unit system: SI");
     ui.add_space(8.0);
     for w in &app.output.warnings {
@@ -268,17 +268,18 @@ pub fn properties_panel(ui: &mut Ui, app: &App) {
             ),
         );
     }
-    for r in &sheet.regions {
-        if let (Some(Err(e)), RegionKind::Math { source, .. }) =
-            (app.output.values.get(&r.id), &r.kind)
-        {
-            ui.colored_label(theme.error, format!("{} {source}: {e}", icons::WARNING));
+    for r in sheet.doc.regions() {
+        if let (Some(Err(e)), RegionKind::Math(m)) = (app.output.values.get(&r.id), &r.kind) {
+            ui.colored_label(
+                theme.error,
+                format!("{} {}: {e}", icons::WARNING, m.source()),
+            );
         }
     }
-    match sheet.state.selection.as_slice() {
+    match sheet.canvas.selection.as_slice() {
         [] => {}
         [id] => {
-            if let Some(r) = sheet.region(*id) {
+            if let Some(r) = sheet.doc.region(*id) {
                 ui.add_space(8.0);
                 ui.label(
                     RichText::new("SELECTED")
@@ -287,7 +288,7 @@ pub fn properties_panel(ui: &mut Ui, app: &App) {
                 );
                 ui.label(format!("{} region", r.kind.label()));
                 ui.label(format!("x {:.0}  y {:.0}", r.pos.x, r.pos.y));
-                ui.label(format!("{:.0} \u{d7} {:.0}", r.size.x, r.size.y));
+                ui.label(format!("{:.0} \u{d7} {:.0}", r.size.w, r.size.h));
             }
         }
         many => {

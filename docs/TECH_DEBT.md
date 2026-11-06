@@ -4,26 +4,22 @@ Known shortcuts and gaps, with what each costs and when it must be paid. A livin
 file: add an entry when a shortcut is taken, delete it when it is paid. Design
 context is in `ARCHITECTURE.md`.
 
-**Last reviewed:** 2026-11-06.  **Size:** S under a session, M a few, L a milestone's worth.
+**Last reviewed:** 2026-11-06 (after phase A).  **Size:** S under a session, M a few, L a milestone's worth.
 
 ## Open
 
-### Structural (pay before Milestone 2: phases A and B)
+### Structural (pay before Milestone 2: phase B; phase A is done)
 
 | ID | Debt | Impact | Pay by | Size |
 |---|---|---|---|---|
-| TD-01 | Document model (`Sheet`, `Region`) lives in `opencalc-ui` and holds egui types and UI state. | CLI cannot open a worksheet; no file format; core is not testable alone. Violates R1, R2. | Before M3; do in phase A | L |
-| TD-02 | No single mutation path; no undo. Regions are edited in three places. | Each new edit path is later rewritten for undo. Violates R3. | Phase A | M |
-| TD-03 | Auto-measured region size is stored in the document and rewritten when zoom changes. | Zooming dirties the document; pollutes future undo and file diffs. | With TD-02 | S |
 | TD-04 | Command IDs are strings defined in three lists; unknown IDs are silently ignored. 49 of 70 ribbon items (33 of 54 plain items plus the 16 Greek-letter flyout items) have no handler and nothing tracks it. | Typos are invisible; ribbon, shortcuts and menu can disagree. Violates R5. | Phase B | M |
 | TD-05 | `App` is a god object (11 `pub` fields); `shell.rs` mutates it directly in 4 places; `app.rs` (488) and `shell.rs` (419) exceed the 400-line limit. | Violates R4 and R8. Ratchet in `scripts/line_limit_exceptions.txt`. | Phase B | M |
-| TD-16 | Two `#[allow(clippy::too_many_arguments)]` (`canvas/mod.rs`, `canvas/paint.rs`). | Signals missing context structs. | Phase B | S |
 
 ### Engine (pay with Milestone 2: phase C)
 
 | ID | Debt | Impact | Pay by | Size |
 |---|---|---|---|---|
-| TD-06 | A Math region holds both `source` and `expr`; the AST is not the single truth (SPEC 3.3). | The file format cannot be fixed until decided (D5). | Decide now; resolve with M2 editor | M |
+| TD-06 | SPEC 3.3 says the AST is the truth, but a Math region is saved as source text and the expression is derived (decision D5, adopted). The two are private and change together, so they cannot disagree. | A format version bump will be needed when the structured editor lands. | M2 editor | M |
 | TD-08 | `Quantity` is a real `f64`. No `Value` enum: no vectors, matrices, complex, text, booleans. | Blocks ranges, vectors, `sqrt(-4) = 2i`. | Phase C, before M2 vectors | M |
 | TD-09 | Units are a hard-coded `match` (`builtin_unit`). No `UnitRegistry`, custom units, per-worksheet unit system, or temperature offsets. The SI/USCS/CGS selector is now shown disabled in the status bar and unhandled in the ribbon (was clickable and did nothing). | Core feature (SPEC 2.3) missing; misleading control. | Phase C; disable the control now (owner decision 4) | M |
 | TD-10 | Errors carry no source position (`Expr::Error(String)`, `EvalError`). | SPEC "error tracing" cannot highlight the failing sub-expression. | With spans in phase C | M |
@@ -45,13 +41,12 @@ context is in `ARCHITECTURE.md`.
 
 | ID | Debt | Impact | Pay by | Size |
 |---|---|---|---|---|
-| TD-14 | Not a git repository. No continuous integration, no `cargo deny` / `cargo audit`. | No history, no review points for the A and B refactors, no automated gate. | **Now**, needs owner approval | S |
-| TD-15 | Typesetting is redone every frame for visible regions; no layout cache. | Fine at 10 regions; unknown at 200 (target 60 fps). | Measure in phase C; cache in phase A (see TD-03) | M |
+| TD-15 | Typesetting is redone every frame for visible regions; only the *sizes* are cached. | Fine at 10 regions; unknown at 200 (target 60 fps). | Measure in phase C; cache layouts if over budget | M |
+| TD-26 | No continuous integration and no `cargo deny` / `cargo audit`. `scripts/check.ps1` is run by hand. | The gate only works if someone remembers to run it. Only Windows is exercised. | With the first Linux/macOS work (M3) | S |
 | TD-17 | Layout numbers (bar heights 32/25/26/24, ribbon sizes) are inline in places rather than in `theme::metrics`. | Drift from the spec's metrics. | Phase B | S |
 | TD-18 | Placeholder controls that look real: the "12 pt" font-size slot. | Misleading until Format is built. | When Format tab is implemented | S |
 | TD-22 | No property tests for unit algebra or golden tests for the parser (SPEC Milestone 2 asks for both). Smoke tests are single-threaded and cannot reproduce timing races. | Algebra bugs are found by luck. | M2 | M |
 | TD-24 | Only Inter Regular is bundled (no bold or italic), so the Format tab's Bold and Italic cannot be implemented yet. Lucide icons are private-use codepoints and rely on font order. | Blocks rich text. | When Format tab is built | S |
-| TD-25 | No `rustfmt.toml` or `.gitattributes`; line endings are whatever the editor wrote. | Noisy diffs once in git, on mixed platforms. | With TD-14 | S |
 
 ## Paid in the 2026-11-06 review
 
@@ -66,3 +61,9 @@ context is in `ARCHITECTURE.md`.
 | R-07 | Unused direct `egui` dependency (version-skew risk). | Removed; everything goes through `eframe::egui`. |
 | R-08 | No integration tests of the UI. | `smoke.rs`: 7 headless end-to-end tests. |
 | R-09 | No automated quality gate; the 400-line rule was unchecked. | `scripts/check.ps1` with a ratchet. |
+| R-10 | TD-01: document model in the UI crate with egui types and UI state. | `core::document` with its own `Point`/`Size`; UI state in `OpenSheet`/`CanvasUi`. Core's dependency tree contains no UI crate. |
+| R-11 | TD-02: regions edited in three places; no undo. | One path, `Worksheet::apply(Edit) -> inverse`, plus `History` with coalescing. Undo/redo in the ribbon, Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z. |
+| R-12 | TD-03: measured size stored in the document and rewritten on zoom. | Measured sizes are UI state (`CanvasUi::sizes`); zooming no longer touches the document. |
+| R-13 | TD-14: no version control. | Git repository; each phase is a commit. (CI and `cargo deny` are still open: TD-26.) |
+| R-14 | TD-16: two `#[allow(clippy::too_many_arguments)]`. | `Scene` and `Place` context structs; no `#[allow]` left in the workspace. |
+| R-15 | TD-25: no line-ending policy. | `.gitattributes` (`eol=lf`) and `rustfmt.toml` (`newline_style = "Unix"`). |

@@ -4,8 +4,9 @@ How the code is organised, the rules that keep it that way, and the plan to get
 from where it is to where it should be. `SPEC.md` says *what* to build; this says
 *how the code is shaped*. `TECH_DEBT.md` is the register of known shortcuts.
 
-**Status:** written after the Milestone 1 review, 2026-11-06. Section 3 is a
-snapshot of the code at that date; update it when a phase in section 7 lands.
+**Status:** written after the Milestone 1 review, 2026-11-06. **Phase A landed
+the same day** (section 7); section 3 shows the code as it was before it, with
+the rows it fixed marked *done*. Update section 3 when phase B lands.
 
 ---
 
@@ -77,9 +78,9 @@ Snapshot, 2026-11-06: about 6,600 lines of Rust (including tests), 105 tests (45
 
 | Concern | Today | Problem | Target | Phase |
 |---|---|---|---|---|
-| Document model | `ui/sheet.rs`, holds `egui::Pos2/Rect/Vec2`, and also `CanvasView` and selection state inside `Sheet` | Violates R1 and R2. The CLI cannot open a worksheet; nothing can be saved without dragging egui in. | `core::document` with own geometry types; UI keeps view and selection in a separate `SheetView` keyed by worksheet ID. | A |
-| Mutation | Three places edit regions directly (`app.rs` insert, delete, `apply_doc_cmds`; `sheet.rs` add/remove) | Violates R3. No undo possible. Move is applied every frame; typing re-parses per keystroke. | `Edit` enum + `Worksheet::apply` returning the inverse; `History` with coalescing (a drag is one step, a burst of typing is one step). | A |
-| Auto-measured size | Stored in `Region.size`; rewritten when the zoom changes (font rounding) | Zooming dirties the document. | `LayoutCache` in the UI keyed by `(RegionId, content revision, zoom bucket)`; the document stores only user-set size. | A |
+| Document model | `ui/sheet.rs`, holds `egui::Pos2/Rect/Vec2`, and also `CanvasView` and selection state inside `Sheet` | Violates R1 and R2. The CLI cannot open a worksheet; nothing can be saved without dragging egui in. | `core::document` with own geometry types; UI keeps view and selection in a separate `SheetView` keyed by worksheet ID. | A: **Done (phase A).** |
+| Mutation | Three places edit regions directly (`app.rs` insert, delete, `apply_doc_cmds`; `sheet.rs` add/remove) | Violates R3. No undo possible. Move is applied every frame; typing re-parses per keystroke. | `Edit` enum + `Worksheet::apply` returning the inverse; `History` with coalescing (a drag is one step, a burst of typing is one step). | A: **Done (phase A).** |
+| Auto-measured size | Stored in `Region.size`; rewritten when the zoom changes (font rounding) | Zooming dirties the document. | `LayoutCache` in the UI keyed by `(RegionId, content revision, zoom bucket)`; the document stores only user-set size. | A: **Done (phase A).** |
 | Commands | Strings in three lists (`HANDLED`, `run()` match arms, ribbon defs). Unknown IDs fall through `_ => {}`. | Typos are silent. 49 of 70 ribbon items (33 of 54 plain items plus the 16 Greek-letter flyout items) have no handler and nothing tracks that. | `CommandId` enum, one table with label, icon and shortcut; `match` is exhaustive. | B |
 | App structure | `App` has 11 `pub` fields; `shell.rs` mutates it in 4 places, bypassing the command queue. `app.rs` is 488 lines, `shell.rs` 419 (limit 400). | Violates R4 and R8. | `AppState` + `dispatch(state, cmd) -> Effects`; panels take `&AppView`, return `Vec<CommandId>`. | B |
 | Math source | A region holds both `source` (text) and `expr` (parsed) | SPEC 3.3 says the AST is the truth. Unresolved, so the file format cannot be fixed. | **Decision D5 below.** | with M2 |
@@ -202,7 +203,7 @@ editor, vectors, undo-able edits) would be written twice.
 
 | Phase | Work | Exit check | Unblocks |
 |---|---|---|---|
-| **A** Document in core | Move `Worksheet`/`Region` to `core::document` with own geometry. Add `Edit` + `apply` + `History`. Move measured sizes to a UI `LayoutCache`. UI state into `SheetView`. | Core has no egui type (checked by `cargo tree`). Undo/redo works for insert, delete, move, typing. `smoke.rs` still passes. | Undo (M3), file format, CLI `check`, headless document tests. |
+| **A** Document in core (**done 2026-11-06**) | `core::document` with own geometry; `Edit` + `apply` + `History`; measured sizes moved out of the document into `CanvasUi`; UI state in `OpenSheet`. | Met: `cargo tree -p opencalc-core` has no UI crate and the source has no `egui` mention. Undo/redo works for insert, delete, move and typing, through the ribbon and the keyboard (smoke tests). | Undo (M3), file format, CLI `check`, headless document tests. |
 | **B** UI structure | `CommandId` enum and one command table. `AppState` + `dispatch`. Split `shell.rs` into `panels/`, `app.rs` into `app/`. Replace the two `too_many_arguments` allows with context structs. | Both files off the size-limit exceptions list. No panel takes `&mut App`. Every ribbon item either has a handler or is listed as `Unimplemented`. | New features land in small files; consistent behaviour across ribbon, shortcuts, menu. |
 | **C** Evaluator foundations | `UnitRegistry`; `Value` enum; spans on tokens and errors; benchmark for the 200-region and 500-region targets. | Custom units resolve; a vector literal evaluates; an error highlights its sub-expression; benchmark numbers recorded. | Milestone 2 proper. |
 | **M2** Core logic | Math editor, ranges, vectors, functions, plots (SPEC section 6). | SPEC exit criterion. | |
@@ -225,7 +226,11 @@ listed. Not yet in place: version control, continuous integration, dependency au
 
 ---
 
-## 9. Decisions needed from the owner
+## 9. Decisions
+
+Resolved 2026-11-06: phases A then B before Milestone 2 (A is done); D5 adopted
+(source text is canonical); `git init`; the unit-system selector disabled until
+units are per-worksheet. As originally put:
 
 1. **Approve phases A then B before Milestone 2.** (Recommended.)
 2. **D5:** persist Math regions as source text until the structured editor exists?
