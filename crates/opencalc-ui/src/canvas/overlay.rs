@@ -28,7 +28,13 @@ pub(super) fn edit_overlay(
     let widget_id = Id::new(("region", id.0));
     let (resp, change) = match &r.kind {
         RegionKind::Math(_) => {
-            editor::math(ui, env, r, view, origin, st, cmds);
+            let cx = editor::Ctx {
+                env,
+                regions,
+                view,
+                origin,
+            };
+            editor::math(ui, &cx, r, st, cmds);
             return;
         }
         RegionKind::Text { text } => {

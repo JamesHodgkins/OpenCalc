@@ -2,45 +2,80 @@
 //! on its typeset form. It owns a caret and a selection (UI state, not document
 //! state) and turns input into `SetMathSource` edits, so undo is unchanged.
 //!
-//! The text rules live in [`text::Field`]; this file reads input, asks the
-//! `SourceLayout` where the caret goes, and draws.
+//! The text rules live in [`text::Field`] and the autocomplete rules in
+//! [`complete`]; this file reads input, asks the `SourceLayout` where the caret
+//! goes, and draws.
 
+mod complete;
 mod text;
 
 use eframe::egui::{
-    self, Event, EventFilter, Id, Key, Modifiers, Pos2, Rect, Sense, Stroke, Ui, Vec2,
+    self, Event, EventFilter, Id, Key, Modifiers, Order, Pos2, Rect, RichText, Sense, Stroke, Ui,
+    Vec2,
 };
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::edit::Edit;
+use opencalc_core::expr::{AssignKind, Expr};
 
+use complete::Candidate;
 pub use text::Field;
 
 use super::paint::{MATH_SIZE, PAD};
 use super::{CanvasCmd, CanvasUi, CanvasView, Env};
+use crate::commands::greek_by_name;
 use crate::layout::SourceLayout;
+
+/// What the editor reads besides the region itself.
+pub(super) struct Ctx<'a> {
+    pub env: &'a Env<'a>,
+    pub regions: &'a [Region],
+    pub view: &'a CanvasView,
+    pub origin: Pos2,
+}
+
+/// The names the worksheet defines (variables and functions), for autocomplete.
+fn defined_names(regions: &[Region]) -> Vec<String> {
+    let mut out = Vec::new();
+    for r in regions {
+        if let RegionKind::Math(m) = &r.kind {
+            match m.expr() {
+                Expr::Assign {
+                    kind: AssignKind::Define,
+                    target,
+                    ..
+                } => out.push(target.clone()),
+                Expr::FunctionDef { name, .. } => out.push(name.clone()),
+                _ => {}
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
 
 /// Edit the math region `r` in place. Called every frame while it is being edited.
 pub(super) fn math(
     ui: &mut Ui,
-    env: &Env,
+    cx: &Ctx,
     r: &Region,
-    view: &CanvasView,
-    origin: Pos2,
     st: &mut CanvasUi,
     cmds: &mut Vec<CanvasCmd>,
 ) {
+    let RegionKind::Math(m) = &r.kind else {
+        return;
+    };
+    let (env, view) = (cx.env, cx.view);
     let zoom = view.zoom;
     let (pad, size) = (PAD * zoom, MATH_SIZE * zoom);
     let paper = env.paper;
     let screen_min = view
-        .rect_to_screen(super::adapt::rect_of(r, &st.sizes), origin)
+        .rect_to_screen(super::adapt::rect_of(r, &st.sizes), cx.origin)
         .min;
     let text_origin = screen_min + Vec2::splat(pad);
     let id = Id::new(("math-editor", r.id.0));
+    let popup_id = id.with("popup");
 
-    let RegionKind::Math(m) = &r.kind else {
-        return;
-    };
     let source = m.source();
     let fresh = st.focus_edit || st.field.is_none();
     let field = st.field.get_or_insert_with(|| Field::new(source));
@@ -49,6 +84,7 @@ pub(super) fn math(
     } else if field.text() != source {
         field.sync(source);
     }
+    let defined = defined_names(cx.regions);
     let layout_of = |ui: &Ui, text: &str| {
         ui.ctx()
             .fonts(|f| SourceLayout::new(f, paper.text, text, size))
@@ -100,8 +136,10 @@ pub(super) fn math(
     if resp.has_focus() {
         let events = ui.input(|i| i.events.clone());
         for event in events {
+            let (start, list) = complete::for_field(field, &defined);
             match event {
-                Event::Text(s) | Event::Paste(s) => field.insert(&s),
+                Event::Text(s) => field.typed(&s, greek_by_name),
+                Event::Paste(s) => field.insert(&s),
                 Event::Copy => copy(ui, field),
                 Event::Cut => {
                     copy(ui, field);
@@ -112,15 +150,25 @@ pub(super) fn math(
                     pressed: true,
                     modifiers,
                     ..
-                } => finished |= key_down(field, &lay, key, modifiers),
+                } => finished |= key_down(field, &lay, key, modifiers, start, &list),
                 _ => {}
             }
             // Later events in this frame (fast typing) see the text so far.
             lay = layout_of(ui, &field.text());
         }
     }
+    // A press on the autocomplete list takes focus for a moment; that is not the
+    // end of editing.
+    let on_popup = ui.data(|d| d.get_temp::<Rect>(popup_id)).is_some_and(|p| {
+        ui.input(|i| i.pointer.interact_pos())
+            .is_some_and(|pos| p.contains(pos))
+    });
     if resp.lost_focus() {
-        finished = true;
+        if on_popup {
+            resp.request_focus();
+        } else {
+            finished = true;
+        }
     }
 
     let text = field.text();
@@ -163,6 +211,20 @@ pub(super) fn math(
         r.id,
         Vec2::new(lay.layout.w + 2.0 * pad, lay.layout.h + 2.0 * pad) / zoom,
     );
+
+    // The autocomplete list, under the caret.
+    let (start, list) = complete::for_field(field, &defined);
+    if list.is_empty() {
+        ui.data_mut(|d| d.remove::<Rect>(popup_id));
+        return;
+    }
+    let at = text_origin + Vec2::new(caret.min.x, caret.max.y + 4.0);
+    let (rect, clicked) = popup(ui, popup_id, at, &list, field.pick, env);
+    ui.data_mut(|d| d.insert_temp(popup_id, rect));
+    if let Some(i) = clicked {
+        accept(field, start, &list[i]);
+        resp.request_focus();
+    }
 }
 
 fn copy(ui: &Ui, field: &Field) {
@@ -171,12 +233,39 @@ fn copy(ui: &Ui, field: &Field) {
     }
 }
 
-/// One key press. Returns true when it ends editing.
-fn key_down(field: &mut Field, lay: &SourceLayout, key: Key, mods: Modifiers) -> bool {
+/// Type the chosen entry in place of the word before the caret.
+fn accept(field: &mut Field, start: usize, c: &Candidate) {
+    field.replace(start, field.caret, &c.insert);
+    // What was just typed is a whole name; do not offer to complete it again.
+    field.typing = false;
+}
+
+/// One key press. Returns true when it ends editing. `list` is the autocomplete
+/// list showing (for the word that starts at `start`), if any.
+fn key_down(
+    field: &mut Field,
+    lay: &SourceLayout,
+    key: Key,
+    mods: Modifiers,
+    start: usize,
+    list: &[Candidate],
+) -> bool {
     let (shift, word) = (mods.shift, mods.command);
     let len = field.len();
+    let listing = !list.is_empty();
     match key {
+        Key::Enter | Key::Tab if listing => {
+            accept(field, start, &list[field.pick.min(list.len() - 1)]);
+        }
+        Key::Tab => {
+            field.expand_greek(greek_by_name);
+        }
+        Key::Escape if listing => {
+            field.dismissed = complete::word_before(field).map(|(_, w)| w);
+        }
         Key::Enter | Key::Escape => return true,
+        Key::ArrowDown if listing => field.pick = (field.pick + 1) % list.len(),
+        Key::ArrowUp if listing => field.pick = (field.pick + list.len() - 1) % list.len(),
         Key::Backspace => field.backspace(),
         Key::Delete => field.delete(),
         Key::A if mods.command => field.select_all(),
@@ -225,4 +314,37 @@ fn step(lay: &SourceLayout, from: usize, dir: i64, len: usize) -> usize {
             return o;
         }
     }
+}
+
+/// Draw the list at `at`. Returns its rectangle and the entry clicked, if any.
+fn popup(
+    ui: &Ui,
+    id: Id,
+    at: Pos2,
+    list: &[Candidate],
+    pick: usize,
+    env: &Env,
+) -> (Rect, Option<usize>) {
+    let mut clicked = None;
+    let area = egui::Area::new(id)
+        .order(Order::Foreground)
+        .fixed_pos(at)
+        .show(ui.ctx(), |ui| {
+            egui::Frame::popup(ui.style())
+                .fill(env.theme.surface)
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 1.0;
+                    for (i, c) in list.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            let selected = i == pick.min(list.len() - 1);
+                            let label = RichText::new(&c.label).monospace();
+                            if ui.selectable_label(selected, label).clicked() {
+                                clicked = Some(i);
+                            }
+                            ui.label(RichText::new(&c.detail).small().color(env.theme.text_weak));
+                        });
+                    }
+                });
+        });
+    (area.response.rect, clicked)
 }

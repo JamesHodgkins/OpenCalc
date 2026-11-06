@@ -5,6 +5,6 @@ mod id;
 mod keys;
 mod registry;
 
-pub use id::{greek_symbols, CommandId};
+pub use id::{greek_by_name, greek_symbols, CommandId};
 pub use keys::BINDINGS;
 pub use registry::{CommandContext, Registry};

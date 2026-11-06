@@ -1,0 +1,235 @@
+//! Autocomplete: names to finish the word being typed, from the built-in
+//! functions, the names defined in the worksheet and the units. Pure, so every rule
+//! is tested without a window.
+
+use opencalc_core::functions::FUNCTIONS;
+use opencalc_core::units::builtin_symbols;
+
+use super::Field;
+
+/// Most entries offered at once.
+pub const MAX_SHOWN: usize = 8;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Variable,
+    Function,
+    Unit,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Candidate {
+    /// What the list shows: a function's name or the name itself.
+    pub label: String,
+    /// What accepting it types: a function's name and an opening bracket, else the name.
+    pub insert: String,
+    /// A short explanation: a function's signature and summary.
+    pub detail: String,
+    pub kind: Kind,
+}
+
+/// The word being typed just before the caret, and where it starts. A number's
+/// digits are not part of it (`2x` is the word `x`), and neither is a name after a
+/// backslash (that is a Greek letter being entered).
+pub fn word_before(field: &Field) -> Option<(usize, String)> {
+    let chars = field.chars();
+    let end = field.caret.min(chars.len());
+    let mut start = end;
+    while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+        start -= 1;
+    }
+    while start < end && chars[start].is_ascii_digit() {
+        start += 1;
+    }
+    if start == end || (start > 0 && chars[start - 1] == '\\') {
+        return None;
+    }
+    Some((start, chars[start..end].iter().collect()))
+}
+
+/// What to offer for `word`: defined names first, then functions, then units.
+/// A name that is already complete is not offered again, except a function, which
+/// still needs its bracket.
+pub fn candidates(word: &str, defined: &[String]) -> Vec<Candidate> {
+    let lower = word.to_lowercase();
+    let matches = |name: &str| name.to_lowercase().starts_with(&lower);
+    let mut out: Vec<Candidate> = Vec::new();
+    let mut push = |c: Candidate| {
+        if !out.iter().any(|o| o.insert == c.insert) {
+            out.push(c);
+        }
+    };
+    let mut names: Vec<&String> = defined
+        .iter()
+        .filter(|n| matches(n) && n.as_str() != word)
+        .collect();
+    names.sort_by_key(|n| (!n.starts_with(word), n.len(), (*n).clone()));
+    for n in names {
+        push(Candidate {
+            label: n.clone(),
+            insert: n.clone(),
+            detail: "defined in this worksheet".to_owned(),
+            kind: Kind::Variable,
+        });
+    }
+    for f in FUNCTIONS.iter().filter(|f| matches(f.name)) {
+        push(Candidate {
+            label: f.name.to_owned(),
+            insert: format!("{}(", f.name),
+            detail: format!("{}  \u{2014} {}", f.signature, f.summary),
+            kind: Kind::Function,
+        });
+    }
+    if matches("if") {
+        push(Candidate {
+            label: "if".to_owned(),
+            insert: "if(".to_owned(),
+            detail: "if(condition, then, otherwise)  \u{2014} one of two values".to_owned(),
+            kind: Kind::Function,
+        });
+    }
+    let mut units: Vec<&str> = builtin_symbols()
+        .filter(|u| matches(u) && *u != word)
+        .collect();
+    units.sort_by_key(|u| (!u.starts_with(word), u.len(), (*u).to_owned()));
+    for u in units {
+        push(Candidate {
+            label: u.to_owned(),
+            insert: u.to_owned(),
+            detail: "unit".to_owned(),
+            kind: Kind::Unit,
+        });
+    }
+    out.truncate(MAX_SHOWN);
+    out
+}
+
+/// The list to show for the field right now: only while the user is typing a word,
+/// and not after Escape closed it for that word.
+pub fn for_field(field: &mut Field, defined: &[String]) -> (usize, Vec<Candidate>) {
+    let Some((start, word)) = word_before(field) else {
+        field.dismissed = None;
+        return (0, Vec::new());
+    };
+    if field.dismissed.as_deref() != Some(word.as_str()) {
+        field.dismissed = None;
+    }
+    if !field.typing || field.dismissed.is_some() || field.has_selection() {
+        return (start, Vec::new());
+    }
+    (start, candidates(&word, defined))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opencalc_core::parser::parse;
+
+    fn field_at_end(text: &str) -> Field {
+        Field::new(text)
+    }
+
+    #[test]
+    fn the_word_is_what_is_before_the_caret_without_a_numbers_digits() {
+        let w = |t: &str| word_before(&field_at_end(t));
+        assert_eq!(w("x + sig"), Some((4, "sig".to_owned())));
+        assert_eq!(w("2x"), Some((1, "x".to_owned())));
+        assert_eq!(w("1.5e"), Some((3, "e".to_owned())));
+        assert_eq!(w("F_x"), Some((0, "F_x".to_owned())));
+        assert_eq!(w("a + "), None);
+        assert_eq!(w("123"), None);
+        assert_eq!(w(""), None);
+        assert_eq!(w("\\alp"), None, "a Greek name is not completed");
+        assert_eq!(w("\u{3b1}b"), Some((0, "\u{3b1}b".to_owned())));
+    }
+
+    #[test]
+    fn functions_defined_names_and_units_are_offered_in_that_order() {
+        let defined = vec!["sigma_y".to_owned(), "s1".to_owned()];
+        let got = candidates("s", &defined);
+        let labels: Vec<&str> = got.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(
+            &labels[..2],
+            ["s1", "sigma_y"],
+            "defined names first, shortest first"
+        );
+        assert!(labels.contains(&"sin") || labels.contains(&"sqrt"));
+        assert!(got.len() <= MAX_SHOWN);
+        let kinds: Vec<Kind> = got.iter().map(|c| c.kind).collect();
+        let first_function = kinds.iter().position(|k| *k == Kind::Function);
+        let last_variable = kinds.iter().rposition(|k| *k == Kind::Variable);
+        if let (Some(f), Some(v)) = (first_function, last_variable) {
+            assert!(v < f);
+        }
+    }
+
+    #[test]
+    fn a_function_inserts_its_bracket_and_a_complete_name_is_not_offered_again() {
+        let got = candidates("sqr", &[]);
+        assert_eq!(got.first().map(|c| c.insert.as_str()), Some("sqrt("));
+        assert!(got[0].detail.contains("sqrt"));
+        // The exact name of a function still offers it (to add the bracket).
+        assert!(candidates("sqrt", &[]).iter().any(|c| c.insert == "sqrt("));
+        // A variable already typed in full is not offered.
+        assert!(candidates("F", &["F".to_owned()])
+            .iter()
+            .all(|c| c.insert != "F"));
+        // Matching ignores case, so `kn` finds `kN`.
+        assert!(candidates("kn", &[]).iter().any(|c| c.insert == "kN"));
+        assert!(candidates("zzzzz", &["a".to_owned()]).is_empty());
+    }
+
+    #[test]
+    fn nothing_offered_is_ever_something_that_would_not_parse() {
+        let defined = vec!["F_x".to_owned(), "\u{3c3}".to_owned(), "d1".to_owned()];
+        let mut seen = 0;
+        for first in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_\u{3c3}F".chars() {
+            for second in ["", "a", "e", "i", "o", "m", "N", "_", "1"] {
+                for c in candidates(&format!("{first}{second}"), &defined) {
+                    seen += 1;
+                    let name = c.insert.trim_end_matches('(');
+                    assert!(
+                        name.chars()
+                            .next()
+                            .is_some_and(|ch| ch.is_alphabetic() || ch == '_')
+                            && name.chars().all(|ch| ch.is_alphanumeric() || ch == '_'),
+                        "{c:?} is not a name"
+                    );
+                    let source = if c.kind == Kind::Function {
+                        format!("{}1)", c.insert)
+                    } else {
+                        c.insert.clone()
+                    };
+                    assert!(
+                        !matches!(parse(&source), opencalc_core::expr::Expr::Error(_)),
+                        "{c:?} gives {source:?}, which does not parse"
+                    );
+                }
+            }
+        }
+        assert!(seen > 100, "only {seen} candidates checked");
+    }
+
+    #[test]
+    fn the_list_shows_only_while_typing_and_stays_closed_after_escape() {
+        let defined = vec!["force".to_owned()];
+        let mut f = Field::new("");
+        assert!(
+            for_field(&mut f, &defined).1.is_empty(),
+            "nothing typed yet"
+        );
+        f.typed("f", |_| None);
+        f.typed("o", |_| None);
+        let (start, list) = for_field(&mut f, &defined);
+        assert_eq!(start, 0);
+        assert!(list.iter().any(|c| c.insert == "force"));
+        // Escape closes it for this word; more typing opens it again.
+        f.dismissed = Some("fo".to_owned());
+        assert!(for_field(&mut f, &defined).1.is_empty());
+        f.typed("r", |_| None);
+        assert!(!for_field(&mut f, &defined).1.is_empty());
+        // Moving the caret hides it.
+        f.set_caret(1, false);
+        assert!(for_field(&mut f, &defined).1.is_empty());
+    }
+}

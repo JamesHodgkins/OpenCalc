@@ -5,6 +5,7 @@
 //! Layouts hold no per-frame state, so they can be cached per region.
 
 mod grid;
+mod names;
 mod source;
 
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use std::sync::Arc;
 use eframe::egui::{self, Color32, FontId, Galley, Pos2, Stroke, Vec2};
 use opencalc_core::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
 pub use source::SourceLayout;
-use source::{glyph_offsets, Mark, MarkKind};
+use source::{Mark, MarkKind};
 
 pub enum Op {
     Text { at: Vec2, galley: Arc<Galley> },
@@ -60,7 +61,9 @@ impl<'a> Typesetter<'a> {
         if self.marks {
             let kind = match e {
                 Expr::Hole => MarkKind::Hole,
-                Expr::Name(_) => glyph_offsets(&laid).map_or(MarkKind::Node, MarkKind::Glyphs),
+                Expr::Name(_) => self
+                    .offsets_of(e, size)
+                    .map_or(MarkKind::Node, MarkKind::Glyphs),
                 _ => MarkKind::Node,
             };
             laid.marks.push(Mark::of(e, &laid, kind));
@@ -71,7 +74,7 @@ impl<'a> Typesetter<'a> {
     fn layout_node(&self, e: &Expr, size: f32) -> Layout {
         match e {
             Expr::Number(v) => self.text(&fmt_num(*v), size),
-            Expr::Name(n) => self.text(n, size),
+            Expr::Name(n) => self.name(n, size),
             Expr::Quantity { value, unit } => self.row(vec![
                 self.text(&fmt_num(*value), size),
                 self.gap(size * 0.25),
@@ -134,7 +137,7 @@ impl<'a> Typesetter<'a> {
             Expr::Fraction { num, den } => self.fraction(num, den, size),
             Expr::Root { radicand } => self.root(radicand, size),
             Expr::Call { name, args } => {
-                let mut parts = vec![self.text(name, size), self.text("(", size)];
+                let mut parts = vec![self.name(name, size), self.text("(", size)];
                 for (i, a) in args.iter().enumerate() {
                     if i > 0 {
                         parts.push(self.text(", ", size));
@@ -154,7 +157,7 @@ impl<'a> Typesetter<'a> {
                     AssignKind::Evaluate => "=",
                 };
                 self.row(vec![
-                    self.text(target, size),
+                    self.name(target, size),
                     self.gap(size * 0.3),
                     self.text(sym, size),
                     self.gap(size * 0.3),

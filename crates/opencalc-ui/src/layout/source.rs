@@ -18,7 +18,7 @@ use eframe::egui::{epaint::text::Fonts, Color32, Pos2, Rect, Vec2};
 use opencalc_core::expr::Expr;
 use opencalc_core::parser::{parse_lenient, Span, SpanNode};
 
-use super::{Layout, Op, Typesetter};
+use super::{Layout, Typesetter};
 
 /// What a recorded rectangle stands for.
 #[derive(Clone, Debug)]
@@ -165,16 +165,6 @@ impl SourceLayout {
         }
         best.0
     }
-}
-
-/// The x offset of every letter boundary of a single-text layout (a name).
-pub(super) fn glyph_offsets(l: &Layout) -> Option<Vec<f32>> {
-    let [Op::Text { galley, .. }] = l.ops.as_slice() else {
-        return None;
-    };
-    let row = galley.rows.first()?;
-    let n = galley.text().chars().count();
-    Some((0..=n).map(|i| row.x_offset(i)).collect())
 }
 
 fn collect(e: &Expr, s: &SpanNode, out: &mut HashMap<usize, (Span, Span)>) {
@@ -332,6 +322,10 @@ mod tests {
         "5 kN / 2 m",
         "(1 + 2) * 3",
         "((x))",
+        "F_x + sigma_y",
+        "_a * b_",
+        "v_1[i_2]",
+        "M_ab := 1",
         "\u{3b1} + \u{3b2}",
         "x =",
         "1 +",
@@ -512,6 +506,30 @@ mod tests {
                 "between the operands: the whole sum"
             );
             assert_eq!(l.enclosing(15), (0, 15), "the end of the source");
+        });
+    }
+
+    #[test]
+    fn a_subscript_is_lowered_and_the_underscore_draws_nothing() {
+        with_fonts(|fonts| {
+            let plain = lay(fonts, "Fx");
+            let sub = lay(fonts, "F_x");
+            assert!(sub.layout.h > plain.layout.h, "the subscript hangs below");
+            let x = |o| sub.caret_rect(o).min.x;
+            assert!(x(0) < x(1), "F is drawn");
+            assert!(
+                (x(1) - x(2)).abs() < 0.01,
+                "both sides of the underscore are one place"
+            );
+            assert!(x(3) > x(2), "x is drawn");
+            // The subscript is smaller than the base: narrower than a full-size x.
+            let full = lay(fonts, "x").layout.w;
+            assert!(x(3) - x(2) < full);
+            // A leading or trailing underscore is an ordinary character.
+            let lead = lay(fonts, "_a");
+            assert!(lead.caret_rect(1).min.x > lead.caret_rect(0).min.x);
+            let trail = lay(fonts, "a_");
+            assert!(trail.caret_rect(2).min.x > trail.caret_rect(1).min.x);
         });
     }
 

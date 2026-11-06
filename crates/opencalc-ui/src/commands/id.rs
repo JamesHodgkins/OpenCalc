@@ -183,6 +183,11 @@ const SYMBOLS: [(char, &str); 16] = [
     ('\u{03a9}', "Omega"),
 ];
 
+/// The Greek letter for a name such as `alpha` or `Delta` (case matters).
+pub fn greek_by_name(name: &str) -> Option<char> {
+    SYMBOLS.iter().find(|(_, n)| *n == name).map(|(c, _)| *c)
+}
+
 /// The characters of the Greek flyout, in display order.
 pub fn greek_symbols() -> impl Iterator<Item = char> {
     SYMBOLS.iter().map(|(c, _)| *c)

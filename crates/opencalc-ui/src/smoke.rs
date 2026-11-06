@@ -951,3 +951,114 @@ fn the_functions_window_inserts_into_the_region_being_edited() {
     h.type_text("4)");
     assert_eq!(h.source_of(id), "x := sqrt(4)");
 }
+
+#[test]
+fn backslash_names_become_greek_letters_and_a_colon_makes_a_define() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text(r"\sigma");
+    h.type_text(" ");
+    h.type_text(":");
+    h.type_text("= 5");
+    assert_eq!(h.source_of(id), "\u{3c3}:= 5");
+    h.press_key(Key::A, Modifiers::COMMAND);
+    h.type_text(r"\beta");
+    h.press_key(Key::Tab, Modifiers::NONE);
+    assert_eq!(h.source_of(id), "\u{3b2}", "Tab also completes the letter");
+    assert!(
+        h.sheet().canvas.editing.is_some(),
+        "Tab does not end editing"
+    );
+}
+
+#[test]
+fn autocomplete_finishes_a_word_with_tab_or_enter_and_escape_only_closes_the_list() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("sqr");
+    h.press_key(Key::Tab, Modifiers::NONE);
+    assert_eq!(h.source_of(id), "sqrt(");
+    // With the list open, Enter accepts instead of ending the edit.
+    h.type_text("co");
+    h.press_key(Key::Enter, Modifiers::NONE);
+    assert!(h.sheet().canvas.editing.is_some());
+    assert!(
+        h.source_of(id).starts_with("sqrt(co"),
+        "{}",
+        h.source_of(id)
+    );
+    assert_ne!(h.source_of(id), "sqrt(co", "the word was completed");
+    // Escape closes the list; a second Escape ends the edit.
+    h.press_key(Key::A, Modifiers::COMMAND);
+    h.type_text("ta");
+    h.press_key(Key::Escape, Modifiers::NONE);
+    assert!(
+        h.sheet().canvas.editing.is_some(),
+        "the first Escape closed only the list"
+    );
+    assert_eq!(h.source_of(id), "ta");
+    h.press_key(Key::Escape, Modifiers::NONE);
+    assert!(h.sheet().canvas.editing.is_none());
+}
+
+#[test]
+fn autocomplete_offers_names_defined_in_the_worksheet_and_arrows_choose() {
+    let mut h = Harness::new();
+    h.settle();
+    let first = h.new_math();
+    h.type_text("stress_y := 250");
+    h.press_key(Key::Enter, Modifiers::NONE);
+    h.settle();
+    let second = h.new_math();
+    h.type_text("stress");
+    h.press_key(Key::Tab, Modifiers::NONE);
+    assert_eq!(h.source_of(second), "stress_y");
+    assert_ne!(first, second);
+}
+
+#[test]
+fn a_subscript_name_edits_like_any_other_text() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("F_x + F_y");
+    h.press_key(Key::Home, Modifiers::NONE);
+    h.press_key(Key::ArrowRight, Modifiers::NONE);
+    h.press_key(Key::ArrowRight, Modifiers::NONE);
+    h.press_key(Key::ArrowRight, Modifiers::NONE);
+    assert!(h.caret() >= 3, "{}", h.caret());
+    assert_eq!(h.source_of(id), "F_x + F_y");
+    h.settle();
+}
+
+#[test]
+fn many_keystrokes_in_one_frame_all_arrive() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    let mut events = Vec::new();
+    for ch in "sigma_y".chars() {
+        events.push(Event::Key {
+            key: Key::A,
+            physical_key: Some(Key::A),
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        });
+        events.push(Event::Text(ch.to_string()));
+    }
+    // The Enter that finishes the region arrives in the same frame.
+    events.push(Event::Key {
+        key: Key::Enter,
+        physical_key: Some(Key::Enter),
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.frame_with(events);
+    h.frame();
+    assert_eq!(h.source_of(id), "sigma_y");
+    assert!(h.sheet().canvas.editing.is_none());
+}

@@ -13,6 +13,13 @@ pub struct Field {
     pub caret: usize,
     /// The other end of the selection; equal to `caret` when nothing is selected.
     pub anchor: usize,
+    /// The text changed by typing since the caret last moved: the autocomplete
+    /// list is only offered then.
+    pub typing: bool,
+    /// Which autocomplete entry is highlighted.
+    pub pick: usize,
+    /// The word whose autocomplete list was closed with Escape.
+    pub dismissed: Option<String>,
 }
 
 impl Field {
@@ -24,7 +31,14 @@ impl Field {
             chars,
             caret: end,
             anchor: end,
+            typing: false,
+            pick: 0,
+            dismissed: None,
         }
+    }
+
+    pub fn chars(&self) -> &[char] {
+        &self.chars
     }
 
     pub fn text(&self) -> String {
@@ -63,6 +77,8 @@ impl Field {
 
     /// Move the caret to `offset`; `extend` keeps the anchor, so the selection grows.
     pub fn set_caret(&mut self, offset: usize, extend: bool) {
+        self.typing = false;
+        self.pick = 0;
         self.caret = offset.min(self.chars.len());
         if !extend {
             self.anchor = self.caret;
@@ -70,6 +86,7 @@ impl Field {
     }
 
     pub fn select(&mut self, start: usize, end: usize) {
+        self.typing = false;
         self.anchor = start.min(self.chars.len());
         self.caret = end.min(self.chars.len());
     }
@@ -99,6 +116,52 @@ impl Field {
         self.chars.splice(a..b, new);
         self.caret = end;
         self.anchor = end;
+        self.typing = true;
+        self.pick = 0;
+    }
+
+    /// Replace the characters `a..b` with `s`, leaving the caret after it.
+    pub fn replace(&mut self, a: usize, b: usize, s: &str) {
+        self.select(a, b);
+        self.insert(s);
+    }
+
+    /// What typing `s` does. Mostly it inserts `s`, with three conveniences:
+    /// a space after a backslash and a name turns it into the Greek letter
+    /// (`greek` finds the letter for a name); `:` makes `:=`; and the `=` that
+    /// finishes a `:=` the user typed by hand is not doubled.
+    pub fn typed(&mut self, s: &str, greek: impl Fn(&str) -> Option<char>) {
+        let before = |n: usize| self.caret.checked_sub(n).map(|i| self.chars[i]);
+        let after = self.chars.get(self.caret).copied();
+        let hand_typed_define = before(1) == Some('=') && before(2) == Some(':');
+        match s {
+            " " if !self.has_selection() && self.expand_greek(greek) => {}
+            ":" if after != Some('=') => self.insert(":="),
+            "=" if !self.has_selection() && hand_typed_define => {}
+            _ => self.insert(s),
+        }
+    }
+
+    /// Replace a backslash and name just before the caret by its Greek letter, if
+    /// `greek` knows the name. Returns whether it did.
+    pub fn expand_greek(&mut self, greek: impl Fn(&str) -> Option<char>) -> bool {
+        if self.has_selection() {
+            return false;
+        }
+        let end = self.caret;
+        let mut start = end;
+        while start > 0 && self.chars[start - 1].is_ascii_alphabetic() {
+            start -= 1;
+        }
+        if start == end || start == 0 || self.chars[start - 1] != '\\' {
+            return false;
+        }
+        let name: String = self.chars[start..end].iter().collect();
+        let Some(letter) = greek(&name) else {
+            return false;
+        };
+        self.replace(start - 1, end, &letter.to_string());
+        true
     }
 
     /// Backspace: the selection, else the character before the caret.
@@ -159,6 +222,58 @@ fn is_word(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn greek(name: &str) -> Option<char> {
+        match name {
+            "alpha" => Some('\u{3b1}'),
+            "Delta" => Some('\u{394}'),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn backslash_name_then_space_becomes_the_greek_letter() {
+        let mut f = Field::new("x + ");
+        for c in ["\\", "a", "l", "p", "h", "a"] {
+            f.typed(c, greek);
+        }
+        assert_eq!(f.text(), "x + \\alpha");
+        f.typed(" ", greek);
+        assert_eq!(
+            (f.text().as_str(), f.caret),
+            ("x + \u{3b1}", 5),
+            "the space is used up"
+        );
+        // Case matters, and an unknown name keeps its text and gets the space.
+        let mut g = Field::new("\\delta");
+        g.typed(" ", greek);
+        assert_eq!(g.text(), "\\delta ");
+        let mut h = Field::new("\\Delta");
+        h.typed(" ", greek);
+        assert_eq!(h.text(), "\u{394}");
+        // A name with no backslash is left alone.
+        let mut k = Field::new("alpha");
+        k.typed(" ", greek);
+        assert_eq!(k.text(), "alpha ");
+    }
+
+    #[test]
+    fn a_colon_makes_a_define_and_the_hand_typed_equals_is_not_doubled() {
+        let mut f = Field::new("x ");
+        f.typed(":", greek);
+        assert_eq!(f.text(), "x :=");
+        f.typed("=", greek);
+        assert_eq!(f.text(), "x :=", "the = that completes := is absorbed");
+        f.typed(" ", greek);
+        f.typed("1", greek);
+        f.typed("=", greek);
+        assert_eq!(f.text(), "x := 1=", "other equals signs are kept");
+        // Typing : in front of an = does not double it either.
+        let mut g = Field::new("x =");
+        g.set_caret(2, false);
+        g.typed(":", greek);
+        assert_eq!(g.text(), "x :=");
+    }
 
     #[test]
     fn typing_inserts_at_the_caret_and_moves_it() {
