@@ -1,0 +1,29 @@
+# source: original; each line is meant to fail in a particular, reportable way
+out_of_range := [1, 2][5]
+negative := [1, 2][0 - 1]
+scalar_index := (5)[0]
+matrix_needs_two := [1, 2; 3, 4][0]
+fraction_index := [1, 2][0.5]
+unit_index := [1, 2][1 m]
+ragged := [1, 2; 3]
+unit_mix := [1 m, 2 s]
+cell_matrix := [[1, 2], 3]
+cond_unit := if(1 m, 1, 2)
+cond_arity := if(1, 2)
+cmp_units := 1 m < 1 s
+cmp_complex := i < 2
+cmp_matrix := [1, 2] == [1, 2]
+!> out_of_range : value
+!> negative : value
+!> scalar_index : value
+!> matrix_needs_two : value
+!> fraction_index : invalid
+!> unit_index : invalid
+!> #7 : invalid
+!> unit_mix : mismatch
+!> cell_matrix : value
+!> cond_unit : invalid
+!> cond_arity : arity
+!> cmp_units : mismatch
+!> cmp_complex : value
+!> cmp_matrix : value

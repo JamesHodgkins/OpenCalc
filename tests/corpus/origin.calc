@@ -1,0 +1,9 @@
+# source: original; ORIGIN sets where indexing starts, as in Mathcad
+ORIGIN := 1
+v := [10, 20, 30]
+first := v[1]
+third := v[3]
+below := v[0]
+=> first = 10
+=> third = 30
+!> below : value

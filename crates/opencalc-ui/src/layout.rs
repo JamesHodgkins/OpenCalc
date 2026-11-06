@@ -4,6 +4,8 @@
 //! line ops relative to its top-left. Composing boxes translates their ops.
 //! Layouts hold no per-frame state, so they can be cached per region.
 
+mod grid;
+
 use std::sync::Arc;
 
 use eframe::egui::{self, Color32, FontId, Galley, Pos2, Stroke, Vec2};
@@ -68,6 +70,12 @@ impl<'a> Typesetter<'a> {
                 let sign = match op {
                     BinaryOp::Add => "+",
                     BinaryOp::Sub => "\u{2212}",
+                    BinaryOp::Eq => "=",
+                    BinaryOp::Ne => "\u{2260}",
+                    BinaryOp::Lt => "<",
+                    BinaryOp::Gt => ">",
+                    BinaryOp::Le => "\u{2264}",
+                    BinaryOp::Ge => "\u{2265}",
                     _ => "\u{00b7}",
                 };
                 // Left operand binds at p; the right needs parens at equal precedence.
@@ -79,6 +87,13 @@ impl<'a> Typesetter<'a> {
                     self.operand(rhs, size, p + 1),
                 ])
             }
+            Expr::Matrix { rows, cols, cells } => self.matrix(*rows, *cols, cells, size),
+            Expr::Index { base, indices } => self.index(base, indices, size),
+            Expr::Conditional {
+                cond,
+                then,
+                otherwise,
+            } => self.call_like("if", &[cond, then, otherwise], size),
             Expr::Fraction { num, den } => self.fraction(num, den, size),
             Expr::Root { radicand } => self.root(radicand, size),
             Expr::Call { name, args } => {
@@ -287,6 +302,13 @@ fn prec(e: &Expr) -> u8 {
             op: BinaryOp::Add | BinaryOp::Sub,
             ..
         } => 1,
+        // Comparisons are the loosest operators, so they are the only ones that
+        // need brackets inside a sum.
+        Expr::Binary {
+            op:
+                BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Gt | BinaryOp::Le | BinaryOp::Ge,
+            ..
+        } => 0,
         Expr::Binary {
             op: BinaryOp::Mul, ..
         } => 2,
@@ -323,6 +345,64 @@ mod tests {
             });
         });
         result.expect("closure ran")
+    }
+
+    fn parsed(src: &str) -> Expr {
+        let e = opencalc_core::parser::parse(src);
+        assert!(!matches!(e, Expr::Error(_)), "{src}");
+        e
+    }
+
+    #[test]
+    fn a_matrix_grows_with_its_rows_and_columns_and_has_brackets() {
+        with_fonts(|t| {
+            let one = t.layout(&parsed("[1]"), 16.0);
+            let wide = t.layout(&parsed("[1, 2, 3]"), 16.0);
+            let tall = t.layout(&parsed("[1; 2; 3]"), 16.0);
+            assert!(wide.w > one.w * 2.0 && wide.h < tall.h);
+            assert!(tall.h > one.h * 2.0 && tall.w < wide.w);
+            // Two bracket spines with two ticks each.
+            let lines = wide
+                .ops
+                .iter()
+                .filter(|o| matches!(o, Op::Line { .. }))
+                .count();
+            assert_eq!(lines, 6);
+        });
+    }
+
+    #[test]
+    fn matrix_columns_line_up_whatever_the_cell_widths() {
+        with_fonts(|t| {
+            // Same shape, so the same width, however wide the cells are.
+            let a = t.layout(&parsed("[1, 2; 3, 4]"), 16.0);
+            let b = t.layout(&parsed("[1, 2; 3, 4]"), 16.0);
+            assert_eq!(a.w, b.w);
+            let narrow = t.layout(&parsed("[1, 1; 1, 1]"), 16.0);
+            let wide = t.layout(&parsed("[1000, 1; 1, 1000]"), 16.0);
+            assert!(wide.w > narrow.w);
+        });
+    }
+
+    #[test]
+    fn an_index_is_lowered_and_a_conditional_reads_like_a_call() {
+        with_fonts(|t| {
+            let v = t.layout(&parsed("v"), 16.0);
+            let v0 = t.layout(&parsed("v[0]"), 16.0);
+            assert!(v0.w > v.w && v0.h > v.h);
+            assert!(v0.baseline == v.baseline);
+            let c = t.layout(&parsed("if(a, 1, 2)"), 16.0);
+            assert!(c.w > t.layout(&parsed("a"), 16.0).w * 3.0);
+        });
+    }
+
+    #[test]
+    fn comparisons_typeset_without_brackets_at_the_top_and_with_them_in_a_sum() {
+        with_fonts(|t| {
+            let top = t.layout(&parsed("a < b"), 16.0);
+            let nested = t.layout(&parsed("(a < b) + 1"), 16.0);
+            assert!(nested.w > top.w, "the comparison needs brackets in a sum");
+        });
     }
 
     #[test]

@@ -79,6 +79,28 @@ impl Matrix {
         &self.data
     }
 
+    /// Element at zero-based `indices`: one index for a vector, two for a matrix.
+    pub fn element(&self, indices: &[usize]) -> Result<Scalar, ValueError> {
+        let (r, c) = match *indices {
+            [i] if self.cols == 1 => (i, 0),
+            [i] if self.rows == 1 => (0, i),
+            [_] => {
+                return Err(shape_error(
+                    "a matrix needs a row and a column index, like M[i, j]",
+                ))
+            }
+            [r, c] => (r, c),
+            _ => return Err(shape_error("an index has one or two numbers")),
+        };
+        if r >= self.rows || c >= self.cols {
+            return Err(ValueError::Shape(format!(
+                "index out of range for a {}x{} matrix",
+                self.rows, self.cols
+            )));
+        }
+        Ok(Scalar::new(self.at(r, c), self.dim))
+    }
+
     pub fn is_finite(&self) -> bool {
         self.data.iter().all(|z| crate::numeric::is_finite(*z))
     }

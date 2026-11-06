@@ -16,6 +16,13 @@ pub enum BinaryOp {
     Mul,
     Div,
     Pow,
+    /// Comparisons give 1 (true) or 0 (false), dimensionless, as in Mathcad.
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -25,6 +32,9 @@ pub enum AssignKind {
     /// `=`
     Evaluate,
 }
+
+/// The name of the variable that sets where indexing starts, as in Mathcad.
+pub const ORIGIN: &str = "ORIGIN";
 
 /// A parse error with the part of the source it points at, as a half-open range
 /// of characters (not bytes). An error at the end of the input has an empty range
@@ -78,6 +88,23 @@ pub enum Expr {
         kind: AssignKind,
         target: String,
         value: Box<Expr>,
+    },
+    /// A matrix or vector written out: `[1, 2; 3, 4]`. Cells are row-major.
+    Matrix {
+        rows: usize,
+        cols: usize,
+        cells: Vec<Expr>,
+    },
+    /// `base[i]` or `base[i, j]`. Counting starts at `ORIGIN` (default 0).
+    Index {
+        base: Box<Expr>,
+        indices: Vec<Expr>,
+    },
+    /// `if(cond, then, otherwise)`; only the chosen branch is evaluated.
+    Conditional {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        otherwise: Box<Expr>,
     },
     // Layout-bearing nodes: typeset as written, evaluated as the plain operator.
     Fraction {
@@ -141,6 +168,13 @@ impl Expr {
             Expr::Fraction { num, den } => vec![num, den],
             Expr::Root { radicand } => vec![radicand],
             Expr::Call { args, .. } => args.iter().collect(),
+            Expr::Matrix { cells, .. } => cells.iter().collect(),
+            Expr::Index { base, indices } => std::iter::once(&**base).chain(indices).collect(),
+            Expr::Conditional {
+                cond,
+                then,
+                otherwise,
+            } => vec![cond, then, otherwise],
             Expr::Assign { value, .. } => vec![value],
             Expr::Number(_) | Expr::Name(_) | Expr::Quantity { .. } | Expr::Error(_) => vec![],
         }
@@ -174,6 +208,24 @@ impl Expr {
                 rhs.collect_names(out);
             }
             Expr::Call { args, .. } => args.iter().for_each(|a| a.collect_names(out)),
+            Expr::Matrix { cells, .. } => cells.iter().for_each(|a| a.collect_names(out)),
+            Expr::Index { base, indices } => {
+                base.collect_names(out);
+                indices.iter().for_each(|a| a.collect_names(out));
+                // Indexing counts from ORIGIN, so it depends on it.
+                if !out.iter().any(|n| n == ORIGIN) {
+                    out.push(ORIGIN.to_owned());
+                }
+            }
+            Expr::Conditional {
+                cond,
+                then,
+                otherwise,
+            } => {
+                cond.collect_names(out);
+                then.collect_names(out);
+                otherwise.collect_names(out);
+            }
             Expr::Assign { value, .. } => value.collect_names(out),
             Expr::Fraction { num, den } => {
                 num.collect_names(out);
@@ -188,23 +240,28 @@ impl Expr {
 /// Binding strength of an expression when printed, higher binds tighter.
 fn strength(e: &Expr) -> u8 {
     match e {
+        Expr::Assign { .. } => 0,
+        Expr::Binary {
+            op:
+                BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Gt | BinaryOp::Le | BinaryOp::Ge,
+            ..
+        } => 1,
         Expr::Binary {
             op: BinaryOp::Add | BinaryOp::Sub,
             ..
-        } => 1,
+        } => 2,
         Expr::Binary {
             op: BinaryOp::Mul | BinaryOp::Div,
             ..
         }
-        | Expr::Fraction { .. } => 2,
-        Expr::Unary { .. } => 3,
+        | Expr::Fraction { .. } => 3,
+        Expr::Unary { .. } => 4,
         Expr::Binary {
             op: BinaryOp::Pow, ..
-        } => 4,
-        Expr::Assign { .. } => 0,
+        } => 5,
         // `5 kN` reads as one unit of meaning but must be bracketed under `^`.
-        Expr::Quantity { .. } => 4,
-        _ => 5,
+        Expr::Quantity { .. } => 5,
+        _ => 6,
     }
 }
 
@@ -213,6 +270,38 @@ fn operand(f: &mut std::fmt::Formatter<'_>, e: &Expr, at_least: u8) -> std::fmt:
         write!(f, "({e})")
     } else {
         write!(f, "{e}")
+    }
+}
+
+fn list(f: &mut std::fmt::Formatter<'_>, items: &[Expr]) -> std::fmt::Result {
+    for (i, a) in items.iter().enumerate() {
+        if i > 0 {
+            f.write_str(", ")?;
+        }
+        write!(f, "{a}")?;
+    }
+    Ok(())
+}
+
+impl BinaryOp {
+    /// The operator as written, and the least strength each side may have
+    /// without brackets.
+    fn written(self) -> (&'static str, u8, u8) {
+        match self {
+            BinaryOp::Eq => ("==", 1, 2),
+            BinaryOp::Ne => ("!=", 1, 2),
+            BinaryOp::Lt => ("<", 1, 2),
+            BinaryOp::Gt => (">", 1, 2),
+            BinaryOp::Le => ("<=", 1, 2),
+            BinaryOp::Ge => (">=", 1, 2),
+            BinaryOp::Add => ("+", 2, 3),
+            BinaryOp::Sub => ("-", 2, 3),
+            BinaryOp::Mul => ("*", 3, 4),
+            BinaryOp::Div => ("/", 3, 4),
+            // Power is right associative; its operands are always bracketed
+            // unless they are atoms, which is never ambiguous.
+            BinaryOp::Pow => ("^", 6, 6),
+        }
     }
 }
 
@@ -227,38 +316,46 @@ impl std::fmt::Display for Expr {
             Expr::Quantity { value, unit } => write!(f, "{value} {unit}"),
             Expr::Unary { arg, .. } => {
                 f.write_str("-")?;
-                operand(f, arg, 4)
+                operand(f, arg, 5)
             }
             Expr::Binary { op, lhs, rhs } => {
-                let (symbol, left, right) = match op {
-                    BinaryOp::Add => ("+", 1, 2),
-                    BinaryOp::Sub => ("-", 1, 2),
-                    BinaryOp::Mul => ("*", 2, 3),
-                    BinaryOp::Div => ("/", 2, 3),
-                    // Power is right associative; its operands are always bracketed
-                    // unless they are atoms, which is never ambiguous.
-                    BinaryOp::Pow => ("^", 5, 5),
-                };
+                let (symbol, left, right) = op.written();
                 operand(f, lhs, left)?;
                 write!(f, " {symbol} ")?;
                 operand(f, rhs, right)
             }
             Expr::Fraction { num, den } => {
-                operand(f, num, 2)?;
+                operand(f, num, 3)?;
                 f.write_str(" / ")?;
-                operand(f, den, 3)
+                operand(f, den, 4)
             }
             Expr::Root { radicand } => write!(f, "sqrt({radicand})"),
             Expr::Call { name, args } => {
                 write!(f, "{name}(")?;
-                for (i, a) in args.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(", ")?;
-                    }
-                    write!(f, "{a}")?;
-                }
+                list(f, args)?;
                 f.write_str(")")
             }
+            Expr::Matrix { cols, cells, .. } => {
+                f.write_str("[")?;
+                for (i, row) in cells.chunks(*cols).enumerate() {
+                    if i > 0 {
+                        f.write_str("; ")?;
+                    }
+                    list(f, row)?;
+                }
+                f.write_str("]")
+            }
+            Expr::Index { base, indices } => {
+                operand(f, base, 6)?;
+                f.write_str("[")?;
+                list(f, indices)?;
+                f.write_str("]")
+            }
+            Expr::Conditional {
+                cond,
+                then,
+                otherwise,
+            } => write!(f, "if({cond}, {then}, {otherwise})"),
             Expr::Assign {
                 kind,
                 target,
@@ -301,6 +398,21 @@ mod tests {
             "vec(1, 2 m, a + b)",
             "1e300 * 1e-300",
             "0.1 + 0.2",
+            "[1, 2; 3, 4]",
+            "[1; 2 m; 3]",
+            "v[0]",
+            "M[i + 1, j]",
+            "M[0][1]",
+            "(a + b)[0]",
+            "-v[0] ^ 2",
+            "if(x > 0, x, -x)",
+            "if(a, if(b, 1, 2), 3)",
+            "a == b",
+            "a + 1 < b * 2",
+            "(a < b) == (c > d)",
+            "a - (b < c)",
+            "2 * (a == b)",
+            "[a < b, c]",
         ] {
             let e = parse(src);
             assert!(!matches!(e, Expr::Error(_)), "{src}");

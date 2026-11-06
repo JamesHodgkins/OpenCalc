@@ -1,6 +1,6 @@
 //! A complex number with a dimension, in SI.
 
-use super::ValueError;
+use super::{Comparison, ValueError};
 use crate::numeric::{self, Complex64};
 use crate::units::{Dimension, Quantity, UnitError};
 
@@ -92,6 +92,28 @@ impl Scalar {
             return Err(UnitError::NotDimensionless("^".into()).into());
         }
         Ok(Scalar::new(numeric::pow(self.z, e.z), Dimension::NONE))
+    }
+
+    /// Compare two scalars. Both must have the same dimension. Equality is exact
+    /// (as in Mathcad without `TOL`); ordering needs real numbers.
+    pub fn compare(self, o: Scalar, how: Comparison) -> Result<bool, ValueError> {
+        self.same_dim(&o)?;
+        match how {
+            Comparison::Eq => Ok(self.z == o.z),
+            Comparison::Ne => Ok(self.z != o.z),
+            ordering => {
+                if !self.is_real() || !o.is_real() {
+                    return Err(ValueError::Unsupported("ordering complex numbers".into()));
+                }
+                let (a, b) = (self.z.re, o.z.re);
+                Ok(match ordering {
+                    Comparison::Lt => a < b,
+                    Comparison::Gt => a > b,
+                    Comparison::Le => a <= b,
+                    _ => a >= b,
+                })
+            }
+        }
     }
 
     /// Principal square root; the dimension must have even exponents.

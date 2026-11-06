@@ -11,6 +11,17 @@ pub use scalar::Scalar;
 use crate::numeric::Complex64;
 use crate::units::{Dimension, Quantity, UnitError};
 
+/// Which comparison to make between two scalars.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Comparison {
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+}
+
 /// Why a value operation failed.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum ValueError {
@@ -113,6 +124,27 @@ impl Value {
             (Value::Matrix(m), Value::Scalar(s)) => Ok(Value::Matrix(m.scaled(s.reciprocal()?)?)),
             _ => Err(ValueError::Unsupported("division by a matrix".into())),
         }
+    }
+
+    /// 1 if the comparison holds, 0 if not, as a dimensionless number.
+    pub fn compare(&self, o: &Value, how: Comparison) -> Result<Value, ValueError> {
+        match (self, o) {
+            (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::dimensionless(f64::from(u8::from(
+                a.compare(*b, how)?,
+            )))),
+            _ => Err(ValueError::Unsupported("comparing matrices".into())),
+        }
+    }
+
+    /// Element `indices` (zero-based) of a matrix or vector. One index addresses
+    /// a vector (a single column or a single row); two address a matrix.
+    pub fn element(&self, indices: &[usize]) -> Result<Value, ValueError> {
+        let Value::Matrix(m) = self else {
+            return Err(ValueError::Shape(
+                "only a matrix or vector can be indexed".into(),
+            ));
+        };
+        m.element(indices).map(Value::Scalar)
     }
 
     pub fn pow(&self, e: &Value) -> Result<Value, ValueError> {

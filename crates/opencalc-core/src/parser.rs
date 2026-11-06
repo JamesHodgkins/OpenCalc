@@ -11,25 +11,13 @@
 //! - A number followed by another name or `(` is implicit multiplication (`2x`).
 //! - `sqrt(x)` is typeset as a radical.
 
+mod lexer;
+
+use lexer::{describe, tokenize, Tok};
+
 use crate::expr::ParseError;
 use crate::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
 use crate::units::builtin_unit;
-
-#[derive(Clone, Debug, PartialEq)]
-enum Tok {
-    Num(f64),
-    Ident(String),
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Caret,
-    LParen,
-    RParen,
-    Comma,
-    Define,
-    Equals,
-}
 
 /// Most symbols (numbers, names, operators, brackets) one region may hold.
 ///
@@ -71,99 +59,6 @@ pub fn parse(src: &str) -> Expr {
 
 fn too_long() -> String {
     format!("expression is too long (limit {MAX_SYMBOLS} symbols)")
-}
-
-/// Tokens with the character range each came from.
-type Tokens = (Vec<Tok>, Vec<(usize, usize)>);
-
-fn tokenize(src: &str) -> Result<Tokens, (String, usize, usize)> {
-    let chars: Vec<char> = src.chars().collect();
-    let mut toks = Vec::new();
-    let mut spans = Vec::new();
-    let mut i = 0;
-    while i < chars.len() {
-        let (before, begin) = (toks.len(), i);
-        let c = chars[i];
-        match c {
-            c if c.is_whitespace() => i += 1,
-            '0'..='9' | '.' => {
-                let start = i;
-                while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
-                    i += 1;
-                }
-                // Exponent: only when `e` is followed by a digit or a signed digit.
-                if i < chars.len() && (chars[i] == 'e' || chars[i] == 'E') {
-                    let mut j = i + 1;
-                    if j < chars.len() && (chars[j] == '+' || chars[j] == '-') {
-                        j += 1;
-                    }
-                    if j < chars.len() && chars[j].is_ascii_digit() {
-                        while j < chars.len() && chars[j].is_ascii_digit() {
-                            j += 1;
-                        }
-                        i = j;
-                    }
-                }
-                let text: String = chars[start..i].iter().collect();
-                let v = text
-                    .parse::<f64>()
-                    .map_err(|_| (format!("bad number '{text}'"), start, i))?;
-                toks.push(Tok::Num(v));
-            }
-            c if c.is_alphabetic() || c == '_' => {
-                let start = i;
-                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
-                    i += 1;
-                }
-                toks.push(Tok::Ident(chars[start..i].iter().collect()));
-            }
-            ':' if chars.get(i + 1) == Some(&'=') => {
-                toks.push(Tok::Define);
-                i += 2;
-            }
-            '+' => {
-                toks.push(Tok::Plus);
-                i += 1;
-            }
-            '-' | '\u{2212}' => {
-                toks.push(Tok::Minus);
-                i += 1;
-            }
-            '*' | '\u{00b7}' | '\u{00d7}' => {
-                toks.push(Tok::Star);
-                i += 1;
-            }
-            '/' => {
-                toks.push(Tok::Slash);
-                i += 1;
-            }
-            '^' => {
-                toks.push(Tok::Caret);
-                i += 1;
-            }
-            '(' => {
-                toks.push(Tok::LParen);
-                i += 1;
-            }
-            ')' => {
-                toks.push(Tok::RParen);
-                i += 1;
-            }
-            ',' => {
-                toks.push(Tok::Comma);
-                i += 1;
-            }
-            '=' => {
-                toks.push(Tok::Equals);
-                i += 1;
-            }
-            other => return Err((format!("unexpected '{other}'"), i, i + 1)),
-        }
-        if toks.len() > before {
-            spans.push((begin, i));
-        }
-    }
-    Ok((toks, spans))
 }
 
 struct Parser {
@@ -246,6 +141,12 @@ impl Parser {
         let mut lhs = self.prefix()?;
         loop {
             let (op, lbp, rbp) = match self.peek() {
+                Some(Tok::EqEq) => (BinaryOp::Eq, 5, 6),
+                Some(Tok::NotEq) => (BinaryOp::Ne, 5, 6),
+                Some(Tok::Less) => (BinaryOp::Lt, 5, 6),
+                Some(Tok::Greater) => (BinaryOp::Gt, 5, 6),
+                Some(Tok::LessEq) => (BinaryOp::Le, 5, 6),
+                Some(Tok::GreaterEq) => (BinaryOp::Ge, 5, 6),
                 Some(Tok::Plus) => (BinaryOp::Add, 10, 11),
                 Some(Tok::Minus) => (BinaryOp::Sub, 10, 11),
                 Some(Tok::Star) => (BinaryOp::Mul, 20, 21),
@@ -267,20 +168,25 @@ impl Parser {
         match self.next() {
             Some(Tok::Num(v)) => self.after_number(v),
             Some(Tok::Ident(name)) => {
-                if self.eat(&Tok::LParen) {
+                let e = if self.eat(&Tok::LParen) {
                     let args = self.args()?;
-                    Ok(call(name, args))
+                    call(name, args)
                 } else {
-                    Ok(Expr::Name(name))
-                }
+                    Expr::Name(name)
+                };
+                self.indexed(e)
             }
             Some(Tok::LParen) => {
                 let e = self.expr(0)?;
                 if self.eat(&Tok::RParen) {
-                    Ok(e)
+                    self.indexed(e)
                 } else {
                     Err("missing ')'".into())
                 }
+            }
+            Some(Tok::LBracket) => {
+                let m = self.matrix()?;
+                self.indexed(m)
             }
             Some(Tok::Minus) => Ok(Expr::Unary {
                 op: UnaryOp::Neg,
@@ -296,6 +202,56 @@ impl Parser {
                 self.pos -= 1;
                 Err("expression ends early".into())
             }
+        }
+    }
+
+    /// Any number of `[i]` or `[i, j]` after a value.
+    fn indexed(&mut self, mut base: Expr) -> Result<Expr, String> {
+        while self.eat(&Tok::LBracket) {
+            let mut indices = vec![self.expr(0)?];
+            while self.eat(&Tok::Comma) {
+                indices.push(self.expr(0)?);
+            }
+            if !self.eat(&Tok::RBracket) {
+                return Err("missing ']'".into());
+            }
+            base = Expr::Index {
+                base: Box::new(base),
+                indices,
+            };
+        }
+        Ok(base)
+    }
+
+    /// The inside of `[ ... ]` after the opening bracket: rows separated by `;`,
+    /// cells by `,`. Every row must have the same length.
+    fn matrix(&mut self) -> Result<Expr, String> {
+        let mut cells = Vec::new();
+        let (mut rows, mut cols) = (0, 0);
+        loop {
+            let mut in_row = 0;
+            loop {
+                cells.push(self.expr(0)?);
+                in_row += 1;
+                if !self.eat(&Tok::Comma) {
+                    break;
+                }
+            }
+            if rows == 0 {
+                cols = in_row;
+            } else if in_row != cols {
+                return Err(format!(
+                    "every row needs {cols} cell(s), this one has {in_row}"
+                ));
+            }
+            rows += 1;
+            if self.eat(&Tok::Semicolon) {
+                continue;
+            }
+            if self.eat(&Tok::RBracket) {
+                return Ok(Expr::Matrix { rows, cols, cells });
+            }
+            return Err("missing ']'".into());
         }
     }
 
@@ -342,6 +298,17 @@ impl Parser {
 }
 
 fn call(name: String, mut args: Vec<Expr>) -> Expr {
+    if name == "if" && args.len() == 3 {
+        let (otherwise, then, cond) = (args.pop(), args.pop(), args.pop());
+        if let (Some(cond), Some(then), Some(otherwise)) = (cond, then, otherwise) {
+            return Expr::Conditional {
+                cond: Box::new(cond),
+                then: Box::new(then),
+                otherwise: Box::new(otherwise),
+            };
+        }
+        unreachable!("three arguments were checked");
+    }
     if name == "sqrt" && args.len() == 1 {
         if let Some(radicand) = args.pop() {
             return Expr::Root {
@@ -356,23 +323,6 @@ fn target_name(lhs: &Expr) -> Result<String, String> {
     match lhs {
         Expr::Name(n) => Ok(n.clone()),
         _ => Err("left of '=' must be a name".into()),
-    }
-}
-
-fn describe(t: &Tok) -> String {
-    match t {
-        Tok::Num(v) => format!("number {v}"),
-        Tok::Ident(n) => format!("'{n}'"),
-        Tok::Plus => "'+'".into(),
-        Tok::Minus => "'-'".into(),
-        Tok::Star => "'*'".into(),
-        Tok::Slash => "'/'".into(),
-        Tok::Caret => "'^'".into(),
-        Tok::LParen => "'('".into(),
-        Tok::RParen => "')'".into(),
-        Tok::Comma => "','".into(),
-        Tok::Define => "':='".into(),
-        Tok::Equals => "'='".into(),
     }
 }
 
@@ -547,6 +497,26 @@ mod tests {
             "f(".repeat(half / 2),
             ")".repeat(half / 2)
         ));
+        // The new nesting forms: matrix literals, indexing, conditionals, comparisons.
+        // Each must be valid (not a parse error), or only the error path is tested.
+        let valid = |src: String| {
+            assert!(!matches!(parse(&src), Expr::Error(_)), "{src}");
+            survives_on_small_stack(src);
+        };
+        valid(format!("{}1{}", "[".repeat(half), "]".repeat(half)));
+        valid(format!("x{}", "[0]".repeat(half / 2)));
+        valid(format!(
+            "{}1{}",
+            "x[".repeat(half / 2),
+            "]".repeat(half / 2)
+        ));
+        valid(format!(
+            "{}1{}",
+            "if(1,".repeat(half / 4),
+            ",2)".repeat(half / 4)
+        ));
+        valid(format!("1{}", "<1".repeat(half)));
+        valid(format!("1{}", "==1".repeat(half / 2)));
     }
 
     #[test]

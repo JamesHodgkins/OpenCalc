@@ -1,0 +1,134 @@
+42
+  42
+1.5e3
+  1500
+x
+  x
+σ_y
+  σ_y
+5 kN
+  (qty 5 kN)
+5 kN / (2 m) ^ 2
+  (/ (qty 5 kN) (^ (qty 2 m) 2))
+1 + 2 * 3
+  (+ 1 (* 2 3))
+(1 + 2) * 3
+  (* (+ 1 2) 3)
+1 - 2 - 3
+  (- (- 1 2) 3)
+1 - (2 - 3)
+  (- 1 (- 2 3))
+8 / 4 / 2
+  (/ (/ 8 4) 2)
+2 ^ 3 ^ 2
+  (^ 2 (^ 3 2))
+-2 ^ 2
+  (neg (^ 2 2))
+(-2) ^ 2
+  (^ (neg 2) 2)
+2 * -3
+  (* 2 (neg 3))
+-x + y
+  (+ (neg x) y)
+2 x
+  (* 2 x)
+2 (x + 1)
+  (* 2 (+ x 1))
+2 x ^ 2
+  (* 2 (^ x 2))
+3 m ^ 2
+  (* 3 (^ m 2))
+sin(x)
+  (call sin x)
+max(1, 2, 3)
+  (call max 1 2 3)
+f()
+  (call f )
+sqrt(x ^ 2 + y ^ 2)
+  (root (+ (^ x 2) (^ y 2)))
+x := 3
+  (:= x 3)
+x = 
+  (= x x)
+x = 5
+  (= x 5)
+area := w * h
+  (:= area (* w h))
+a == b
+  (== a b)
+a != b
+  (!= a b)
+a < b
+  (< a b)
+a >= b
+  (>= a b)
+a + 1 < b * 2
+  (< (+ a 1) (* b 2))
+1 < 2 == 3 > 2
+  (> (== (< 1 2) 3) 2)
+a ≤ b
+  (<= a b)
+a ≠ b
+  (!= a b)
+[1, 2, 3]
+  (matrix 1x3 1 2 3)
+[1; 2; 3]
+  (matrix 3x1 1 2 3)
+[1, 2; 3, 4]
+  (matrix 2x2 1 2 3 4)
+[1 m, 2 m]
+  (matrix 1x2 (qty 1 m) (qty 2 m))
+[a + 1, b * 2]
+  (matrix 1x2 (+ a 1) (* b 2))
+v[0]
+  (index v 0)
+M[i, j]
+  (index M i j)
+M[0][1]
+  (index (index M 0) 1)
+f(x)[2]
+  (index (call f x) 2)
+(a + b)[0]
+  (index (+ a b) 0)
+[1, 2][0]
+  (index (matrix 1x2 1 2) 0)
+-v[0]
+  (neg (index v 0))
+v[0] ^ 2
+  (^ (index v 0) 2)
+2 v[0]
+  (* 2 (index v 0))
+v[i + 1]
+  (index v (+ i 1))
+if(x > 0, x, -x)
+  (if (> x 0) x (neg x))
+if(a, if(b, 1, 2), 3)
+  (if a (if b 1 2) 3)
+if(1, 2)
+  (call if 1 2)
+
+  (error 0..0 empty)
+1 +
+  (error 3..3 expression ends early)
+(1 + 2
+  (error 6..6 missing ')')
+1 + * 2
+  (error 4..5 unexpected '*')
+[1, 2; 3]
+  (error 8..9 every row needs 2 cell(s), this one has 1)
+[1, 2
+  (error 5..5 missing ']')
+[]
+  (error 1..2 unexpected ']')
+v[0
+  (error 3..3 missing ']')
+v[]
+  (error 2..3 unexpected ']')
+2 [1]
+  (error 2..3 unexpected '[')
+1 = = 2
+  (error 2..3 left of '=' must be a name)
+2 + 3 := 4
+  (error 6..8 left of '=' must be a name)
+1 ! 2
+  (error 2..3 unexpected '!')

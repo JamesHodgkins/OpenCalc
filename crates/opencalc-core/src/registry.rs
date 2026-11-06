@@ -42,7 +42,7 @@ pub enum RegistryError {
 }
 
 /// The imaginary unit is the only constant; functions are in `functions`.
-const CONSTANTS: &[&str] = &["i"];
+const CONSTANTS: &[&str] = &["i", "if", "ORIGIN"];
 
 fn reserved(symbol: &str) -> bool {
     CONSTANTS.contains(&symbol) || crate::functions::lookup(symbol).is_some()
