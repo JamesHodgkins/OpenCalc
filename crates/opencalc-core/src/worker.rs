@@ -9,8 +9,9 @@ use std::panic::AssertUnwindSafe;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::JoinHandle;
 
-use crate::eval::{all_failed, evaluate, Output, RegionId};
+use crate::eval::{all_failed, evaluate_with, Output, RegionId};
 use crate::expr::Expr;
+use crate::registry::UnitRegistry;
 
 /// Stack for the evaluation thread. Virtual memory only; pages are committed as used.
 const WORKER_STACK: usize = 8 * 1024 * 1024;
@@ -19,6 +20,7 @@ enum Request {
     Recalculate {
         revision: u64,
         regions: Vec<(RegionId, Expr)>,
+        units: UnitRegistry,
     },
     Shutdown,
 }
@@ -57,14 +59,17 @@ impl Worker {
                     }
                     match latest {
                         Request::Shutdown => break,
-                        Request::Recalculate { revision, regions } => {
+                        Request::Recalculate {
+                            revision,
+                            regions,
+                            units,
+                        } => {
                             // A panic in the evaluator must not end the worker thread: report
                             // it on every region and keep serving requests.
-                            let output =
-                                std::panic::catch_unwind(AssertUnwindSafe(|| evaluate(&regions)))
-                                    .unwrap_or_else(|_| {
-                                        all_failed(&regions, "the evaluator panicked")
-                                    });
+                            let output = std::panic::catch_unwind(AssertUnwindSafe(|| {
+                                evaluate_with(&regions, &units)
+                            }))
+                            .unwrap_or_else(|_| all_failed(&regions, "the evaluator panicked"));
                             if res_tx.send(EvalResult { revision, output }).is_err() {
                                 break;
                             }
@@ -79,8 +84,22 @@ impl Worker {
 
     /// Queue a recalculation. Returns false if the worker has stopped.
     pub fn request(&self, revision: u64, regions: Vec<(RegionId, Expr)>) -> bool {
+        self.request_with(revision, regions, UnitRegistry::builtin())
+    }
+
+    /// Queue a recalculation with the worksheet's own units.
+    pub fn request_with(
+        &self,
+        revision: u64,
+        regions: Vec<(RegionId, Expr)>,
+        units: UnitRegistry,
+    ) -> bool {
         self.tx
-            .send(Request::Recalculate { revision, regions })
+            .send(Request::Recalculate {
+                revision,
+                regions,
+                units,
+            })
             .is_ok()
     }
 

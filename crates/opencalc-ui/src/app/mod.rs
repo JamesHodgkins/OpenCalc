@@ -53,12 +53,14 @@ impl App {
     fn recalculate(&mut self) {
         let calc = &mut self.state.calc;
         calc.revision += 1;
-        let snapshot = self
+        let (snapshot, units) = self
             .state
             .active_sheet()
-            .map(|s| s.doc.math_regions())
+            .map(|s| (s.doc.math_regions(), s.doc.units().unwrap_or_default()))
             .unwrap_or_default();
-        self.state.calc.worker_ok = self.worker.request(self.state.calc.revision, snapshot);
+        self.state.calc.worker_ok =
+            self.worker
+                .request_with(self.state.calc.revision, snapshot, units);
     }
 
     /// Take the worker's answer if it is for the revision now on screen.

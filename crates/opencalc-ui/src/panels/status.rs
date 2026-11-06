@@ -39,15 +39,39 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                 out.push(command);
             }
         }
-        // Shown but disabled: per-worksheet unit systems are not built yet (TD-09).
-        // A control that looks live but does nothing is worse than an honest stub.
-        let units = Look {
-            enabled: false,
-            active: false,
-        };
-        let width = w::small_width(ui, true, Some("SI"));
-        w::small_button(ui, &theme, units, Some(icons::RULER), Some("SI"), width)
-            .on_hover_text("Unit systems are not available yet. All values are SI internally.");
+        // The unit system of the active worksheet. Clicking steps SI, USCS, CGS.
+        if let Some(current) = state.unit_system_command() {
+            let next = match current {
+                CommandId::UnitsSi => CommandId::UnitsUscs,
+                CommandId::UnitsUscs => CommandId::UnitsCgs,
+                _ => CommandId::UnitsSi,
+            };
+            let label = current.label();
+            let look = Look {
+                enabled: true,
+                active: false,
+            };
+            let width = w::small_width(ui, true, Some(label));
+            let button = w::small_button(ui, &theme, look, Some(icons::RULER), Some(label), width);
+            if button
+                .on_hover_text(format!(
+                    "Show results in {} (click for {})",
+                    label,
+                    next.label()
+                ))
+                .clicked()
+            {
+                out.push(next);
+            }
+        } else {
+            let look = Look {
+                enabled: false,
+                active: false,
+            };
+            let width = w::small_width(ui, true, Some("SI"));
+            w::small_button(ui, &theme, look, Some(icons::RULER), Some("SI"), width)
+                .on_hover_text("Open a worksheet to choose its unit system");
+        }
 
         let n = state.output.warnings.len();
         let colour = if n > 0 {

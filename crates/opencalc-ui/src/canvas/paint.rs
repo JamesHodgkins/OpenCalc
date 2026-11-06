@@ -139,7 +139,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 t.layout(expr, size),
                 Some(plain(
                     f,
-                    &format!("= {}", format_value(q)),
+                    &format!("= {}", format_value(q, env.units)),
                     theme.text,
                     size,
                 )),

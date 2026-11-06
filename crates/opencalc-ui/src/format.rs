@@ -2,12 +2,13 @@
 //! (spec section 2.4) and user-chosen display units will grow here.
 
 use opencalc_core::numeric::Complex64;
+use opencalc_core::registry::UnitSystem;
 use opencalc_core::units::{Dimension, Quantity};
 use opencalc_core::value::Value;
 
-/// Units offered for automatic display, smallest first within a dimension.
-/// Conversion is for display only; values stay in SI.
-const DISPLAY: &[(&str, Dimension, f64)] = &[
+/// Units offered for automatic display in each unit system, smallest first
+/// within a dimension. Conversion is for display only; values stay in SI.
+const SI: &[(&str, Dimension, f64)] = &[
     ("mm", Dimension::LENGTH, 1e-3),
     ("m", Dimension::LENGTH, 1.0),
     ("km", Dimension::LENGTH, 1e3),
@@ -23,6 +24,50 @@ const DISPLAY: &[(&str, Dimension, f64)] = &[
     ("MPa", Dimension::PRESSURE, 1e6),
 ];
 
+const USCS: &[(&str, Dimension, f64)] = &[
+    ("in", Dimension::LENGTH, 0.0254),
+    ("ft", Dimension::LENGTH, 0.3048),
+    ("in\u{00b2}", Dimension::AREA, 0.0254 * 0.0254),
+    ("ft\u{00b2}", Dimension::AREA, 0.3048 * 0.3048),
+    ("lb", Dimension::MASS, 0.453_592_37),
+    ("s", Dimension::TIME, 1.0),
+    ("lbf", Dimension::FORCE, 4.448_221_615_260_5),
+    ("kip", Dimension::FORCE, 4_448.221_615_260_5),
+    ("psi", Dimension::PRESSURE, 6_894.757_293_168_36),
+    ("ksi", Dimension::PRESSURE, 6_894_757.293_168_36),
+];
+
+const CGS: &[(&str, Dimension, f64)] = &[
+    ("cm", Dimension::LENGTH, 1e-2),
+    ("cm\u{00b2}", Dimension::AREA, 1e-4),
+    ("g", Dimension::MASS, 1e-3),
+    ("s", Dimension::TIME, 1.0),
+    ("dyn", Dimension::FORCE, 1e-5),
+    ("Ba", Dimension::PRESSURE, 0.1),
+];
+
+/// A system's display units for a dimension. A dimension the system has no unit
+/// for (say, a volume in CGS) falls back to the SI table, then to SI base units.
+fn candidates(system: UnitSystem, dim: Dimension) -> Vec<(&'static str, f64)> {
+    let table = match system {
+        UnitSystem::Si => SI,
+        UnitSystem::Uscs => USCS,
+        UnitSystem::Cgs => CGS,
+    };
+    let pick = |t: &'static [(&'static str, Dimension, f64)]| -> Vec<(&'static str, f64)> {
+        t.iter()
+            .filter(|(_, d, _)| *d == dim)
+            .map(|(l, _, s)| (*l, *s))
+            .collect()
+    };
+    let own = pick(table);
+    if own.is_empty() {
+        pick(SI)
+    } else {
+        own
+    }
+}
+
 /// Relative slack when deciding whether a value reaches a unit. Arithmetic like
 /// 10 kN / (0.1 m)^2 gives 999999.9999999998 Pa, which is 1 MPa to anyone reading it.
 const ROUNDING: f64 = 1e-9;
@@ -31,17 +76,17 @@ const ROUNDING: f64 = 1e-9;
 /// gives a value of at least 1 (so 5 N stays "5 N" and 10 000 N becomes "10 kN"),
 /// or the smallest unit if the value is below 1 in all of them. Returns the
 /// label and the scale to divide SI values by.
-fn display_unit(dim: Dimension, magnitude: f64) -> (String, f64) {
+fn display_unit(system: UnitSystem, dim: Dimension, magnitude: f64) -> (String, f64) {
     if dim.is_dimensionless() {
         return (String::new(), 1.0);
     }
-    let candidates = DISPLAY.iter().filter(|(_, d, _)| *d == dim);
-    let chosen = candidates
-        .clone()
-        .rfind(|(_, _, scale)| magnitude >= scale * (1.0 - ROUNDING))
-        .or_else(|| candidates.min_by(|a, b| a.2.total_cmp(&b.2)));
+    let options = candidates(system, dim);
+    let chosen = options
+        .iter()
+        .rfind(|(_, scale)| magnitude >= scale * (1.0 - ROUNDING))
+        .or_else(|| options.iter().min_by(|a, b| a.1.total_cmp(&b.1)));
     match chosen {
-        Some((label, _, scale)) => ((*label).to_owned(), *scale),
+        Some((label, scale)) => ((*label).to_owned(), *scale),
         None => (si_base(dim), 1.0),
     }
 }
@@ -62,8 +107,8 @@ fn with_unit(text: String, label: &str) -> String {
     }
 }
 
-pub fn format_quantity(q: Quantity) -> String {
-    let (label, scale) = display_unit(q.dim, q.si.abs());
+pub fn format_quantity(q: Quantity, system: UnitSystem) -> String {
+    let (label, scale) = display_unit(system, q.dim, q.si.abs());
     with_unit(format!("{:.*}", digits(q.dim), q.si / scale), &label)
 }
 
@@ -79,13 +124,13 @@ fn complex_text(z: Complex64, scale: f64, digits: usize) -> String {
 
 /// Show any value. A complex scalar is `(3 + 4i) m`; a matrix lists its rows
 /// separated by semicolons (`2x2 [1, 2; 3, 4]`) until matrices get typeset.
-pub fn format_value(v: &Value) -> String {
+pub fn format_value(v: &Value, system: UnitSystem) -> String {
     const SHOWN: usize = 24;
     match v {
         Value::Scalar(s) => match s.as_real() {
-            Some(q) => format_quantity(q),
+            Some(q) => format_quantity(q, system),
             None => {
-                let (label, scale) = display_unit(s.dim, s.z.re.abs().max(s.z.im.abs()));
+                let (label, scale) = display_unit(system, s.dim, s.z.re.abs().max(s.z.im.abs()));
                 let text = complex_text(s.z, scale, digits(s.dim));
                 if label.is_empty() {
                     text
@@ -99,7 +144,7 @@ pub fn format_value(v: &Value) -> String {
                 .elements()
                 .iter()
                 .fold(0.0_f64, |p, z| p.max(z.re.abs()).max(z.im.abs()));
-            let (label, scale) = display_unit(m.dim, peak);
+            let (label, scale) = display_unit(system, m.dim, peak);
             let mut rows = Vec::new();
             let mut shown = 0;
             'rows: for r in 0..m.rows() {
@@ -151,14 +196,49 @@ mod tests {
     use super::*;
 
     fn show(v: f64, unit: &str) -> String {
-        format_quantity(Quantity::from_unit(v, unit).unwrap())
+        format_quantity(Quantity::from_unit(v, unit).unwrap(), UnitSystem::Si)
     }
 
     fn shown(src: &str) -> String {
         use opencalc_core::eval::{evaluate, RegionId};
         let regions = vec![(RegionId(1), opencalc_core::parser::parse(src))];
         let out = evaluate(&regions);
-        format_value(out.values[&RegionId(1)].as_ref().unwrap())
+        format_value(out.values[&RegionId(1)].as_ref().unwrap(), UnitSystem::Si)
+    }
+
+    fn shown_in(system: UnitSystem, v: f64, unit: &str) -> String {
+        format_quantity(Quantity::from_unit(v, unit).unwrap(), system)
+    }
+
+    #[test]
+    fn uscs_shows_feet_inches_and_psi() {
+        let u = UnitSystem::Uscs;
+        assert_eq!(shown_in(u, 1.0, "m"), "3.2808 ft");
+        assert_eq!(shown_in(u, 5.0, "mm"), "0.1969 in");
+        assert_eq!(shown_in(u, 1.0, "MPa"), "145.0377 psi");
+        assert_eq!(shown_in(u, 100.0, "MPa"), "14.5038 ksi");
+        assert_eq!(shown_in(u, 10.0, "kN"), "2.2481 kip");
+        assert_eq!(shown_in(u, 1.0, "kg"), "2.2046 lb");
+    }
+
+    #[test]
+    fn cgs_shows_centimetres_grams_and_dynes() {
+        let c = UnitSystem::Cgs;
+        assert_eq!(shown_in(c, 2.0, "m"), "200.0000 cm");
+        assert_eq!(shown_in(c, 1.0, "N"), "100000.0000 dyn");
+        assert_eq!(shown_in(c, 2.0, "kg"), "2000.0000 g");
+    }
+
+    #[test]
+    fn a_dimension_with_no_unit_in_the_system_falls_back_to_si() {
+        // Time has "s" everywhere; an unlisted dimension shows SI base units.
+        let volume = Quantity::from_unit(2.0, "m")
+            .unwrap()
+            .pow(Quantity::dimensionless(3.0))
+            .unwrap();
+        for system in UnitSystem::ALL {
+            assert_eq!(format_quantity(volume, system), "8.0000 m^3");
+        }
     }
 
     #[test]
@@ -221,7 +301,7 @@ mod tests {
             stress.si, 1e6,
             "the point of this test: it is not exactly 1e6"
         );
-        assert_eq!(format_quantity(stress), "1.0000 MPa");
+        assert_eq!(format_quantity(stress, UnitSystem::Si), "1.0000 MPa");
         // But a genuinely smaller value still steps down.
         assert_eq!(show(999.0, "kPa"), "999.0000 kPa");
     }
@@ -243,17 +323,23 @@ mod tests {
             .unwrap()
             .pow(Quantity::dimensionless(2.0))
             .unwrap();
-        assert_eq!(format_quantity(small), "100.0000 mm\u{00b2}");
+        assert_eq!(
+            format_quantity(small, UnitSystem::Si),
+            "100.0000 mm\u{00b2}"
+        );
         let big = Quantity::from_unit(3.0, "m")
             .unwrap()
             .pow(Quantity::dimensionless(2.0))
             .unwrap();
-        assert_eq!(format_quantity(big), "9.0000 m\u{00b2}");
+        assert_eq!(format_quantity(big, UnitSystem::Si), "9.0000 m\u{00b2}");
     }
 
     #[test]
     fn dimensionless_has_no_unit() {
-        assert_eq!(format_quantity(Quantity::dimensionless(1.5)), "1.500000");
+        assert_eq!(
+            format_quantity(Quantity::dimensionless(1.5), UnitSystem::Si),
+            "1.500000"
+        );
     }
 
     #[test]
@@ -263,6 +349,6 @@ mod tests {
             .unwrap()
             .over(Quantity::from_unit(2.0, "m").unwrap())
             .unwrap();
-        assert_eq!(format_quantity(q), "3000.0000 kg*s^-2");
+        assert_eq!(format_quantity(q, UnitSystem::Si), "3000.0000 kg*s^-2");
     }
 }

@@ -3,6 +3,7 @@
 
 use eframe::egui::{Pos2, Rect};
 use opencalc_core::eval::Output;
+use opencalc_core::registry::UnitSystem;
 
 use crate::commands::{CommandContext, CommandId};
 use crate::sheet::OpenSheet;
@@ -97,7 +98,17 @@ impl AppState {
         ]
         .into_iter()
         .filter_map(|(on, command)| on.then_some(command))
+        .chain(self.unit_system_command())
         .collect()
+    }
+
+    /// The unit system of the active worksheet, as its command.
+    pub fn unit_system_command(&self) -> Option<CommandId> {
+        self.active_sheet().map(|s| match s.doc.unit_system() {
+            UnitSystem::Si => CommandId::UnitsSi,
+            UnitSystem::Uscs => CommandId::UnitsUscs,
+            UnitSystem::Cgs => CommandId::UnitsCgs,
+        })
     }
 
     pub fn status_text(&self) -> String {
@@ -153,7 +164,7 @@ mod tests {
     #[test]
     fn active_toggles_list_exactly_the_switched_on_ones() {
         let mut s = AppState::new(PaletteKey::Neutral);
-        assert_eq!(s.active_toggles().len(), 5);
+        assert_eq!(s.active_toggles().len(), 6);
         s.snap = false;
         s.show_names = false;
         let on = s.active_toggles();

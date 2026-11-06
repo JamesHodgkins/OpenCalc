@@ -17,6 +17,7 @@ use eframe::egui::{
 use opencalc_core::document::{Region, RegionId, RegionKind};
 use opencalc_core::edit::Edit;
 use opencalc_core::eval::Output;
+use opencalc_core::registry::UnitSystem;
 
 use crate::theme::{type_size, Theme};
 use adapt::{point, rect_of, Sizes};
@@ -28,6 +29,7 @@ use view::{snap, GRID};
 pub struct Env<'a> {
     pub theme: &'a Theme,
     pub output: &'a Output,
+    pub units: UnitSystem,
     pub show_grid: bool,
     pub snap: bool,
 }

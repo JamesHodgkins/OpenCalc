@@ -9,7 +9,8 @@ use std::collections::HashMap;
 
 use crate::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
 use crate::functions;
-use crate::units::{Quantity, UnitError};
+use crate::registry::UnitRegistry;
+use crate::units::UnitError;
 use crate::value::{Value, ValueError};
 
 pub use crate::document::RegionId;
@@ -50,6 +51,12 @@ impl From<ValueError> for EvalError {
 
 type Env = HashMap<String, Result<Value, EvalError>>;
 
+/// What an expression is evaluated against: the defined names and the units.
+struct Cx<'a> {
+    env: Env,
+    units: &'a UnitRegistry,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Warning {
     /// A name defined by more than one region. The last in layout order wins.
@@ -77,8 +84,13 @@ pub fn all_failed(regions: &[(RegionId, Expr)], message: &str) -> Output {
     out
 }
 
-/// Evaluate regions given in layout order.
+/// Evaluate regions given in layout order, with only the built-in units.
 pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
+    evaluate_with(regions, &UnitRegistry::builtin())
+}
+
+/// Evaluate regions given in layout order, with the worksheet's units.
+pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Output {
     let mut out = Output::default();
 
     // name -> definer; last definition in layout order wins.
@@ -126,7 +138,10 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
         })
         .collect();
 
-    let mut env: Env = HashMap::new();
+    let mut cx = Cx {
+        env: HashMap::new(),
+        units,
+    };
     for component in tarjan(&edges) {
         let cyclic = component.len() > 1 || edges[component[0]].contains(&component[0]);
         for &i in &component {
@@ -134,7 +149,7 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
             let result = if cyclic {
                 Err(EvalError::Cycle)
             } else {
-                eval_region(expr, &env)
+                eval_region(expr, &cx)
             };
             if let Expr::Assign {
                 kind: AssignKind::Define,
@@ -143,7 +158,7 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
             } = expr
             {
                 if winner.get(target.as_str()) == Some(id) {
-                    env.insert(target.clone(), result.clone());
+                    cx.env.insert(target.clone(), result.clone());
                 }
             }
             out.values.insert(*id, result);
@@ -152,17 +167,17 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
     out
 }
 
-fn eval_region(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
+fn eval_region(expr: &Expr, cx: &Cx) -> Result<Value, EvalError> {
     match expr {
-        Expr::Assign { value, .. } => eval(value, env),
-        other => eval(other, env),
+        Expr::Assign { value, .. } => eval(value, cx),
+        other => eval(other, cx),
     }
 }
 
 /// Evaluate one expression. The single choke point that rejects non-finite
 /// results, so they cannot reach a displayed value.
-fn eval(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
-    let v = eval_node(expr, env)?;
+fn eval(expr: &Expr, cx: &Cx) -> Result<Value, EvalError> {
+    let v = eval_node(expr, cx)?;
     if v.is_finite() {
         Ok(v)
     } else {
@@ -170,15 +185,17 @@ fn eval(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
     }
 }
 
-fn eval_node(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
+fn eval_node(expr: &Expr, cx: &Cx) -> Result<Value, EvalError> {
     match expr {
         Expr::Number(v) => Ok(Value::dimensionless(*v)),
-        Expr::Quantity { value, unit } => Ok(Quantity::from_unit(*value, unit)?.into()),
+        Expr::Quantity { value, unit } => Ok(cx.units.quantity(*value, unit)?.into()),
         // A defined variable shadows a unit of the same name, and a unit shadows
         // the imaginary unit `i`.
-        Expr::Name(n) => match env.get(n) {
+        Expr::Name(n) => match cx.env.get(n) {
             Some(r) => r.clone(),
-            None => Quantity::from_unit(1.0, n)
+            None => cx
+                .units
+                .quantity(1.0, n)
                 .map(Value::from)
                 .or_else(|_| constant(n))
                 .map_err(|_| EvalError::Undefined(n.clone())),
@@ -186,18 +203,18 @@ fn eval_node(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
         Expr::Unary {
             op: UnaryOp::Neg,
             arg,
-        } => Ok(eval(arg, env)?.negated()),
-        Expr::Binary { op, lhs, rhs } => binary(*op, &eval(lhs, env)?, &eval(rhs, env)?),
-        Expr::Fraction { num, den } => binary(BinaryOp::Div, &eval(num, env)?, &eval(den, env)?),
-        Expr::Root { radicand } => functions::call("sqrt", &[eval(radicand, env)?]),
+        } => Ok(eval(arg, cx)?.negated()),
+        Expr::Binary { op, lhs, rhs } => binary(*op, &eval(lhs, cx)?, &eval(rhs, cx)?),
+        Expr::Fraction { num, den } => binary(BinaryOp::Div, &eval(num, cx)?, &eval(den, cx)?),
+        Expr::Root { radicand } => functions::call("sqrt", &[eval(radicand, cx)?]),
         Expr::Call { name, args } => {
             let values = args
                 .iter()
-                .map(|a| eval(a, env))
+                .map(|a| eval(a, cx))
                 .collect::<Result<Vec<_>, _>>()?;
             functions::call(name, &values)
         }
-        Expr::Assign { value, .. } => eval(value, env),
+        Expr::Assign { value, .. } => eval(value, cx),
         Expr::Error(msg) => Err(EvalError::Invalid(msg.clone())),
     }
 }
@@ -286,7 +303,7 @@ fn tarjan(edges: &[Vec<usize>]) -> Vec<Vec<usize>> {
 mod tests {
     use super::*;
     use crate::expr::BinaryOp::*;
-    use crate::units::Dimension;
+    use crate::units::{Dimension, Quantity};
 
     fn id(n: u64) -> RegionId {
         RegionId(n)
@@ -493,6 +510,47 @@ mod tests {
         assert_eq!(run_src("2 ^ 10").map(|q| q.si), Ok(1024.0));
         assert_eq!(run_src("0 * 5").map(|q| q.si), Ok(0.0));
         assert!(run_src("1e300 * 1e7").is_ok_and(|q| q.si > 9.9e306 && q.si < 1.1e307));
+    }
+
+    #[test]
+    fn a_worksheets_own_units_work_after_a_number_and_as_a_name() {
+        use crate::units::UnitDef;
+        let units = UnitRegistry::new(vec![UnitDef {
+            symbol: "furlong".into(),
+            dimension: Dimension::LENGTH,
+            to_si_scale: 201.168,
+        }])
+        .unwrap();
+        let regions = vec![
+            (id(1), crate::parser::parse("a := 2 furlong")),
+            (id(2), crate::parser::parse("b := a + 1 furlong")),
+            (id(3), crate::parser::parse("c := b / 1 m")),
+        ];
+        let out = evaluate_with(&regions, &units);
+        let c = out.values[&id(3)].as_ref().unwrap().as_real().unwrap();
+        assert!((c.si - 3.0 * 201.168).abs() < 1e-9 && c.dim == Dimension::NONE);
+        // Without the definition the same worksheet reports the unit as undefined.
+        assert!(matches!(
+            evaluate(&regions).values[&id(1)],
+            Err(EvalError::Undefined(_))
+        ));
+    }
+
+    #[test]
+    fn a_variable_shadows_a_custom_unit_of_the_same_name() {
+        use crate::units::UnitDef;
+        let units = UnitRegistry::new(vec![UnitDef {
+            symbol: "w".into(),
+            dimension: Dimension::LENGTH,
+            to_si_scale: 10.0,
+        }])
+        .unwrap();
+        let regions = vec![
+            (id(1), crate::parser::parse("w := 3")),
+            (id(2), crate::parser::parse("r := 2 w")),
+        ];
+        let out = evaluate_with(&regions, &units);
+        assert_eq!(si(&out, 2), 6.0);
     }
 
     #[test]

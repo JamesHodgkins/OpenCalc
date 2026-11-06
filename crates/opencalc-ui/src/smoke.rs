@@ -151,6 +151,24 @@ fn release(pos: Pos2) -> Event {
 const F: RegionId = RegionId(3);
 
 #[test]
+fn switching_unit_system_redraws_results_without_recalculating() {
+    let mut h = Harness::new();
+    h.settle();
+    let applied = h.app.state.calc.applied;
+    for command in [
+        CommandId::UnitsUscs,
+        CommandId::UnitsCgs,
+        CommandId::UnitsSi,
+    ] {
+        h.command(command);
+        h.settle();
+    }
+    // Display only: the worker was not asked for anything.
+    assert_eq!(h.app.state.calc.applied, applied);
+    assert!(h.app.state.output.values.values().all(Result::is_ok));
+}
+
+#[test]
 fn the_sample_sheet_renders_and_every_region_evaluates() {
     let mut h = Harness::new();
     h.settle();

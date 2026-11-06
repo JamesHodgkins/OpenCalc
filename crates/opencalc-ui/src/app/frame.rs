@@ -120,6 +120,7 @@ impl App {
         let env = canvas::Env {
             theme: &state.theme,
             output: &state.output,
+            units: state.sheets[sheet].doc.unit_system(),
             show_grid: state.show_grid,
             snap: state.snap,
         };

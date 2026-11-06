@@ -5,6 +5,8 @@
 //! back as an [`Effect`] for `App` to carry out.
 
 use opencalc_core::document::RegionKind;
+use opencalc_core::edit::Edit;
+use opencalc_core::registry::UnitSystem;
 
 use super::state::AppState;
 use crate::canvas::CanvasCmd;
@@ -93,6 +95,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             s.redo();
         }),
         CalcAll => fx.push(Effect::Recalculate),
+        UnitsSi => set_unit_system(state, UnitSystem::Si),
+        UnitsUscs => set_unit_system(state, UnitSystem::Uscs),
+        UnitsCgs => set_unit_system(state, UnitSystem::Cgs),
 
         ViewZoomIn => zoom_by(state, 1.25),
         ViewZoomOut => zoom_by(state, 1.0 / 1.25),
@@ -181,6 +186,15 @@ fn with_eval_check(state: &mut AppState, fx: &mut Vec<Effect>, f: impl FnOnce(&m
     f(&mut state.sheets[i]);
     if state.sheets[i].doc.eval_revision() != before {
         fx.push(Effect::Recalculate);
+    }
+}
+
+/// Show results in another unit system. Display only, so no recalculation; it
+/// is an edit so it can be undone.
+fn set_unit_system(state: &mut AppState, system: UnitSystem) {
+    if let Some(i) = state.active {
+        state.sheets[i].edit(Edit::SetUnitSystem(system));
+        state.sheets[i].seal();
     }
 }
 
@@ -468,5 +482,36 @@ mod tests {
             !s.sheets[0].can_undo(),
             "two steps: the sealed burst and the last edit"
         );
+    }
+
+    #[test]
+    fn choosing_a_unit_system_is_an_undoable_edit_that_needs_no_recalculation() {
+        let mut s = state();
+        s.active = Some(0);
+        assert_eq!(run(&mut s, CommandId::UnitsUscs), vec![]);
+        assert_eq!(s.sheets[0].doc.unit_system(), UnitSystem::Uscs);
+        assert_eq!(s.unit_system_command(), Some(CommandId::UnitsUscs));
+        assert!(s.active_toggles().contains(&CommandId::UnitsUscs));
+        run(&mut s, CommandId::UnitsCgs);
+        assert_eq!(s.sheets[0].doc.unit_system(), UnitSystem::Cgs);
+        // Each choice is its own undo step.
+        assert_eq!(run(&mut s, CommandId::EditUndo), vec![]);
+        assert_eq!(s.sheets[0].doc.unit_system(), UnitSystem::Uscs);
+        run(&mut s, CommandId::EditUndo);
+        assert_eq!(s.sheets[0].doc.unit_system(), UnitSystem::Si);
+    }
+
+    #[test]
+    fn each_worksheet_keeps_its_own_unit_system() {
+        let mut s = state();
+        s.active = Some(0);
+        run(&mut s, CommandId::UnitsUscs);
+        run(&mut s, CommandId::FileNew);
+        assert_eq!(s.unit_system_command(), Some(CommandId::UnitsSi));
+        s.active = Some(0);
+        assert_eq!(s.unit_system_command(), Some(CommandId::UnitsUscs));
+        s.active = None;
+        assert_eq!(s.unit_system_command(), None);
+        assert_eq!(dispatch(&mut s, CommandId::UnitsSi), Some(vec![]));
     }
 }

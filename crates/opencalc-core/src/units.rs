@@ -122,6 +122,13 @@ const BUILTIN: &[(&str, Dimension, f64)] = &[
     ("Pa", Dimension::PRESSURE, 1.0),
     ("kPa", Dimension::PRESSURE, 1e3),
     ("MPa", Dimension::PRESSURE, 1e6),
+    // US customary and CGS, so results can be shown in them (see `UnitSystem`).
+    ("lbf", Dimension::FORCE, 4.448_221_615_260_5),
+    ("kip", Dimension::FORCE, 4_448.221_615_260_5),
+    ("psi", Dimension::PRESSURE, 6_894.757_293_168_36),
+    ("ksi", Dimension::PRESSURE, 6_894_757.293_168_36),
+    ("dyn", Dimension::FORCE, 1e-5),
+    ("Ba", Dimension::PRESSURE, 0.1),
 ];
 
 /// Look up a built-in unit by symbol.

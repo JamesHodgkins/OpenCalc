@@ -19,6 +19,7 @@ pub fn show(ui: &mut Ui, state: &AppState) {
         ui.label(RichText::new("No worksheet open").color(theme.text_weak));
         return;
     };
+    let units = sheet.doc.unit_system();
     let mut any = false;
     for r in sheet.doc.regions() {
         let RegionKind::Math(m) = &r.kind else {
@@ -34,7 +35,7 @@ pub fn show(ui: &mut Ui, state: &AppState) {
         };
         any = true;
         let value = match state.output.values.get(&r.id) {
-            Some(Ok(q)) => format_value(q),
+            Some(Ok(q)) => format_value(q, units),
             Some(Err(_)) => "error".to_owned(),
             None => "\u{2026}".to_owned(),
         };

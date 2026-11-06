@@ -12,6 +12,8 @@ pub use geometry::{Point, Size};
 pub use region::{MathRegion, Region, RegionId, RegionKind};
 
 use crate::expr::Expr;
+use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
+use crate::units::UnitDef;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Worksheet {
@@ -22,6 +24,12 @@ pub struct Worksheet {
     /// Next region ID to hand out. Only ever grows, so an ID is never reused even
     /// after the region is deleted and the deletion undone.
     pub(crate) next_id: u64,
+    /// Which units results are displayed in. Display only; values are SI.
+    #[serde(default)]
+    pub(crate) unit_system: UnitSystem,
+    /// Units defined by this worksheet, beyond the built-in ones.
+    #[serde(default)]
+    pub(crate) custom_units: Vec<UnitDef>,
     /// Bumped by every applied edit. Not saved; lets caches notice change.
     #[serde(skip)]
     pub(crate) revision: u64,
@@ -35,7 +43,10 @@ pub struct Worksheet {
 /// allocation state and `revision` is bookkeeping, so neither counts.
 impl PartialEq for Worksheet {
     fn eq(&self, other: &Worksheet) -> bool {
-        self.title == other.title && self.regions == other.regions
+        self.title == other.title
+            && self.regions == other.regions
+            && self.unit_system == other.unit_system
+            && self.custom_units == other.custom_units
     }
 }
 
@@ -45,6 +56,8 @@ impl Worksheet {
             title: title.to_owned(),
             regions: Vec::new(),
             next_id: 1,
+            unit_system: UnitSystem::default(),
+            custom_units: Vec::new(),
             revision: 0,
             eval_revision: 0,
         }
@@ -52,6 +65,20 @@ impl Worksheet {
 
     pub fn title(&self) -> &str {
         &self.title
+    }
+
+    pub fn unit_system(&self) -> UnitSystem {
+        self.unit_system
+    }
+
+    pub fn custom_units(&self) -> &[UnitDef] {
+        &self.custom_units
+    }
+
+    /// The units this worksheet can use. Edits only accept valid definitions, so
+    /// this fails only for a file that was edited by hand; loading must check it.
+    pub fn units(&self) -> Result<UnitRegistry, RegistryError> {
+        UnitRegistry::new(self.custom_units.clone())
     }
 
     pub fn regions(&self) -> &[Region] {
@@ -225,5 +252,21 @@ mod tests {
             _ => panic!("expected a math region"),
         };
         assert!(matches!(expr, Expr::Error(_)));
+    }
+
+    #[test]
+    fn unit_settings_are_saved_and_old_files_without_them_still_load() {
+        let mut w = sample();
+        w.unit_system = UnitSystem::Uscs;
+        let back: Worksheet = serde_json::from_str(&serde_json::to_string(&w).unwrap()).unwrap();
+        assert_eq!(back.unit_system(), UnitSystem::Uscs);
+        // A file from before unit settings existed has neither field.
+        let mut value: serde_json::Value = serde_json::to_value(sample()).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("unit_system");
+        object.remove("custom_units");
+        let old: Worksheet = serde_json::from_value(value).unwrap();
+        assert_eq!(old.unit_system(), UnitSystem::Si);
+        assert!(old.custom_units().is_empty());
     }
 }

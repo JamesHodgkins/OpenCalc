@@ -34,7 +34,10 @@ impl RunKey {
             Edit::SetMathSource { id, .. } => Some(RunKey::Source(*id)),
             Edit::SetText { id, .. } => Some(RunKey::Text(*id)),
             Edit::SetRegionSize { id, .. } => Some(RunKey::Size(*id)),
-            Edit::InsertRegions { .. } | Edit::DeleteRegions { .. } => None,
+            Edit::InsertRegions { .. }
+            | Edit::DeleteRegions { .. }
+            | Edit::SetUnitSystem(_)
+            | Edit::SetCustomUnits(_) => None,
         }
     }
 }

@@ -182,15 +182,15 @@ impl CommandId {
             | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
             | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
             | ViewGrid | ViewSnap | ViewLive | ViewNames | ViewProperties | ViewResetLayout
-            | ViewTheme | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) => true,
+            | ViewTheme | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
+            | SelectSheet(_) | CloseSheet(_) => true,
             FileOpen | FileSave | ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind
             | EditReplace | RegionLock | RegionTag | InsertGreek | InsertSymbol(_) | FormatBold
             | FormatItalic | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
-            | FormatEngineering | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate | UnitsSi
-            | UnitsUscs | UnitsCgs | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn
-            | UnitsDisplayN | UnitsDisplayKn | UnitsDisplayReset | UnitsDefine | UnitsManage
-            | CalcChanged | CalcCheck | WarnList | WarnNext | WarnPrev | ViewGuides
-            | HelpShortcuts | HelpGuide => false,
+            | FormatEngineering | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate
+            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
+            | UnitsDisplayReset | UnitsDefine | UnitsManage | CalcChanged | CalcCheck
+            | WarnList | WarnNext | WarnPrev | ViewGuides | HelpShortcuts | HelpGuide => false,
         }
     }
 

@@ -11,6 +11,8 @@
 mod history;
 
 use crate::document::{Point, Region, RegionId, RegionKind, Size, Worksheet};
+use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
+use crate::units::UnitDef;
 
 pub use history::History;
 
@@ -41,6 +43,10 @@ pub enum Edit {
         id: RegionId,
         size: Size,
     },
+    /// Display results in another unit system. Does not change any value.
+    SetUnitSystem(UnitSystem),
+    /// Replace the worksheet's own unit definitions.
+    SetCustomUnits(Vec<UnitDef>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -55,6 +61,8 @@ pub enum EditError {
     UnorderedIndices,
     #[error("region {0:?} is not the right kind for this edit")]
     WrongKind(RegionId),
+    #[error("invalid unit definitions: {0}")]
+    BadUnits(#[from] RegistryError),
 }
 
 /// The result of applying an edit.
@@ -70,7 +78,7 @@ pub struct Applied {
 /// Whether an edit changes math content: new math source, or math regions added.
 fn touches_math(edit: &Edit) -> bool {
     match edit {
-        Edit::SetMathSource { .. } => true,
+        Edit::SetMathSource { .. } | Edit::SetCustomUnits(_) => true,
         Edit::InsertRegions { regions } => regions
             .iter()
             .any(|(_, r)| matches!(r.kind, RegionKind::Math(_))),
@@ -123,6 +131,17 @@ impl Worksheet {
                 let region = self.region_mut(*id)?;
                 let old = std::mem::replace(&mut region.size, *size);
                 Ok(Edit::SetRegionSize { id: *id, size: old })
+            }
+            Edit::SetUnitSystem(system) => Ok(Edit::SetUnitSystem(std::mem::replace(
+                &mut self.unit_system,
+                *system,
+            ))),
+            Edit::SetCustomUnits(units) => {
+                UnitRegistry::new(units.clone())?;
+                Ok(Edit::SetCustomUnits(std::mem::replace(
+                    &mut self.custom_units,
+                    units.clone(),
+                )))
             }
         }
     }
@@ -199,6 +218,70 @@ impl Worksheet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn furlong() -> UnitDef {
+        UnitDef {
+            symbol: "furlong".into(),
+            dimension: crate::units::Dimension::LENGTH,
+            to_si_scale: 201.168,
+        }
+    }
+
+    #[test]
+    fn the_unit_system_changes_by_edit_and_undoes() {
+        let mut w = Worksheet::new("t");
+        let before = w.eval_revision();
+        let applied = w.apply(Edit::SetUnitSystem(UnitSystem::Uscs)).unwrap();
+        assert_eq!(w.unit_system(), UnitSystem::Uscs);
+        assert_eq!(applied.inverse, Edit::SetUnitSystem(UnitSystem::Si));
+        // Display only: no recalculation is needed.
+        assert_eq!(w.eval_revision(), before);
+        assert_eq!(w.revision(), 1);
+        w.apply(applied.inverse).unwrap();
+        assert_eq!(w.unit_system(), UnitSystem::Si);
+        // Setting what is already set is a no-op.
+        assert!(
+            !w.apply(Edit::SetUnitSystem(UnitSystem::Si))
+                .unwrap()
+                .changed
+        );
+    }
+
+    #[test]
+    fn custom_units_change_by_edit_undo_and_force_a_recalculation() {
+        let mut w = Worksheet::new("t");
+        let before = w.eval_revision();
+        let applied = w.apply(Edit::SetCustomUnits(vec![furlong()])).unwrap();
+        assert_eq!(w.custom_units(), [furlong()]);
+        assert_eq!(w.eval_revision(), before + 1);
+        w.apply(applied.inverse).unwrap();
+        assert!(w.custom_units().is_empty());
+    }
+
+    #[test]
+    fn invalid_unit_definitions_change_nothing() {
+        let mut w = Worksheet::new("t");
+        let mut bad = furlong();
+        bad.symbol = "m".into();
+        let err = w.apply(Edit::SetCustomUnits(vec![bad])).unwrap_err();
+        assert!(matches!(err, EditError::BadUnits(_)));
+        assert!(w.custom_units().is_empty());
+        assert_eq!(w.revision(), 0);
+    }
+
+    #[test]
+    fn unit_settings_edits_never_merge_in_history() {
+        let mut w = Worksheet::new("t");
+        let mut h = History::default();
+        h.apply(&mut w, Edit::SetUnitSystem(UnitSystem::Uscs))
+            .unwrap();
+        h.apply(&mut w, Edit::SetUnitSystem(UnitSystem::Cgs))
+            .unwrap();
+        h.undo(&mut w).unwrap();
+        assert_eq!(w.unit_system(), UnitSystem::Uscs);
+        h.undo(&mut w).unwrap();
+        assert_eq!(w.unit_system(), UnitSystem::Si);
+    }
 
     fn sheet() -> (Worksheet, Vec<RegionId>) {
         let mut w = Worksheet::new("t");
