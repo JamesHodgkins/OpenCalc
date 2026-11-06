@@ -407,4 +407,93 @@ mod tests {
         f.sync("ab+cde");
         assert_eq!(f.caret, 2, "the caret keeps its distance from the end");
     }
+
+    #[test]
+    fn goal_x_is_dropped_by_any_caret_move_or_edit() {
+        let mut f = Field::new("abc");
+        f.goal_x = Some(10.0);
+        f.set_caret(1, false);
+        assert_eq!(f.goal_x, None);
+        f.goal_x = Some(10.0);
+        f.insert("z");
+        assert_eq!(f.goal_x, None);
+    }
+
+    mod props {
+        use super::*;
+        use proptest::prelude::*;
+
+        #[derive(Clone, Debug)]
+        enum Op {
+            Insert(String),
+            Typed(String),
+            Backspace,
+            Delete,
+            Caret(usize, bool),
+            Select(usize, usize),
+            SelectAll,
+            Sync(String),
+        }
+
+        fn op() -> impl Strategy<Value = Op> {
+            // Any Unicode text, including controls, combining marks and astral chars.
+            let s = || prop::string::string_regex("(?s).{0,12}").unwrap();
+            prop_oneof![
+                s().prop_map(Op::Insert),
+                s().prop_map(Op::Typed),
+                Just(Op::Backspace),
+                Just(Op::Delete),
+                (0..40usize, any::<bool>()).prop_map(|(a, b)| Op::Caret(a, b)),
+                (0..40usize, 0..40usize).prop_map(|(a, b)| Op::Select(a, b)),
+                Just(Op::SelectAll),
+                s().prop_map(Op::Sync),
+            ]
+        }
+
+        proptest! {
+            #[test]
+            fn caret_and_anchor_stay_in_range_and_the_selection_is_a_valid_slice(
+                start in "(?s).{0,12}",
+                ops in prop::collection::vec(op(), 0..40),
+            ) {
+                let mut f = Field::new(&start);
+                for o in ops {
+                    match o {
+                        Op::Insert(s) => f.insert(&s),
+                        Op::Typed(s) => f.typed(&s, |_| None),
+                        Op::Backspace => f.backspace(),
+                        Op::Delete => f.delete(),
+                        Op::Caret(a, e) => f.set_caret(a, e),
+                        Op::Select(a, b) => f.select(a, b),
+                        Op::SelectAll => f.select_all(),
+                        Op::Sync(s) => f.sync(&s),
+                    }
+                    prop_assert!(f.caret <= f.len());
+                    prop_assert!(f.anchor <= f.len());
+                    let (a, b) = f.selection();
+                    prop_assert!(a <= b && b <= f.len());
+                    let _ = f.selected_text();
+                    prop_assert!(f.word_left(f.caret) <= f.caret);
+                    prop_assert!(f.word_right(f.caret) >= f.caret);
+                    prop_assert!(f.word_right(f.caret) <= f.len());
+                }
+            }
+
+            #[test]
+            fn insertion_never_exceeds_the_cap_and_replacing_with_the_old_text_restores_it(
+                base in "[a-z +*/^()]{0,20}",
+                pasted in "(?s).{0,30}",
+                at in 0..25usize,
+            ) {
+                let mut f = Field::new(&base);
+                let a = at.min(f.len());
+                f.select(a, a);
+                f.insert(&pasted);
+                prop_assert!(f.len() <= MAX_CHARS.max(base.chars().count()));
+                let inserted = f.caret - a;
+                f.replace(a, a + inserted, "");
+                prop_assert_eq!(f.text(), base);
+            }
+        }
+    }
 }

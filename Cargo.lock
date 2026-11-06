@@ -2431,6 +2431,7 @@ version = "0.0.1"
 dependencies = [
  "eframe",
  "opencalc-core",
+ "proptest",
 ]
 
 [[package]]

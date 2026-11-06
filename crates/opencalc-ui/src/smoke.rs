@@ -1173,3 +1173,75 @@ fn clicking_a_flyout_that_floats_over_the_canvas_does_not_end_editing() {
         "still editing after the click"
     );
 }
+
+#[test]
+fn up_and_down_remember_the_column_they_started_from() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("a / b");
+    h.press_key(Key::End, Modifiers::NONE);
+    h.press_key(Key::ArrowUp, Modifiers::NONE);
+    let goal = h.sheet().canvas.field.as_ref().expect("editing").goal_x;
+    assert!(goal.is_some(), "a vertical move records its column");
+    h.press_key(Key::ArrowDown, Modifiers::NONE);
+    assert_eq!(
+        h.sheet().canvas.field.as_ref().expect("editing").goal_x,
+        goal,
+        "the column survives repeated vertical moves"
+    );
+    h.press_key(Key::ArrowLeft, Modifiers::NONE);
+    assert_eq!(
+        h.sheet().canvas.field.as_ref().expect("editing").goal_x,
+        None,
+        "a horizontal move forgets it"
+    );
+    assert_eq!(
+        h.source_of(id),
+        "a / b",
+        "navigation never edits the source"
+    );
+}
+
+#[test]
+fn moving_the_caret_makes_no_edit_and_undo_while_editing_keeps_it_in_range() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x + 12345");
+    let before = h.source_of(id);
+    h.press_key(Key::Home, Modifiers::NONE);
+    h.press_key(Key::ArrowRight, SHIFT);
+    h.press_key(Key::End, Modifiers::NONE);
+    assert_eq!(
+        h.source_of(id),
+        before,
+        "caret and selection moves are not edits"
+    );
+    h.press_key(Key::Z, Modifiers::COMMAND);
+    let len = h.source_of(id).chars().count();
+    if let Some(f) = h.sheet().canvas.field.as_ref() {
+        assert!(
+            f.caret <= len && f.anchor <= len,
+            "caret clamped after undo"
+        );
+    }
+}
+
+#[test]
+fn the_crosshair_follows_a_click_on_blank_page() {
+    let mut h = Harness::new();
+    h.settle();
+    let before = h.sheet().canvas.insert_at;
+    let at = h.app.state.viewport.max - egui::vec2(120.0, 80.0);
+    h.frame_with(vec![Event::PointerMoved(at)]);
+    h.frame_with(vec![press(at)]);
+    h.frame_with(vec![release(at)]);
+    assert_ne!(
+        h.sheet().canvas.insert_at,
+        before,
+        "{at:?} {:?}",
+        h.app.state.viewport
+    );
+    assert!(h.sheet().canvas.editing.is_none());
+}
