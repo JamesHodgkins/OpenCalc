@@ -5,7 +5,8 @@
 //! (`x =`, or `2 + 3 =`). Errors are always shown, wherever they happen, so a failing
 //! definition is not silent.
 
-use opencalc_core::eval::EvalError;
+use opencalc_core::document::RegionId;
+use opencalc_core::eval::{EvalError, Warning};
 use opencalc_core::expr::{AssignKind, Expr};
 use opencalc_core::value::Value;
 
@@ -37,6 +38,15 @@ pub fn beside<'a>(expr: &Expr, result: Option<&'a Result<Value, EvalError>>) -> 
         None if is_evaluation(expr) => Beside::Pending,
         _ => Beside::Nothing,
     }
+}
+
+/// The name this region defines if another region defines it too (the last one in
+/// layout order wins, so every such region is flagged).
+pub fn redefined(warnings: &[Warning], id: RegionId) -> Option<&str> {
+    warnings.iter().find_map(|w| {
+        let Warning::Redefinition { name, regions } = w;
+        regions.contains(&id).then_some(name.as_str())
+    })
 }
 
 /// The part of the expression to typeset before the `=` of an evaluation region.
@@ -98,6 +108,20 @@ mod tests {
         for src in ["x =", "x := 1 / 0", "1 / 0", "f(x) := x"] {
             assert_eq!(shown(src, Some(&e)), "error", "{src}");
         }
+    }
+
+    #[test]
+    fn every_region_defining_a_repeated_name_is_flagged_and_others_are_not() {
+        use opencalc_core::eval::evaluate;
+        let regions = vec![
+            (RegionId(1), parse("x := 1")),
+            (RegionId(2), parse("y := 2")),
+            (RegionId(3), parse("x := 3")),
+        ];
+        let out = evaluate(&regions);
+        assert_eq!(redefined(&out.warnings, RegionId(1)), Some("x"));
+        assert_eq!(redefined(&out.warnings, RegionId(3)), Some("x"));
+        assert_eq!(redefined(&out.warnings, RegionId(2)), None);
     }
 
     #[test]

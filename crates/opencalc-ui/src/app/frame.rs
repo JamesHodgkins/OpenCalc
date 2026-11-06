@@ -88,17 +88,6 @@ impl App {
                     panels::functions::show(ui, &self.state, &mut panel_edits);
                 });
         }
-        if self.state.show_props {
-            egui::SidePanel::right(egui::Id::new(("props", self.state.layout_gen)))
-                .default_width(width * 0.30)
-                .width_range(160.0..=600.0)
-                .frame(dock)
-                .show(ctx, |ui| {
-                    ui.set_min_width(ui.available_width());
-                    panels::properties::show(ui, &self.state);
-                });
-        }
-
         egui::CentralPanel::default()
             .frame(bar(theme.base, 0, 0))
             .show(ctx, |ui| match self.state.active {

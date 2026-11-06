@@ -97,12 +97,35 @@ pub struct SourceLayout {
 
 impl SourceLayout {
     pub fn new(fonts: &Fonts, colour: Color32, src: &str, size: f32) -> SourceLayout {
+        SourceLayout::showing(fonts, colour, src, size, |e| e)
+    }
+
+    /// Like `new`, but typesets only the part of the expression `select` picks (the
+    /// whole one, or one of its direct children, as a region that shows `x` for
+    /// `x =` does). Offsets outside that part collapse onto its edges.
+    pub fn showing(
+        fonts: &Fonts,
+        colour: Color32,
+        src: &str,
+        size: f32,
+        select: impl for<'e> Fn(&'e Expr) -> &'e Expr,
+    ) -> SourceLayout {
         let (expr, spans) = parse_lenient(src);
+        let shown = select(&expr);
+        let shown_spans = if std::ptr::eq(shown, &expr) {
+            &spans
+        } else {
+            expr.children()
+                .iter()
+                .position(|c| std::ptr::eq(*c, shown))
+                .and_then(|i| spans.kids.get(i))
+                .unwrap_or(&spans)
+        };
         let layout = Typesetter::new(fonts, colour)
             .with_marks()
-            .layout(&expr, size);
+            .layout(shown, size);
         let mut spans_of = HashMap::new();
-        collect(&expr, &spans, &mut spans_of);
+        collect(shown, shown_spans, &mut spans_of);
         let stops = stops(&layout, &spans_of);
         let chars = src.chars().count();
         let carets = (0..=chars).map(|o| caret_at(&stops, o, layout.h)).collect();
@@ -122,6 +145,34 @@ impl SourceLayout {
     pub fn caret_rect(&self, offset: usize) -> Rect {
         let c = &self.carets[offset.min(self.chars())];
         Rect::from_min_max(Pos2::new(c.x, c.top), Pos2::new(c.x, c.bottom))
+    }
+
+    /// Rectangles (relative to the layout) covering the characters `a..b`, one per
+    /// line of the typeset form. An empty range gives a narrow one at its caret.
+    pub fn bands(&self, a: usize, b: usize) -> Vec<Rect> {
+        let (a, b) = (a.min(self.chars()), b.min(self.chars()));
+        if a >= b {
+            let c = self.caret_rect(a);
+            return vec![c.expand2(Vec2::new(3.0, 0.0))];
+        }
+        let mut out: Vec<Rect> = Vec::new();
+        for o in a..b {
+            let (p, q) = (self.caret_rect(o), self.caret_rect(o + 1));
+            if (p.center().y - q.center().y).abs() >= p.height() * 0.5 || q.min.x <= p.min.x {
+                continue;
+            }
+            let band = Rect::from_min_max(
+                Pos2::new(p.min.x, p.min.y.min(q.min.y)),
+                Pos2::new(q.min.x, p.max.y.max(q.max.y)),
+            );
+            match out.last_mut() {
+                Some(last) if (last.center().y - band.center().y).abs() < band.height() * 0.5 => {
+                    *last = last.union(band);
+                }
+                _ => out.push(band),
+            }
+        }
+        out
     }
 
     /// The smallest node of the expression that covers the character at `offset`

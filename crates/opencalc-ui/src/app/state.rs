@@ -38,7 +38,6 @@ pub struct AppState {
     pub live_recalc: bool,
     /// The optional Functions window.
     pub show_functions: bool,
-    pub show_props: bool,
     /// Bumped by "Reset layout" so dock panels forget their saved widths.
     pub layout_gen: u32,
     /// Window width the default dock widths are a share of: the initial window
@@ -76,7 +75,6 @@ impl AppState {
             snap: true,
             live_recalc: true,
             show_functions: false,
-            show_props: false,
             layout_gen: 0,
             dock_basis: crate::INITIAL_WIDTH,
             viewport: Rect::from_min_size(Pos2::ZERO, eframe::egui::vec2(800.0, 600.0)),
@@ -119,7 +117,6 @@ impl AppState {
             (self.snap, CommandId::ViewSnap),
             (self.live_recalc, CommandId::CalcAuto),
             (self.show_functions, CommandId::ViewFunctions),
-            (self.show_props, CommandId::ViewProperties),
         ]
         .into_iter()
         .filter_map(|(on, command)| on.then_some(command))
@@ -214,7 +211,7 @@ mod tests {
         s.snap = false;
         s.show_functions = true;
         let on = s.active_toggles();
-        assert!(!on.contains(&CommandId::ViewSnap) && !on.contains(&CommandId::ViewProperties));
+        assert!(!on.contains(&CommandId::ViewSnap));
         assert!(on.contains(&CommandId::ViewFunctions));
         assert!(on.contains(&CommandId::ViewGrid) && on.contains(&CommandId::CalcAuto));
     }

@@ -203,15 +203,9 @@ pub(super) fn math(
     // Draw: selection, the typeset text, then the caret.
     let painter = ui.painter();
     let (a, b) = field.selection();
-    for o in a..b {
-        let (p, q) = (lay.caret_rect(o), lay.caret_rect(o + 1));
-        if (p.center().y - q.center().y).abs() < p.height() * 0.5 && q.min.x > p.min.x {
-            let band = Rect::from_min_max(
-                text_origin + Vec2::new(p.min.x, p.min.y.min(q.min.y)),
-                text_origin + Vec2::new(q.min.x, p.max.y.max(q.max.y)),
-            );
-            painter.rect_filled(band, 0.0, env.theme.accent.gamma_multiply(0.3));
-        }
+    for band in lay.bands(a, b) {
+        let band = band.translate(text_origin.to_vec2());
+        painter.rect_filled(band, 0.0, env.theme.accent.gamma_multiply(0.3));
     }
     lay.layout.paint(painter, text_origin, paper.text);
     let caret = lay.caret_rect(field.caret);

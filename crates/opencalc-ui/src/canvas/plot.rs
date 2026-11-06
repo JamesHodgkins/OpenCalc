@@ -115,7 +115,7 @@ pub fn paint(painter: &Painter, env: &Env, r: &Region, spec: &PlotSpec, top_left
         None => note("\u{2026}", theme.text_weak),
         Some(Err(e)) => note(&format!("{} {e}", crate::icons::WARNING), theme.error),
         Some(Ok(data)) if data.is_empty() => note(
-            "Choose the x values and the series to plot in the properties panel.",
+            "Choose the x values and the series to plot in the Plot window.",
             theme.text_weak,
         ),
         Some(Ok(data)) => chart(painter, env, spec, data, rect, top, zoom),

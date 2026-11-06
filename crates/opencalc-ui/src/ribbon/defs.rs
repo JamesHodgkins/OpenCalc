@@ -234,13 +234,7 @@ fn document() -> Tab {
                 "Insert",
                 vec![stack(&[CommandId::InsertArea, CommandId::InsertPicture])],
             ),
-            panel(
-                "Window",
-                vec![stack(&[
-                    CommandId::ViewProperties,
-                    CommandId::ViewResetLayout,
-                ])],
-            ),
+            panel("Window", vec![stack(&[CommandId::ViewResetLayout])]),
         ],
     }
 }

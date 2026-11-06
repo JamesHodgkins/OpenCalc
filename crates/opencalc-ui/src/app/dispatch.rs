@@ -117,10 +117,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         ViewSnap => state.snap = !state.snap,
         CalcAuto => state.live_recalc = !state.live_recalc,
         ViewFunctions => state.show_functions = !state.show_functions,
-        ViewProperties => state.show_props = !state.show_props,
         ViewResetLayout => {
             state.show_functions = false;
-            state.show_props = false;
             state.layout_gen += 1;
             fx.push(Effect::ResetDockWidths);
         }
@@ -323,7 +321,6 @@ mod tests {
             (CommandId::ViewSnap, |s| s.snap, true),
             (CommandId::CalcAuto, |s| s.live_recalc, true),
             (CommandId::ViewFunctions, |s| s.show_functions, false),
-            (CommandId::ViewProperties, |s| s.show_props, false),
         ] {
             assert_eq!(get(&s), starts_on, "{}", command.name());
             run(&mut s, command);
@@ -337,16 +334,12 @@ mod tests {
     fn reset_layout_restores_the_panels_and_asks_for_new_widths() {
         let mut s = state();
         s.show_functions = true;
-        s.show_props = true;
         let gen = s.layout_gen;
         assert_eq!(
             run(&mut s, CommandId::ViewResetLayout),
             vec![Effect::ResetDockWidths]
         );
-        assert!(
-            !s.show_functions && !s.show_props,
-            "the panels are closed by default"
-        );
+        assert!(!s.show_functions, "the panels are closed by default");
         assert_eq!(s.layout_gen, gen + 1);
     }
 

@@ -17,6 +17,42 @@ pub struct Dimension {
     pub luminosity: i8,
 }
 
+/// A dimension in words, as error messages show it: `length`, `mass·length / time^2`.
+/// No dimension at all reads as `a plain number`.
+impl std::fmt::Display for Dimension {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const NAMES: [&str; 7] = [
+            "length",
+            "mass",
+            "time",
+            "current",
+            "temperature",
+            "amount",
+            "luminosity",
+        ];
+        let part = |sign: i8| {
+            let items: Vec<String> = self
+                .exps()
+                .iter()
+                .zip(NAMES)
+                .filter(|(e, _)| e.signum() == sign)
+                .map(|(e, name)| match e.abs() {
+                    1 => name.to_owned(),
+                    n => format!("{name}^{n}"),
+                })
+                .collect();
+            items.join("\u{b7}")
+        };
+        let (top, bottom) = (part(1), part(-1));
+        match (top.is_empty(), bottom.is_empty()) {
+            (true, true) => f.write_str("a plain number"),
+            (false, true) => f.write_str(&top),
+            (true, false) => write!(f, "1 / {bottom}"),
+            (false, false) => write!(f, "{top} / {bottom}"),
+        }
+    }
+}
+
 impl Dimension {
     pub const NONE: Dimension = Dimension::new([0; 7]);
     pub const LENGTH: Dimension = Dimension::new([1, 0, 0, 0, 0, 0, 0]);
@@ -151,7 +187,7 @@ pub fn builtin_symbols() -> impl Iterator<Item = &'static str> {
 /// Errors from quantity arithmetic.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum UnitError {
-    #[error("unit mismatch: cannot combine {0:?} with {1:?}")]
+    #[error("unit mismatch: cannot combine {0} with {1}")]
     Mismatch(Dimension, Dimension),
     #[error("function '{0}' needs a dimensionless argument")]
     NotDimensionless(String),
@@ -271,6 +307,20 @@ impl Quantity {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dimensions_read_in_words_in_error_messages() {
+        let say = |d: Dimension| d.to_string();
+        assert_eq!(say(Dimension::NONE), "a plain number");
+        assert_eq!(say(Dimension::LENGTH), "length");
+        assert_eq!(say(Dimension::AREA), "length^2");
+        assert_eq!(say(Dimension::FORCE), "length·mass / time^2");
+        assert_eq!(say(Dimension::PRESSURE), "mass / length·time^2");
+        let one_over_time = Dimension::TIME.checked_powi(-1).expect("an exponent");
+        assert_eq!(say(one_over_time), "1 / time");
+        let message = UnitError::Mismatch(Dimension::LENGTH, Dimension::TIME).to_string();
+        assert_eq!(message, "unit mismatch: cannot combine length with time");
+    }
 
     #[test]
     fn force_is_mass_length_over_time_squared() {

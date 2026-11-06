@@ -8,6 +8,7 @@ use eframe::egui::{
 use opencalc_core::expr::Expr;
 
 use super::adapt::{kind_icon, vec};
+use super::errors;
 use super::result::{self, Beside};
 use super::view::{CanvasView, GRID};
 use super::Env;
@@ -126,7 +127,8 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
     let size = MATH_SIZE * zoom;
     let blank = source.trim().is_empty();
     let result = env.output.values.get(&r.id);
-    let (lay, res) = ui.ctx().fonts(|f| {
+    let path = env.output.error_paths.get(&r.id).map(Vec::as_slice);
+    let (lay, res, bands) = ui.ctx().fonts(|f| {
         let t = Typesetter::new(f, theme.text);
         let warn = |message: String| {
             plain(
@@ -137,17 +139,30 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
             )
         };
         if blank {
-            return (plain(f, "math", theme.text_disabled, size), None);
-        }
-        if let Expr::Error(e) = expr {
             return (
-                plain(f, source, theme.text, size),
-                Some(warn(e.to_string())),
+                plain(f, "math", theme.text_disabled, size),
+                None,
+                Vec::new(),
             );
+        }
+        // An error is underlined in the typeset form; the message goes beside it.
+        let marked = errors::mark(f, theme.text, source, expr, path, size);
+        let (typed, bands) = match marked {
+            Some(m) if matches!(expr, Expr::Error(_)) || matches!(result, Some(Err(_))) => {
+                (m.layout, m.bands)
+            }
+            _ => (t.layout(result::typeset_part(expr), size), Vec::new()),
+        };
+        if let Expr::Error(e) = expr {
+            let typed = if bands.is_empty() {
+                plain(f, source, theme.text, size)
+            } else {
+                typed
+            };
+            return (typed, Some(warn(e.to_string())), bands);
         }
         // A definition or bare expression shows only what was typed; an
         // evaluation region (`x =`) also shows its answer. Errors always show.
-        let typed = t.layout(result::typeset_part(expr), size);
         let after = match result::beside(expr, result) {
             Beside::Nothing => None,
             Beside::Pending => Some(plain(f, "= \u{2026}", theme.text_weak, size)),
@@ -159,7 +174,13 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
             )),
             Beside::Failed(e) => Some(warn(e.to_string())),
         };
-        (typed, after)
+        // A name another region also defines: the last one wins, so say so here.
+        let after = after.or_else(|| {
+            let name = result::redefined(&env.output.warnings, r.id)?;
+            let text = format!("{} '{name}' is defined again", crate::icons::WARNING);
+            Some(plain(f, &text, theme.warning, size))
+        });
+        (typed, after, bands)
     });
     let pad = PAD * zoom;
     let gap = if res.is_some() {
@@ -174,6 +195,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
     if !skip_content {
         let origin = top_left + Vec2::splat(pad);
         lay.paint(painter, origin, theme.text);
+        errors::paint(painter, &bands, origin, theme.error, zoom);
         if let Some(res) = res {
             let at = origin + Vec2::new(lay.w + gap, lay.baseline - res.baseline);
             res.paint(painter, at, theme.text);

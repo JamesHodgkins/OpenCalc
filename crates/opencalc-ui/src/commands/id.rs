@@ -154,7 +154,6 @@ commands! {
     ViewPageView: "view.page_view", "Page View", icons::FIT;
     ViewDraftView: "view.draft_view", "Draft View", icons::LIST;
     ViewFunctions: "view.functions", "Functions", icons::NAMES;
-    ViewProperties: "view.properties", "Properties", icons::PROPERTIES;
     ViewResetLayout: "view.reset_layout", "Reset layout", icons::RESET;
     // Help.
     HelpShortcuts: "help.shortcuts", "Shortcuts", icons::KEYBOARD;
@@ -210,10 +209,10 @@ impl CommandId {
             FileNew | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
             | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
             | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
-            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewProperties | ViewResetLayout
-            | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs
-            | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_)
-            | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
+            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
+            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
             | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
                 true
             }

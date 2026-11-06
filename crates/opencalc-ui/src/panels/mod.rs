@@ -8,7 +8,6 @@ pub mod home;
 pub mod options;
 pub mod page_setup;
 pub mod plot_window;
-pub mod properties;
 pub mod status;
 pub mod title;
 

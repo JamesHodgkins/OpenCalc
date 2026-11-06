@@ -1,6 +1,6 @@
 # Math editor design (Milestone 2.5)
 
-Status: **approved** (hybrid editor, `lpha` Greek entry, underscore subscripts). Progress: **E1 done** (spans), **E2 done** (`parse_lenient`), **E3 done** (`SourceLayout`: `caret_rect`, `offset_at`), **E4 done** (math editor widget), **E5 done**, including the ribbon Greek button (subscripts, `lpha`, `:` gives `:=`, autocomplete); E6 not started.
+Status: **approved** (hybrid editor, `lpha` Greek entry, underscore subscripts). Progress: **E1 done** (spans), **E2 done** (`parse_lenient`), **E3 done** (`SourceLayout`: `caret_rect`, `offset_at`), **E4 done** (math editor widget), **E5 done**, including the ribbon Greek button (subscripts, `lpha`, `:` gives `:=`, autocomplete), **E6 done** (errors underlined in place; the Properties pane is gone).
 
 ## 1. What exists today
 
@@ -132,7 +132,7 @@ document state) and turns input into `Edit::SetMathSource`:
 
 - A parse error underlines its character range in the typeset form.
 - An evaluation error highlights the sub-expression at its path, using the spans.
-- The properties panel keeps its text description; the underline is the new part.
+- The message stays beside the region. The Properties pane was removed; redefinition warnings are drawn on the regions too.
 
 ## 5. Steps
 

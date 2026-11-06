@@ -241,7 +241,7 @@ fn the_real_app_opens_one_blank_untitled_worksheet_with_no_panels() {
     assert_eq!(app.state.sheets.len(), 1);
     assert_eq!(app.state.sheets[0].title(), "Untitled");
     assert!(app.state.sheets[0].doc.regions().is_empty());
-    assert!(!app.state.show_functions && !app.state.show_props);
+    assert!(!app.state.show_functions);
 }
 
 #[test]
@@ -353,7 +353,7 @@ fn the_sample_plot_is_evaluated_drawn_and_editable_with_undo() {
     assert!((points[0].0 - 0.05).abs() < 1e-12);
     assert!((points[0].1 - 10_000.0 / (0.05 * 0.05)).abs() < 1e-3);
 
-    // Selecting it shows its editor in the properties panel; frames must not panic.
+    // Selecting it opens the Plot window; frames must not panic.
     let id = plot_id(&h);
     h.app.state.sheets[0].canvas.selection = vec![id];
     h.frame();

@@ -8,6 +8,7 @@
 
 pub mod adapt;
 mod editor;
+mod errors;
 pub mod hit;
 mod overlay;
 mod page;
