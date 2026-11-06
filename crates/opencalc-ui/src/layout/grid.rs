@@ -38,6 +38,7 @@ impl Typesetter<'_> {
             h,
             baseline: h / 2.0 + size * AXIS,
             ops: Vec::new(),
+            marks: Vec::new(),
         };
         let (mut y, mut slots) = (size * 0.1, Vec::new());
         for r in 0..rows {
@@ -81,6 +82,7 @@ impl Typesetter<'_> {
             h,
             baseline: bb,
             ops: Vec::new(),
+            marks: Vec::new(),
         };
         out.absorb(b, Vec2::ZERO, false);
         out.absorb(sub, Vec2::new(bw, sub_top), false);
@@ -130,6 +132,8 @@ impl Layout {
                 },
             });
         }
+        self.marks
+            .extend(child.marks.iter().map(|m| m.translated(at)));
     }
 
     /// Square brackets down both sides of the whole box.

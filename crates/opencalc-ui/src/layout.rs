@@ -5,11 +5,17 @@
 //! Layouts hold no per-frame state, so they can be cached per region.
 
 mod grid;
+// Used by the editor widget (E4); until then only its tests build it.
+#[allow(dead_code)]
+mod source;
 
 use std::sync::Arc;
 
 use eframe::egui::{self, Color32, FontId, Galley, Pos2, Stroke, Vec2};
 use opencalc_core::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
+#[allow(unused_imports)]
+pub use source::SourceLayout;
+use source::{glyph_offsets, Mark, MarkKind};
 
 pub enum Op {
     Text { at: Vec2, galley: Arc<Galley> },
@@ -22,6 +28,8 @@ pub struct Layout {
     /// Distance from the top to the text baseline.
     pub baseline: f32,
     pub ops: Vec<Op>,
+    /// Where each expression node was drawn; only filled when the typesetter marks.
+    pub marks: Vec<Mark>,
 }
 
 /// Scale of a script (exponent) relative to its base.
@@ -32,14 +40,38 @@ const AXIS: f32 = 0.28;
 pub struct Typesetter<'a> {
     fonts: &'a egui::epaint::text::Fonts,
     colour: Color32,
+    /// Record node rectangles (for the editor); off for plain drawing.
+    marks: bool,
 }
 
 impl<'a> Typesetter<'a> {
     pub fn new(fonts: &'a egui::epaint::text::Fonts, colour: Color32) -> Self {
-        Typesetter { fonts, colour }
+        Typesetter {
+            fonts,
+            colour,
+            marks: false,
+        }
+    }
+
+    pub fn with_marks(mut self) -> Self {
+        self.marks = true;
+        self
     }
 
     pub fn layout(&self, e: &Expr, size: f32) -> Layout {
+        let mut laid = self.layout_node(e, size);
+        if self.marks {
+            let kind = match e {
+                Expr::Hole => MarkKind::Hole,
+                Expr::Name(_) => glyph_offsets(&laid).map_or(MarkKind::Node, MarkKind::Glyphs),
+                _ => MarkKind::Node,
+            };
+            laid.marks.push(Mark::of(e, &laid, kind));
+        }
+        laid
+    }
+
+    fn layout_node(&self, e: &Expr, size: f32) -> Layout {
         match e {
             Expr::Number(v) => self.text(&fmt_num(*v), size),
             Expr::Name(n) => self.text(n, size),
@@ -150,11 +182,15 @@ impl<'a> Typesetter<'a> {
     /// A child, parenthesised if it binds looser than `min`.
     fn operand(&self, e: &Expr, size: f32, min: u8) -> Layout {
         if prec(e) < min {
-            self.row(vec![
+            let mut wrapped = self.row(vec![
                 self.text("(", size),
                 self.layout(e, size),
                 self.text(")", size),
-            ])
+            ]);
+            if self.marks {
+                wrapped.marks.push(Mark::of(e, &wrapped, MarkKind::Paren));
+            }
+            wrapped
         } else {
             self.layout(e, size)
         }
@@ -173,6 +209,7 @@ impl<'a> Typesetter<'a> {
                 at: Vec2::ZERO,
                 galley,
             }],
+            marks: Vec::new(),
         }
     }
 
@@ -182,6 +219,7 @@ impl<'a> Typesetter<'a> {
             h: 0.0,
             baseline: 0.0,
             ops: Vec::new(),
+            marks: Vec::new(),
         }
     }
 
@@ -194,6 +232,7 @@ impl<'a> Typesetter<'a> {
             h: above + below,
             baseline: above,
             ops: Vec::new(),
+            marks: Vec::new(),
         };
         for p in parts {
             let at = Vec2::new(out.w, above - p.baseline);
@@ -215,6 +254,7 @@ impl<'a> Typesetter<'a> {
             h,
             baseline: bar_y + size * AXIS,
             ops: Vec::new(),
+            marks: Vec::new(),
         };
         out.absorb(n, Vec2::new((w - nw) / 2.0, 0.0), false);
         out.absorb(d, Vec2::new((w - dw) / 2.0, bar_y + size * 0.08), false);
@@ -241,6 +281,7 @@ impl<'a> Typesetter<'a> {
             h,
             baseline,
             ops: Vec::new(),
+            marks: Vec::new(),
         };
         out.absorb(b, Vec2::new(0.0, base_y), false);
         out.absorb(e, Vec2::new(bw, exp_y), false);
@@ -259,6 +300,7 @@ impl<'a> Typesetter<'a> {
             h,
             baseline,
             ops: Vec::new(),
+            marks: Vec::new(),
         };
         let (rw, bottom) = (r.w, h);
         out.absorb(r, Vec2::new(tick, top), false);
@@ -297,6 +339,8 @@ impl Layout {
                 },
             });
         }
+        self.marks
+            .extend(child.marks.iter().map(|m| m.translated(at)));
     }
 
     pub fn paint(&self, painter: &egui::Painter, origin: Pos2, colour: Color32) {
