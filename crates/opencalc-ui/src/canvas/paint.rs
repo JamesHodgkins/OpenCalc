@@ -17,10 +17,10 @@ use crate::theme::{metrics, type_size, Theme};
 use opencalc_core::document::{MathRegion, Region, RegionKind};
 
 /// Typeset size of a math region at 100% zoom.
-const MATH_SIZE: f32 = 20.0;
+pub(super) const MATH_SIZE: f32 = 20.0;
 const TEXT_SIZE: f32 = 14.0;
 /// Padding around region content, in document units.
-const PAD: f32 = 6.0;
+pub(super) const PAD: f32 = 6.0;
 /// Gap between an expression and its result, in document units.
 const RESULT_GAP: f32 = 6.0;
 

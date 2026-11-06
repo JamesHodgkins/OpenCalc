@@ -24,6 +24,8 @@ struct Harness {
     ctx: egui::Context,
     app: App,
     time: f64,
+    /// The last text the app put on the clipboard.
+    copied: Option<String>,
 }
 
 impl Harness {
@@ -34,6 +36,7 @@ impl Harness {
             ctx,
             app,
             time: 0.0,
+            copied: None,
         }
     }
 
@@ -46,7 +49,12 @@ impl Harness {
             ..Default::default()
         };
         let app = &mut self.app;
-        let _ = self.ctx.run(input, |ctx| app.frame(ctx));
+        let out = self.ctx.run(input, |ctx| app.frame(ctx));
+        for command in out.platform_output.commands {
+            if let egui::OutputCommand::CopyText(text) = command {
+                self.copied = Some(text);
+            }
+        }
     }
 
     fn frame(&mut self) {
@@ -734,4 +742,212 @@ fn the_ribbon_has_the_same_height_on_every_tab() {
             height(&h)
         );
     }
+}
+
+// ---- the math editor (E4)
+
+impl Harness {
+    /// Open a new math region for editing and return its id.
+    fn new_math(&mut self) -> RegionId {
+        self.command(CommandId::InsertMath);
+        self.frame();
+        *self
+            .sheet()
+            .canvas
+            .selection
+            .first()
+            .expect("the new region is selected")
+    }
+
+    fn type_text(&mut self, text: &str) {
+        for ch in text.chars() {
+            self.frame_with(vec![Event::Text(ch.to_string())]);
+        }
+    }
+
+    fn press_key(&mut self, key: Key, modifiers: Modifiers) {
+        self.frame_with(vec![Event::Key {
+            key,
+            physical_key: Some(key),
+            pressed: true,
+            repeat: false,
+            modifiers,
+        }]);
+    }
+
+    fn source_of(&self, id: RegionId) -> String {
+        match &self.sheet().doc.region(id).expect("region").kind {
+            RegionKind::Math(m) => m.source().to_owned(),
+            _ => panic!("math region"),
+        }
+    }
+
+    fn caret(&self) -> usize {
+        self.sheet().canvas.field.as_ref().expect("editing").caret
+    }
+}
+
+const SHIFT: Modifiers = Modifiers {
+    shift: true,
+    ..Modifiers::NONE
+};
+
+#[test]
+fn the_editor_inserts_at_the_caret_and_backspace_and_delete_work() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("ac");
+    h.press_key(Key::ArrowLeft, Modifiers::NONE);
+    h.type_text("b");
+    assert_eq!(h.source_of(id), "abc");
+    h.press_key(Key::Backspace, Modifiers::NONE);
+    assert_eq!(h.source_of(id), "ac");
+    h.press_key(Key::Delete, Modifiers::NONE);
+    assert_eq!(h.source_of(id), "a");
+    h.press_key(Key::Home, Modifiers::NONE);
+    h.type_text("\u{3b1}");
+    assert_eq!(
+        h.source_of(id),
+        "\u{3b1}a",
+        "Greek goes in as one character"
+    );
+}
+
+#[test]
+fn shift_arrows_select_and_typing_replaces_the_selection() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x + yy");
+    h.press_key(Key::ArrowLeft, SHIFT);
+    h.press_key(Key::ArrowLeft, SHIFT);
+    h.type_text("z");
+    assert_eq!(h.source_of(id), "x + z");
+    h.press_key(Key::A, Modifiers::COMMAND);
+    h.type_text("q");
+    assert_eq!(h.source_of(id), "q");
+}
+
+#[test]
+fn copy_puts_the_source_text_of_the_selection_on_the_clipboard_and_cut_removes_it() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("a / b");
+    h.press_key(Key::Home, SHIFT);
+    h.frame_with(vec![Event::Copy]);
+    assert_eq!(h.copied.as_deref(), Some("a / b"));
+    h.frame_with(vec![Event::Cut]);
+    assert_eq!(h.source_of(id), "");
+    h.frame_with(vec![Event::Paste("1\n+ 2".to_owned())]);
+    assert_eq!(
+        h.source_of(id),
+        "1 + 2",
+        "a pasted line break becomes a space"
+    );
+}
+
+#[test]
+fn arrows_skip_characters_that_draw_nothing_and_up_down_move_between_fraction_lines() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("((x))");
+    h.press_key(Key::Home, Modifiers::NONE);
+    h.press_key(Key::ArrowRight, Modifiers::NONE);
+    assert!(
+        h.caret() >= 2,
+        "the brackets draw nothing, so one arrow press moves past them: {}",
+        h.caret()
+    );
+    // In a fraction, Up goes to the numerator and Down back to the denominator.
+    h.press_key(Key::A, Modifiers::COMMAND);
+    h.type_text("a / b");
+    assert_eq!(h.source_of(id), "a / b");
+    h.press_key(Key::End, Modifiers::NONE);
+    h.press_key(Key::ArrowUp, Modifiers::NONE);
+    assert!(h.caret() <= 1, "caret in the numerator: {}", h.caret());
+    h.press_key(Key::ArrowDown, Modifiers::NONE);
+    assert!(h.caret() >= 4, "caret in the denominator: {}", h.caret());
+}
+
+#[test]
+fn clicking_in_the_region_places_the_caret_and_a_double_click_selects_a_node() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("alpha + beta");
+    h.frame();
+    let sheet = h.sheet();
+    let r = sheet.doc.region(id).expect("region");
+    let rect = rect_of(r, &sheet.canvas.sizes);
+    let at = |fx: f32| {
+        sheet.view.doc_to_screen(
+            Pos2::new(rect.min.x + rect.width() * fx, rect.center().y),
+            h.app.state.viewport.min,
+        )
+    };
+    let (near_start, near_end) = (at(0.1), at(0.97));
+    h.frame_with(vec![Event::PointerMoved(near_start)]);
+    h.frame_with(vec![press(near_start)]);
+    h.frame_with(vec![release(near_start)]);
+    assert!(
+        h.caret() <= 2,
+        "a click near the left puts the caret near the start: {}",
+        h.caret()
+    );
+    h.frame_with(vec![Event::PointerMoved(near_end)]);
+    h.frame_with(vec![press(near_end)]);
+    h.frame_with(vec![release(near_end)]);
+    assert!(h.caret() >= 10, "a click near the right: {}", h.caret());
+    assert_eq!(
+        h.source_of(id),
+        "alpha + beta",
+        "clicking never changes the text"
+    );
+}
+
+#[test]
+fn enter_and_escape_end_editing_and_the_whole_burst_is_one_undo_step() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("m := 3");
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    assert!(h.sheet().canvas.editing.is_none());
+    assert!(h.sheet().canvas.field.is_none());
+    assert_eq!(h.source_of(id), "m := 3");
+    h.key(Key::Z, Modifiers::COMMAND);
+    assert_eq!(h.source_of(id), "");
+}
+
+#[test]
+fn half_typed_input_never_breaks_a_frame_and_a_huge_paste_is_capped() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    for text in ["(", "1 +", " $", " * [1, 2; 3", " f(", "\u{20ac}"] {
+        h.type_text(text);
+    }
+    assert_eq!(h.source_of(id), "(1 + $ * [1, 2; 3 f(\u{20ac}");
+    h.frame_with(vec![Event::Paste("9".repeat(20_000))]);
+    assert!(h.source_of(id).chars().count() <= 8192);
+    h.settle();
+}
+
+#[test]
+fn the_functions_window_inserts_into_the_region_being_edited() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x := ");
+    h.sheet().doc.region(id).expect("region");
+    // An edit from outside the editor (as the Functions window makes) is picked up.
+    let source = "x := sqrt(".to_owned();
+    h.app.state.sheets[0].edit(Edit::SetMathSource { id, source });
+    h.frame();
+    h.type_text("4)");
+    assert_eq!(h.source_of(id), "x := sqrt(4)");
 }

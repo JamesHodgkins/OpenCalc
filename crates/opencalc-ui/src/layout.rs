@@ -5,15 +5,12 @@
 //! Layouts hold no per-frame state, so they can be cached per region.
 
 mod grid;
-// Used by the editor widget (E4); until then only its tests build it.
-#[allow(dead_code)]
 mod source;
 
 use std::sync::Arc;
 
 use eframe::egui::{self, Color32, FontId, Galley, Pos2, Stroke, Vec2};
 use opencalc_core::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
-#[allow(unused_imports)]
 pub use source::SourceLayout;
 use source::{glyph_offsets, Mark, MarkKind};
 

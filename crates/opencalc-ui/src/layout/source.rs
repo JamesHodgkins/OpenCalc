@@ -92,6 +92,7 @@ pub struct SourceLayout {
     pub layout: Layout,
     /// Caret positions, one per offset `0..=chars`.
     carets: Vec<Stop>,
+    spans: SpanNode,
 }
 
 impl SourceLayout {
@@ -105,7 +106,11 @@ impl SourceLayout {
         let stops = stops(&layout, &spans_of);
         let chars = src.chars().count();
         let carets = (0..=chars).map(|o| caret_at(&stops, o, layout.h)).collect();
-        SourceLayout { layout, carets }
+        SourceLayout {
+            layout,
+            carets,
+            spans,
+        }
     }
 
     /// The number of characters of the source.
@@ -117,6 +122,23 @@ impl SourceLayout {
     pub fn caret_rect(&self, offset: usize) -> Rect {
         let c = &self.carets[offset.min(self.chars())];
         Rect::from_min_max(Pos2::new(c.x, c.top), Pos2::new(c.x, c.bottom))
+    }
+
+    /// The smallest node of the expression that covers the character at `offset`
+    /// (or before it, at the end), as `(start, end)`. What a double click selects.
+    pub fn enclosing(&self, offset: usize) -> (usize, usize) {
+        let at = offset.min(self.chars().saturating_sub(1));
+        let mut node = &self.spans;
+        loop {
+            let next = node
+                .kids
+                .iter()
+                .find(|k| k.inner.start <= at && at < k.inner.end);
+            match next {
+                Some(k) => node = k,
+                None => return (node.inner.start, node.inner.end),
+            }
+        }
     }
 
     /// The offset whose caret is nearest `point` (relative to the layout's top left).
@@ -475,6 +497,21 @@ mod tests {
                 .width();
             let step = l.caret_rect(10).min.x - l.caret_rect(9).min.x;
             assert!((step - paren).abs() < 0.5, "step {step}, bracket {paren}");
+        });
+    }
+
+    #[test]
+    fn double_click_selects_the_smallest_node_under_the_caret() {
+        with_fonts(|fonts| {
+            let l = lay(fonts, "alpha + (b * c)");
+            assert_eq!(l.enclosing(2), (0, 5), "a name");
+            assert_eq!(l.enclosing(11), (9, 14), "a node inside brackets");
+            assert_eq!(
+                l.enclosing(7),
+                (0, 15),
+                "between the operands: the whole sum"
+            );
+            assert_eq!(l.enclosing(15), (0, 15), "the end of the source");
         });
     }
 

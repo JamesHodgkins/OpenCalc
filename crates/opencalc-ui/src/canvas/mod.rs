@@ -7,6 +7,7 @@
 //! and live in [`CanvasUi`], not in the document.
 
 pub mod adapt;
+mod editor;
 pub mod hit;
 mod overlay;
 mod page;
@@ -71,6 +72,8 @@ pub struct CanvasUi {
     pub editing: Option<RegionId>,
     /// Ask the in-place editor to take keyboard focus on its next frame.
     pub focus_edit: bool,
+    /// The math editor's text, caret and selection while a math region is edited.
+    pub field: Option<editor::Field>,
     /// Where the next inserted region goes (document space).
     pub insert_at: Pos2,
     /// Content sizes measured by the last paint.
@@ -87,6 +90,7 @@ impl Default for CanvasUi {
             selection: Vec::new(),
             editing: None,
             focus_edit: false,
+            field: None,
             insert_at: Pos2::new(40.0, 40.0),
             sizes: Sizes::new(),
             fit_pending: true,
@@ -179,7 +183,7 @@ pub fn show(
         }
     }
 
-    overlay::edit_overlay(ui, regions, view, origin, st, &mut cmds);
+    overlay::edit_overlay(ui, env, regions, view, origin, st, &mut cmds);
     let scene = Scene {
         env,
         regions,
