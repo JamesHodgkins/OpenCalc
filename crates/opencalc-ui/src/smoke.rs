@@ -1369,3 +1369,30 @@ fn zooming_while_editing_keeps_the_caret_and_clicks_consistent() {
     h.type_text("c");
     assert_eq!(h.source_of(id), "a / bc");
 }
+
+#[test]
+fn enter_readies_the_next_input_below_and_typing_starts_it() {
+    let mut h = Harness::new();
+    h.settle();
+    let first = h.new_math();
+    h.type_text("a := 1");
+    h.key(Key::Enter, Modifiers::NONE);
+    assert!(h.sheet().canvas.editing.is_none());
+    assert!(
+        h.sheet().canvas.selection.is_empty(),
+        "nothing stays highlighted"
+    );
+    let below = h.sheet().canvas.insert_at;
+    let r = h.sheet().doc.region(first).expect("region");
+    assert!(
+        below.y > f32::from(r.pos.y),
+        "the insertion point is below it"
+    );
+    let count = h.sheet().doc.regions().len();
+    h.frame_with(vec![Event::Text("b".into())]);
+    assert_eq!(h.sheet().doc.regions().len(), count + 1);
+    let id = *h.sheet().canvas.selection.first().expect("selected");
+    assert_ne!(id, first);
+    assert_eq!(h.source_of(id), "b");
+    assert_eq!(h.source_of(first), "a := 1", "the first input is untouched");
+}

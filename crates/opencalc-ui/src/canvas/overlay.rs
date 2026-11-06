@@ -117,3 +117,12 @@ pub(super) fn type_to_create(ui: &Ui, st: &mut CanvasUi, cmds: &mut Vec<CanvasCm
     cmds.push(CanvasCmd::Seal);
     cmds.push(CanvasCmd::TypeAhead(typed));
 }
+
+/// Enter ends an input and readies the next: the insertion point drops just below
+/// the finished region, nothing stays selected, and typing starts a new math region.
+pub(super) fn next_input_below(st: &mut CanvasUi, region: &Region) {
+    let r = rect_of(region, &st.sizes);
+    st.insert_at = super::view::snap(Pos2::new(r.min.x, r.max.y + 12.0), super::view::GRID);
+    st.selection.clear();
+    st.armed = true;
+}

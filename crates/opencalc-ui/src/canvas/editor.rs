@@ -216,6 +216,9 @@ pub(super) fn math(
         }));
     }
     if finished {
+        if !pressed_elsewhere && ui.input(|i| i.key_pressed(Key::Enter)) {
+            super::overlay::next_input_below(st, r);
+        }
         st.editing = None;
         st.field = None;
         cmds.push(CanvasCmd::Seal);
