@@ -10,9 +10,7 @@ use std::collections::HashMap;
 use crate::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
 use crate::units::{Dimension, Quantity, UnitError};
 
-/// Stable identity of a region. Never a list position.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct RegionId(pub u64);
+pub use crate::document::RegionId;
 
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum EvalError {

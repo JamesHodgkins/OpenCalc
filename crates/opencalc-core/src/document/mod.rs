@@ -1,0 +1,218 @@
+//! The document model: what is saved. Pure data, no UI types (rules R1, R2).
+//!
+//! A [`Worksheet`] is changed only through [`crate::edit::Edit`]s, so undo,
+//! autosave and the file format share one choke point (rule R3).
+
+mod geometry;
+mod region;
+
+use serde::{Deserialize, Serialize};
+
+pub use geometry::{Point, Size};
+pub use region::{MathRegion, Region, RegionId, RegionKind};
+
+use crate::expr::Expr;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Worksheet {
+    pub(crate) title: String,
+    /// Back to front. This is also creation order, which decides which of several
+    /// definitions of one name wins; moving a region never changes it.
+    pub(crate) regions: Vec<Region>,
+    /// Next region ID to hand out. Only ever grows, so an ID is never reused even
+    /// after the region is deleted and the deletion undone.
+    pub(crate) next_id: u64,
+    /// Bumped by every applied edit. Not saved; lets caches notice change.
+    #[serde(skip)]
+    pub(crate) revision: u64,
+}
+
+/// Two worksheets are equal if they have the same content. `next_id` is
+/// allocation state and `revision` is bookkeeping, so neither counts.
+impl PartialEq for Worksheet {
+    fn eq(&self, other: &Worksheet) -> bool {
+        self.title == other.title && self.regions == other.regions
+    }
+}
+
+impl Worksheet {
+    pub fn new(title: &str) -> Worksheet {
+        Worksheet {
+            title: title.to_owned(),
+            regions: Vec::new(),
+            next_id: 1,
+            revision: 0,
+        }
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    pub fn regions(&self) -> &[Region] {
+        &self.regions
+    }
+
+    pub fn region(&self, id: RegionId) -> Option<&Region> {
+        self.regions.iter().find(|r| r.id == id)
+    }
+
+    pub fn index_of(&self, id: RegionId) -> Option<usize> {
+        self.regions.iter().position(|r| r.id == id)
+    }
+
+    /// Increases with every applied edit.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// Make a region with a fresh ID, not yet part of the worksheet. Add it with
+    /// [`crate::edit::Edit::InsertRegions`].
+    pub fn new_region(&mut self, kind: RegionKind, pos: Point) -> Region {
+        let id = RegionId(self.next_id);
+        self.next_id += 1;
+        let size = kind.default_size();
+        Region {
+            id,
+            pos,
+            size,
+            kind,
+        }
+    }
+
+    /// Math regions in layout order, as the evaluator takes them.
+    pub fn math_regions(&self) -> Vec<(RegionId, Expr)> {
+        self.regions
+            .iter()
+            .filter_map(|r| match &r.kind {
+                RegionKind::Math(m) => Some((r.id, m.expr().clone())),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_regions_get_increasing_ids_even_if_never_inserted() {
+        let mut w = Worksheet::new("t");
+        let a = w.new_region(RegionKind::Plot, Point::default());
+        let b = w.new_region(RegionKind::Table, Point::default());
+        assert_eq!((a.id, b.id), (RegionId(1), RegionId(2)));
+        assert!(w.regions().is_empty(), "allocating an ID does not add it");
+    }
+
+    #[test]
+    fn math_region_expression_always_matches_its_source() {
+        let mut m = MathRegion::new("x := 1 + 2");
+        assert_eq!(m.expr(), &crate::parser::parse("x := 1 + 2"));
+        m.set_source("y := 3".to_owned());
+        assert_eq!(m.source(), "y := 3");
+        assert_eq!(m.expr(), &crate::parser::parse("y := 3"));
+    }
+
+    #[test]
+    fn worksheets_compare_by_content_not_bookkeeping() {
+        let mut a = Worksheet::new("t");
+        let b = Worksheet::new("t");
+        let _ = a.new_region(RegionKind::Plot, Point::default()); // bumps next_id only
+        a.revision = 9;
+        assert_eq!(a, b);
+        assert_ne!(Worksheet::new("other"), b);
+    }
+
+    #[test]
+    fn only_math_regions_are_evaluated() {
+        let mut w = Worksheet::new("t");
+        for kind in [
+            RegionKind::Plot,
+            RegionKind::math("a := 1"),
+            RegionKind::Text { text: "x".into() },
+            RegionKind::math("b := 2"),
+        ] {
+            let r = w.new_region(kind, Point::default());
+            w.regions.push(r);
+        }
+        let ids: Vec<u64> = w.math_regions().iter().map(|(id, _)| id.0).collect();
+        assert_eq!(ids, [2, 4]);
+    }
+
+    fn sample() -> Worksheet {
+        let mut w = Worksheet::new("Beam stress");
+        for (kind, x) in [
+            (RegionKind::math("F := 10 kN"), 40.0),
+            (
+                RegionKind::Text {
+                    text: "Notes \u{3c3}".into(),
+                },
+                80.0,
+            ),
+            (
+                RegionKind::Area {
+                    title: "Loads".into(),
+                },
+                120.0,
+            ),
+            (RegionKind::Plot, 160.0),
+            (RegionKind::Table, 200.0),
+            (RegionKind::Picture, 240.0),
+        ] {
+            let r = w.new_region(kind, Point::new(x, 20.0));
+            w.regions.push(r);
+        }
+        w
+    }
+
+    #[test]
+    fn saves_math_as_source_text_and_not_as_an_expression_tree() {
+        let json = serde_json::to_string(&sample()).unwrap();
+        assert!(json.contains("F := 10 kN"), "{json}");
+        // Decision D5: the AST is not part of the file format.
+        assert!(
+            !json.contains("Quantity"),
+            "AST leaked into the file: {json}"
+        );
+        assert!(!json.contains("Assign"), "AST leaked into the file: {json}");
+        assert!(
+            !json.contains("revision"),
+            "bookkeeping leaked into the file"
+        );
+    }
+
+    #[test]
+    fn every_region_type_round_trips_through_json() {
+        let original = sample();
+        let json = serde_json::to_string(&original).unwrap();
+        let back: Worksheet = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, original);
+        // The expression was re-derived from the source on load.
+        let f = back.regions().first().and_then(|r| match &r.kind {
+            RegionKind::Math(m) => Some(m.expr().clone()),
+            _ => None,
+        });
+        assert_eq!(f, Some(crate::parser::parse("F := 10 kN")));
+        // IDs keep counting from where they were, so none is ever reused.
+        let mut back = back;
+        assert_eq!(
+            back.new_region(RegionKind::Plot, Point::default()).id,
+            RegionId(7)
+        );
+    }
+
+    #[test]
+    fn loading_applies_the_parser_limits_to_hostile_source() {
+        let long = "(".repeat(100_000);
+        let json = format!(
+            r#"{{"title":"t","regions":[{{"id":1,"pos":{{"x":0,"y":0}},"size":{{"w":1,"h":1}},"kind":{{"Math":{{"source":"{long}"}}}}}}],"next_id":2}}"#
+        );
+        let w: Worksheet = serde_json::from_str(&json).unwrap();
+        let expr = match &w.regions()[0].kind {
+            RegionKind::Math(m) => m.expr().clone(),
+            _ => panic!("expected a math region"),
+        };
+        assert!(matches!(expr, Expr::Error(_)));
+    }
+}
