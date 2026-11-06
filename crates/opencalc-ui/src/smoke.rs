@@ -1384,10 +1384,7 @@ fn enter_readies_the_next_input_below_and_typing_starts_it() {
     );
     let below = h.sheet().canvas.insert_at;
     let r = h.sheet().doc.region(first).expect("region");
-    assert!(
-        below.y > f32::from(r.pos.y),
-        "the insertion point is below it"
-    );
+    assert!(below.y > r.pos.y, "the insertion point is below it");
     let count = h.sheet().doc.regions().len();
     h.frame_with(vec![Event::Text("b".into())]);
     assert_eq!(h.sheet().doc.regions().len(), count + 1);
