@@ -148,6 +148,8 @@ fn complex_text(z: Complex64, scale: f64, digits: usize, peak: f64) -> String {
 /// Show any value. A complex scalar is `(3 + 4i) m`; a matrix lists its rows
 /// separated by semicolons (`2x2 [1, 2; 3, 4]`) until matrices get typeset.
 pub fn format_value(v: &Value, system: UnitSystem) -> String {
+    // A list is shown on one line, so it gets fewer values than a matrix grid.
+    const SHOWN_IN_LIST: usize = 8;
     const SHOWN: usize = 24;
     match v {
         Value::Scalar(s) => match s.as_real() {
@@ -197,10 +199,10 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
             let mut items: Vec<String> = r
                 .elements()
                 .iter()
-                .take(SHOWN)
+                .take(SHOWN_IN_LIST)
                 .map(|z| complex_text(*z, scale, digits(r.dim), peak))
                 .collect();
-            if r.len() > SHOWN {
+            if r.len() > SHOWN_IN_LIST {
                 items.push("\u{2026}".to_owned());
             }
             let count = if r.len() == 1 {
@@ -323,7 +325,7 @@ mod tests {
         );
         let long = shown("0..99");
         assert!(long.starts_with("100 values [0.000000, 1.000000") && long.contains('\u{2026}'));
-        assert!(long.len() < 300, "{long}");
+        assert!(long.len() < 120, "{long}");
     }
 
     #[test]

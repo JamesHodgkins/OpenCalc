@@ -1,6 +1,6 @@
 //! The Names and Units browser (left dock).
 
-use eframe::egui::{RichText, Ui};
+use eframe::egui::{self, RichText, Ui};
 use opencalc_core::document::RegionKind;
 use opencalc_core::expr::{AssignKind, Expr};
 
@@ -42,10 +42,16 @@ pub fn show(ui: &mut Ui, state: &AppState) {
         };
         ui.horizontal(|ui| {
             ui.label(RichText::new(target).color(theme.text));
-            ui.label(
-                RichText::new(value)
-                    .size(type_size::SMALL)
-                    .color(theme.text_weak),
+            // Long values (lists, matrices) are cut to the panel's width. Without
+            // this the label makes the panel as wide as the whole text, which
+            // pushes the canvas aside and leaves an unpainted strip.
+            ui.add(
+                egui::Label::new(
+                    RichText::new(value)
+                        .size(type_size::SMALL)
+                        .color(theme.text_weak),
+                )
+                .truncate(),
             );
         });
     }

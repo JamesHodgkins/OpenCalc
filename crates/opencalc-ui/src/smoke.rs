@@ -226,6 +226,23 @@ fn inserting_each_region_type_adds_and_selects_it() {
     h.settle();
 }
 
+#[test]
+fn a_long_value_in_the_names_panel_does_not_push_the_canvas_aside() {
+    // The sample defines a list of 11 widths, whose text is far wider than the
+    // names panel. The panel must stay within its width range (400 points), so the
+    // canvas starts right after it, not after the whole text.
+    let mut h = Harness::new();
+    h.settle();
+    for _ in 0..5 {
+        h.frame();
+    }
+    let canvas_left = h.app.state.viewport.min.x;
+    assert!(
+        canvas_left <= 420.0,
+        "the canvas starts at x = {canvas_left}, so the names panel grew past its limit"
+    );
+}
+
 /// The sample sheet's plot region.
 fn plot_id(h: &Harness) -> RegionId {
     h.sheet()
