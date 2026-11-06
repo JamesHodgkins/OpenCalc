@@ -165,6 +165,11 @@ pub fn apply_canvas(state: &mut AppState, sheet: usize, cmds: Vec<CanvasCmd>) ->
                 state.sheets[sheet].edit(edit);
             }
             CanvasCmd::Seal => state.sheets[sheet].seal(),
+            CanvasCmd::TypeAhead(text) => {
+                let s = &mut state.sheets[sheet];
+                let id = s.insert(RegionKind::math(""));
+                s.edit(Edit::SetMathSource { id, source: text });
+            }
         }
     }
     let changed = state.sheets[sheet].doc.eval_revision() != before;

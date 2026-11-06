@@ -54,6 +54,9 @@ pub enum CanvasCmd {
     /// A gesture ended (mouse released, in-place editing finished): the next
     /// edit starts a new undo step.
     Seal,
+    /// Typing on the blank page: make a math region at the insertion point holding
+    /// this text, and open it for editing.
+    TypeAhead(String),
 }
 
 enum Drag {
@@ -79,6 +82,8 @@ pub struct CanvasUi {
     pub field: Option<editor::Field>,
     /// Where the next inserted region goes (document space).
     pub insert_at: Pos2,
+    /// The last click was on blank page, so typing starts a math region there.
+    pub armed: bool,
     /// Content sizes measured by the last paint.
     pub sizes: Sizes,
     /// Fit the page width into the viewport on the next frame (set when a
@@ -95,6 +100,7 @@ impl Default for CanvasUi {
             focus_edit: false,
             field: None,
             insert_at: Pos2::new(40.0, 40.0),
+            armed: false,
             sizes: Sizes::new(),
             fit_pending: true,
             drag: None,
@@ -189,6 +195,7 @@ pub fn show(
     overlay::edit_overlay(ui, env, regions, view, origin, st, &mut cmds);
     if st.editing.is_none() {
         overlay::crosshair(&painter, view, origin, st, env);
+        overlay::type_to_create(ui, st, &mut cmds);
     }
     let scene = Scene {
         env,
@@ -352,6 +359,7 @@ fn pointer(
         if hit != st.editing {
             st.editing = None;
         }
+        st.armed = hit.is_none();
         if hit.is_none() {
             st.insert_at = snap(doc, GRID);
         }

@@ -92,3 +92,28 @@ pub(super) fn clip_notice(painter: &Painter, origin: Pos2, height: f32, zoom: f3
         env.theme.warning,
     );
 }
+
+/// Click-and-type: after a click on blank page, the first printable text starts a
+/// math region at the insertion point. Does nothing while another widget (a search
+/// box, say) wants the keyboard.
+pub(super) fn type_to_create(ui: &Ui, st: &mut CanvasUi, cmds: &mut Vec<CanvasCmd>) {
+    if !st.armed || ui.ctx().wants_keyboard_input() {
+        return;
+    }
+    let typed: String = ui.input(|i| {
+        i.events
+            .iter()
+            .filter_map(|e| match e {
+                eframe::egui::Event::Text(s) => Some(s.as_str()),
+                _ => None,
+            })
+            .collect()
+    });
+    let typed: String = typed.chars().filter(|c| !c.is_control()).collect();
+    if typed.trim().is_empty() {
+        return;
+    }
+    st.armed = false;
+    cmds.push(CanvasCmd::Seal);
+    cmds.push(CanvasCmd::TypeAhead(typed));
+}

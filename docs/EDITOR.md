@@ -180,6 +180,9 @@ The cursor specification is implemented as follows. The caret is transient UI st
 (`Field`), never saved and never an `Edit`.
 
 - Worksheet crosshair at `insert_at`, drawn only when no region is being edited.
+- Click-and-type: after a click on blank page, the first printable text creates a math
+  region at the crosshair and opens it (not while another box, such as Functions
+  search, has the keyboard).
 - Up/Down keep a goal x across repeated presses (`Field::goal_x`).
 - An insertion cut short by the 8,192-character limit shows a notice under the region.
 - Sources over the limit are never truncated; editing is refused with a message.

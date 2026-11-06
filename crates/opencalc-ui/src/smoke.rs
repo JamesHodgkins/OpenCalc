@@ -1245,3 +1245,42 @@ fn the_crosshair_follows_a_click_on_blank_page() {
     );
     assert!(h.sheet().canvas.editing.is_none());
 }
+
+#[test]
+fn typing_after_a_click_on_blank_page_starts_a_math_region_there() {
+    let mut h = Harness::new();
+    h.settle();
+    let at = h.app.state.viewport.max - egui::vec2(120.0, 80.0);
+    h.frame_with(vec![Event::PointerMoved(at)]);
+    h.frame_with(vec![press(at)]);
+    h.frame_with(vec![release(at)]);
+    let count = h.sheet().doc.regions().len();
+    h.frame_with(vec![Event::Text("x".into())]);
+    assert_eq!(h.sheet().doc.regions().len(), count + 1);
+    let id = *h.sheet().canvas.selection.first().expect("selected");
+    assert_eq!(h.source_of(id), "x");
+    assert_eq!(h.sheet().canvas.editing, Some(id));
+    h.type_text("+1");
+    assert_eq!(
+        h.source_of(id),
+        "x+1",
+        "typing carries on in the new region"
+    );
+    h.key(Key::Enter, Modifiers::NONE);
+    h.key(Key::Z, Modifiers::COMMAND);
+    h.key(Key::Z, Modifiers::COMMAND);
+    assert_eq!(
+        h.sheet().doc.regions().len(),
+        count,
+        "typing, then creation, each undo in one step"
+    );
+}
+
+#[test]
+fn typing_without_a_blank_click_creates_nothing() {
+    let mut h = Harness::new();
+    h.settle();
+    let count = h.sheet().doc.regions().len();
+    h.frame_with(vec![Event::Text("x".into())]);
+    assert_eq!(h.sheet().doc.regions().len(), count);
+}
