@@ -4,9 +4,9 @@ How the code is organised, the rules that keep it that way, and the plan to get
 from where it is to where it should be. `SPEC.md` says *what* to build; this says
 *how the code is shaped*. `TECH_DEBT.md` is the register of known shortcuts.
 
-**Status:** written after the Milestone 1 review, 2026-11-06. **Phase A landed
-the same day** (section 7); section 3 shows the code as it was before it, with
-the rows it fixed marked *done*. Update section 3 when phase B lands.
+**Status:** written after the Milestone 1 review, 2026-11-06. **Phases A and B
+landed the same day** (section 7). Section 3 shows the code as it was before
+them, with the rows they fixed marked *done*; section 2 shows the code as built.
 
 ---
 
@@ -32,42 +32,39 @@ the rows it fixed marked *done*. Update section 3 when phase B lands.
 
 ---
 
-## 2. Target module map
+## 2. Module map
 
-Today's layout is in section 3. This is where each piece should end up.
+As built after phases A and B. Items marked *planned* do not exist yet.
 
 ```
 crates/opencalc-core/src/
-  expr.rs            AST (Expr)                                  exists
-  parser.rs          Pratt parser, spans on tokens               exists (+spans)
-  units/             dimension.rs, quantity.rs, registry.rs      split from units.rs
-  eval/              graph.rs (deps, Tarjan), value.rs,          split from eval.rs
-                     functions.rs (builtins), error.rs
-  worker.rs          background evaluation, revision protocol    exists
-  document/          mod.rs (Worksheet, Region, RegionKind),     NEW  <- from ui/sheet.rs
-                     geometry.rs (Point, Size, Rect; f32, serde)
-  edit/              mod.rs (Edit enum, apply -> inverse),       NEW
-                     history.rs (undo/redo, coalescing)
-  file/              container, manifest, migrations             Milestone 3
+  expr.rs            AST (Expr)
+  parser.rs          Pratt parser; MAX_SYMBOLS limit                   (spans: planned, C)
+  units.rs           Dimension, Quantity, built-in units               (-> units/ + registry: planned, C)
+  eval.rs            dependency graph, Tarjan, evaluation              (-> eval/ + Value: planned, C)
+  worker.rs          background evaluation, revision protocol, panic safety
+  document/          Worksheet, Region, RegionKind, MathRegion; own Point and Size
+  edit/              Edit enum, Worksheet::apply -> inverse; History (undo/redo, coalescing)
+  file/              container, manifest, migrations                   (planned, M3)
 
 crates/opencalc-ui/src/
-  main.rs
-  app/               state.rs (AppState: data only), frame.rs    split from app.rs
-                     (panel layout), dispatch.rs (command ->
-                     effects), sheets.rs (open/close/select)
-  commands/          id.rs (CommandId enum), table.rs (label,     split from commands.rs
-                     icon, shortcut), registry.rs (enabled/active)
-  ribbon/            mod.rs, defs.rs (data, ids only), show.rs,   exists
-                     widgets.rs
-  canvas/            view.rs, hit.rs, paint.rs, input.rs,         exists (+input, cache)
-                     edit_overlay.rs, layout_cache.rs
-  panels/            title.rs, doc_tabs.rs, names.rs,             split from shell.rs
-                     properties.rs, status.rs, home.rs, about.rs
-  theme.rs  fonts.rs  icons.rs  format.rs  layout.rs (typesetter)  exist
-  smoke.rs           headless end-to-end tests                    NEW (done)
+  main.rs            entry point and window size
+  app/               mod.rs (App: worker, ribbon, effects), state.rs (AppState: data only),
+                     dispatch.rs (command -> state change + Effects), frame.rs (panel layout,
+                     key bindings)
+  commands/          id.rs (CommandId table, one macro), keys.rs (key bindings),
+                     registry.rs (what is enabled and active right now)
+  sheet.rs           OpenSheet: a core Worksheet + History + view + canvas state
+  panels/            title, doc_tabs, names, properties, status, home, about, slots:
+                     read-only views that push commands
+  ribbon/            mod.rs, defs.rs (data: command IDs only), show.rs, widgets.rs
+  canvas/            mod.rs (widget), view.rs (transform), hit.rs, paint.rs, adapt.rs
+                     (core <-> egui types, measured sizes)             (layout cache: planned, TD-15)
+  theme.rs  fonts.rs  icons.rs  format.rs  layout.rs (typesetter)
+  smoke.rs           headless end-to-end tests
 
 crates/opencalc-cli/src/
-  main.rs            check / calc, using core only                needs core::document + core::file
+  main.rs            check / calc, using core only                     (needs core::file, M3)
 ```
 
 ---
@@ -81,8 +78,8 @@ Snapshot, 2026-11-06: about 6,600 lines of Rust (including tests), 105 tests (45
 | Document model | `ui/sheet.rs`, holds `egui::Pos2/Rect/Vec2`, and also `CanvasView` and selection state inside `Sheet` | Violates R1 and R2. The CLI cannot open a worksheet; nothing can be saved without dragging egui in. | `core::document` with own geometry types; UI keeps view and selection in a separate `SheetView` keyed by worksheet ID. | A: **Done (phase A).** |
 | Mutation | Three places edit regions directly (`app.rs` insert, delete, `apply_doc_cmds`; `sheet.rs` add/remove) | Violates R3. No undo possible. Move is applied every frame; typing re-parses per keystroke. | `Edit` enum + `Worksheet::apply` returning the inverse; `History` with coalescing (a drag is one step, a burst of typing is one step). | A: **Done (phase A).** |
 | Auto-measured size | Stored in `Region.size`; rewritten when the zoom changes (font rounding) | Zooming dirties the document. | `LayoutCache` in the UI keyed by `(RegionId, content revision, zoom bucket)`; the document stores only user-set size. | A: **Done (phase A).** |
-| Commands | Strings in three lists (`HANDLED`, `run()` match arms, ribbon defs). Unknown IDs fall through `_ => {}`. | Typos are silent. 49 of 70 ribbon items (33 of 54 plain items plus the 16 Greek-letter flyout items) have no handler and nothing tracks that. | `CommandId` enum, one table with label, icon and shortcut; `match` is exhaustive. | B |
-| App structure | `App` has 11 `pub` fields; `shell.rs` mutates it in 4 places, bypassing the command queue. `app.rs` is 488 lines, `shell.rs` 419 (limit 400). | Violates R4 and R8. | `AppState` + `dispatch(state, cmd) -> Effects`; panels take `&AppView`, return `Vec<CommandId>`. | B |
+| Commands | Strings in three lists (`HANDLED`, `run()` match arms, ribbon defs). Unknown IDs fall through `_ => {}`. | Typos are silent. 49 of 70 ribbon items (33 of 54 plain items plus the 16 Greek-letter flyout items) have no handler and nothing tracks that. | `CommandId` enum, one table with label, icon and shortcut; `match` is exhaustive. | B: **Done (phase B).** |
+| App structure | `App` has 11 `pub` fields; `shell.rs` mutates it in 4 places, bypassing the command queue. `app.rs` is 488 lines, `shell.rs` 419 (limit 400). | Violates R4 and R8. | `AppState` + `dispatch(state, cmd) -> Effects`; panels take `&AppView`, return `Vec<CommandId>`. | B: **Done (phase B).** |
 | Math source | A region holds both `source` (text) and `expr` (parsed) | SPEC 3.3 says the AST is the truth. Unresolved, so the file format cannot be fixed. | **Decision D5 below.** | with M2 |
 | Evaluator | Whole sheet recomputed per edit; `Quantity` is a real `f64`; functions and units are hard-coded matches | No vectors, matrices, complex, custom units or incremental recalculation. | `Value` enum; `UnitRegistry` passed to the evaluator; dirty propagation when measured necessary. | C |
 | Errors | `Expr::Error(String)`, `EvalError` with no position | SPEC "error tracing" cannot highlight a sub-expression. | Spans on tokens and errors. | C |
@@ -204,7 +201,7 @@ editor, vectors, undo-able edits) would be written twice.
 | Phase | Work | Exit check | Unblocks |
 |---|---|---|---|
 | **A** Document in core (**done 2026-11-06**) | `core::document` with own geometry; `Edit` + `apply` + `History`; measured sizes moved out of the document into `CanvasUi`; UI state in `OpenSheet`. | Met: `cargo tree -p opencalc-core` has no UI crate and the source has no `egui` mention. Undo/redo works for insert, delete, move and typing, through the ribbon and the keyboard (smoke tests). | Undo (M3), file format, CLI `check`, headless document tests. |
-| **B** UI structure | `CommandId` enum and one command table. `AppState` + `dispatch`. Split `shell.rs` into `panels/`, `app.rs` into `app/`. Replace the two `too_many_arguments` allows with context structs. | Both files off the size-limit exceptions list. No panel takes `&mut App`. Every ribbon item either has a handler or is listed as `Unimplemented`. | New features land in small files; consistent behaviour across ribbon, shortcuts, menu. |
+| **B** UI structure (**done 2026-11-06**) | `CommandId` enum and one command table. `AppState` + `dispatch`. `shell.rs` split into `panels/`, `app.rs` into `app/`. Context structs replaced both `too_many_arguments` allows. | Met: the size-limit exceptions list is empty (largest file 394 lines); no panel takes `&mut` state; every command is either handled by `dispatch` or marked unimplemented, and a test keeps the two in agreement. | New features land in small files; consistent behaviour across ribbon, shortcuts, menu. |
 | **C** Evaluator foundations | `UnitRegistry`; `Value` enum; spans on tokens and errors; benchmark for the 200-region and 500-region targets. | Custom units resolve; a vector literal evaluates; an error highlights its sub-expression; benchmark numbers recorded. | Milestone 2 proper. |
 | **M2** Core logic | Math editor, ranges, vectors, functions, plots (SPEC section 6). | SPEC exit criterion. | |
 | **M3** Persistence | `core::file`, autosave, export, CLI. | SPEC exit criterion. | |

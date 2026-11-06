@@ -7,9 +7,9 @@ mod fonts;
 mod format;
 mod icons;
 mod layout;
+mod panels;
 mod ribbon;
 mod sheet;
-mod shell;
 #[cfg(test)]
 mod smoke;
 mod theme;

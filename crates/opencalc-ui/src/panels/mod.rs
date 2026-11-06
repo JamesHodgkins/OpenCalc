@@ -1,0 +1,23 @@
+//! Window furniture from spec section 4.1. Each panel reads application state
+//! and pushes the commands the user raised; none changes state itself (rule R4).
+
+pub mod about;
+pub mod doc_tabs;
+pub mod home;
+pub mod names;
+pub mod properties;
+pub mod slots;
+pub mod status;
+pub mod title;
+
+use crate::app::AppState;
+use crate::commands::{CommandId, Registry};
+
+/// The read-only view of the app a panel draws from.
+pub struct PanelCx<'a> {
+    pub state: &'a AppState,
+    pub registry: &'a Registry,
+}
+
+/// Where a panel puts the commands the user raised this frame.
+pub type Commands = Vec<CommandId>;

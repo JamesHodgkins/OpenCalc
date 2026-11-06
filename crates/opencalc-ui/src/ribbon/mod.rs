@@ -14,10 +14,24 @@ use std::collections::HashMap;
 
 use eframe::egui::Rect;
 
+use crate::commands::CommandId;
+
 pub struct Item {
-    pub command: &'static str,
+    pub command: CommandId,
+    /// Copied from the command table when the item is built, so a label and icon
+    /// are defined once (rule R5).
     pub label: &'static str,
     pub icon: char,
+}
+
+impl Item {
+    pub fn of(command: CommandId) -> Item {
+        Item {
+            command,
+            label: command.label(),
+            icon: command.icon(),
+        }
+    }
 }
 
 pub struct Split {
@@ -73,21 +87,21 @@ pub struct RibbonState {
     /// (tab, panel) of the open flyout.
     pub open_panel: Option<(usize, usize)>,
     /// Last item picked from each split, by the split's first command.
-    pub split_picks: HashMap<&'static str, &'static str>,
+    pub split_picks: HashMap<CommandId, CommandId>,
 }
 
 /// What the ribbon needs from the command registry.
 pub trait CommandSource {
     /// Unknown commands are not enabled.
-    fn is_enabled(&self, command: &str) -> bool;
-    fn shortcut_text(&self, command: &str) -> Option<&str>;
-    fn is_active(&self, _command: &str) -> bool {
+    fn is_enabled(&self, command: CommandId) -> bool;
+    fn shortcut_text(&self, command: CommandId) -> Option<String>;
+    fn is_active(&self, _command: CommandId) -> bool {
         false
     }
 }
 
 #[derive(Default)]
 pub struct RibbonOutput {
-    pub clicked: Option<&'static str>,
+    pub clicked: Option<CommandId>,
     pub slots: Vec<(&'static str, Rect)>,
 }

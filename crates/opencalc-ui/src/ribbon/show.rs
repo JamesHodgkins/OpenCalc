@@ -7,6 +7,7 @@ use eframe::egui::{
 
 use super::widgets::{self as w, Look};
 use super::{Cell, Column, CommandSource, Item, Panel, Ribbon, RibbonOutput, RibbonState, Split};
+use crate::commands::CommandId;
 use crate::theme::{metrics, type_size, Theme};
 
 /// Everything a draw call needs, so helpers take one argument.
@@ -18,7 +19,7 @@ struct Cx<'a> {
 }
 
 impl Cx<'_> {
-    fn look(&self, command: &str) -> Look {
+    fn look(&self, command: CommandId) -> Look {
         Look {
             enabled: self.source.is_enabled(command),
             active: self.source.is_active(command),
@@ -46,7 +47,8 @@ impl Ribbon {
         for (i, tab) in self.tabs.iter().enumerate() {
             let active = i == state.active_tab;
             let width = w::text_width(ui, tab.title, type_size::TAB) + 24.0;
-            let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 25.0), Sense::click());
+            let (rect, resp) =
+                ui.allocate_exact_size(Vec2::new(width, metrics::TAB_STRIP), Sense::click());
             if active {
                 let top = CornerRadius {
                     nw: 4,
@@ -288,7 +290,7 @@ fn rows_ui(ui: &mut Ui, cx: &mut Cx, rows: &[Vec<Cell>], id: ((usize, usize), us
 /// The item a split currently runs: the last pick, else the first.
 fn current_pick<'a>(cx: &Cx, split: &'a Split) -> Option<&'a Item> {
     let first = split.items.first()?;
-    let picked = cx.state.split_picks.get(first.command);
+    let picked = cx.state.split_picks.get(&first.command);
     Some(
         picked
             .and_then(|c| split.items.iter().find(|i| i.command == *c))

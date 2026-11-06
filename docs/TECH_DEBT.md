@@ -4,16 +4,9 @@ Known shortcuts and gaps, with what each costs and when it must be paid. A livin
 file: add an entry when a shortcut is taken, delete it when it is paid. Design
 context is in `ARCHITECTURE.md`.
 
-**Last reviewed:** 2026-11-06 (after phase A).  **Size:** S under a session, M a few, L a milestone's worth.
+**Last reviewed:** 2026-11-06 (after phases A and B).  **Size:** S under a session, M a few, L a milestone's worth.
 
 ## Open
-
-### Structural (pay before Milestone 2: phase B; phase A is done)
-
-| ID | Debt | Impact | Pay by | Size |
-|---|---|---|---|---|
-| TD-04 | Command IDs are strings defined in three lists; unknown IDs are silently ignored. 49 of 70 ribbon items (33 of 54 plain items plus the 16 Greek-letter flyout items) have no handler and nothing tracks it. | Typos are invisible; ribbon, shortcuts and menu can disagree. Violates R5. | Phase B | M |
-| TD-05 | `App` is a god object (11 `pub` fields); `shell.rs` mutates it directly in 4 places; `app.rs` (488) and `shell.rs` (419) exceed the 400-line limit. | Violates R4 and R8. Ratchet in `scripts/line_limit_exceptions.txt`. | Phase B | M |
 
 ### Engine (pay with Milestone 2: phase C)
 
@@ -43,7 +36,6 @@ context is in `ARCHITECTURE.md`.
 |---|---|---|---|---|
 | TD-15 | Typesetting is redone every frame for visible regions; only the *sizes* are cached. | Fine at 10 regions; unknown at 200 (target 60 fps). | Measure in phase C; cache layouts if over budget | M |
 | TD-26 | No continuous integration and no `cargo deny` / `cargo audit`. `scripts/check.ps1` is run by hand. | The gate only works if someone remembers to run it. Only Windows is exercised. | With the first Linux/macOS work (M3) | S |
-| TD-17 | Layout numbers (bar heights 32/25/26/24, ribbon sizes) are inline in places rather than in `theme::metrics`. | Drift from the spec's metrics. | Phase B | S |
 | TD-18 | Placeholder controls that look real: the "12 pt" font-size slot. | Misleading until Format is built. | When Format tab is implemented | S |
 | TD-22 | No property tests for unit algebra or golden tests for the parser (SPEC Milestone 2 asks for both). Smoke tests are single-threaded and cannot reproduce timing races. | Algebra bugs are found by luck. | M2 | M |
 | TD-24 | Only Inter Regular is bundled (no bold or italic), so the Format tab's Bold and Italic cannot be implemented yet. Lucide icons are private-use codepoints and rely on font order. | Blocks rich text. | When Format tab is built | S |
@@ -67,3 +59,6 @@ context is in `ARCHITECTURE.md`.
 | R-13 | TD-14: no version control. | Git repository; each phase is a commit. (CI and `cargo deny` are still open: TD-26.) |
 | R-14 | TD-16: two `#[allow(clippy::too_many_arguments)]`. | `Scene` and `Place` context structs; no `#[allow]` left in the workspace. |
 | R-15 | TD-25: no line-ending policy. | `.gitattributes` (`eol=lf`) and `rustfmt.toml` (`newline_style = "Unix"`). |
+| R-16 | TD-04: command IDs were strings in three lists; unknown IDs ignored; 49 of 70 ribbon items had no handler and nothing tracked it. | One `CommandId` table (a macro generates the enum, name, label and icon together). Key bindings are one table that gives both the behaviour and the tooltip text. `is_implemented` is an exhaustive match, and a test checks `dispatch` agrees with it. |
+| R-17 | TD-05: `App` was a god object; `shell.rs` mutated it in 4 places; two files over the size limit. | `AppState` (data) + `dispatch` (the only mutator) + `panels/` (read-only, push commands). The size exceptions list is empty. |
+| R-18 | TD-17: bar heights and similar were inline numbers. | `theme::metrics` holds the bar heights; the frame code uses them. |

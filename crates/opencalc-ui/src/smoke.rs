@@ -15,7 +15,7 @@ use opencalc_core::document::{Point, RegionId, RegionKind};
 
 use crate::app::App;
 use crate::canvas::adapt::{pos, rect_of};
-use crate::commands::HANDLED;
+use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
@@ -60,22 +60,25 @@ impl Harness {
         }
         while Instant::now() < end {
             self.frame();
-            if self.app.status_text().contains("up to date") {
+            if self.app.state.status_text().contains("up to date") {
                 return;
             }
             std::thread::sleep(Duration::from_millis(5));
         }
-        panic!("worker result never arrived: {}", self.app.status_text());
+        panic!(
+            "worker result never arrived: {}",
+            self.app.state.status_text()
+        );
     }
 
-    fn command(&mut self, command: &'static str) {
+    fn command(&mut self, command: CommandId) {
         self.app.queue.push(command);
         self.frame();
         self.frame();
     }
 
     fn sheet(&self) -> &OpenSheet {
-        &self.app.sheets[self.app.active.expect("a worksheet is open")]
+        &self.app.state.sheets[self.app.state.active.expect("a worksheet is open")]
     }
 
     fn region_pos(&self, id: RegionId) -> Point {
@@ -87,7 +90,9 @@ impl Harness {
         let sheet = self.sheet();
         let r = sheet.doc.region(id).expect("region exists");
         let centre = rect_of(r, &sheet.canvas.sizes).center();
-        sheet.view.doc_to_screen(centre, self.app.viewport.min)
+        sheet
+            .view
+            .doc_to_screen(centre, self.app.state.viewport.min)
     }
 
     /// Press on a region, drag it 100 px right and 60 px down in steps, release.
@@ -152,15 +157,23 @@ fn the_sample_sheet_renders_and_every_region_evaluates() {
     let sheet = h.sheet();
     let math = sheet.doc.math_regions().len();
     assert_eq!(math, 6);
-    assert_eq!(h.app.output.values.len(), math);
-    assert!(h.app.output.values.values().all(Result::is_ok));
-    assert!(h.app.output.warnings.is_empty());
+    assert_eq!(h.app.state.output.values.len(), math);
+    assert!(h.app.state.output.values.values().all(Result::is_ok));
+    assert!(h.app.state.output.warnings.is_empty());
 }
 
 #[test]
 fn every_command_runs_without_panicking() {
-    let extras = ["file.example", "tab.home", "app.quit", "no.such.command"];
-    for command in HANDLED.iter().chain(extras.iter()) {
+    let mut all: Vec<CommandId> = CommandId::ALL.to_vec();
+    // The parameterised commands, in range and out of range.
+    all.extend([
+        CommandId::SelectSheet(0),
+        CommandId::SelectSheet(9),
+        CommandId::CloseSheet(0),
+        CommandId::CloseSheet(9),
+        CommandId::InsertSymbol('x'),
+    ]);
+    for command in all {
         let mut h = Harness::new();
         h.settle();
         h.app.queue.push(command);
@@ -176,20 +189,20 @@ fn inserting_each_region_type_adds_and_selects_it() {
     h.settle();
     let before = h.sheet().doc.regions().len();
     let commands = [
-        ("insert.math", "Math"),
-        ("insert.text", "Text"),
-        ("insert.area", "Area"),
-        ("insert.plot", "Plot"),
-        ("insert.table", "Table"),
-        ("insert.picture", "Picture"),
+        (CommandId::InsertMath, "Math"),
+        (CommandId::InsertText, "Text"),
+        (CommandId::InsertArea, "Area"),
+        (CommandId::InsertPlot, "Plot"),
+        (CommandId::InsertTable, "Table"),
+        (CommandId::InsertPicture, "Picture"),
     ];
     for (n, (command, label)) in commands.iter().enumerate() {
-        h.command(command);
+        h.command(*command);
         let sheet = h.sheet();
-        assert_eq!(sheet.doc.regions().len(), before + n + 1, "{command}");
+        assert_eq!(sheet.doc.regions().len(), before + n + 1, "{command:?}");
         let newest = sheet.doc.regions().last().expect("a region");
         assert_eq!(newest.kind.label(), *label);
-        assert_eq!(sheet.canvas.selection, vec![newest.id], "{command}");
+        assert_eq!(sheet.canvas.selection, vec![newest.id], "{command:?}");
     }
     h.settle();
 }
@@ -229,10 +242,10 @@ fn a_whole_drag_is_one_undo_step_and_redo_puts_it_back() {
     let moved = h.region_pos(F);
     assert_ne!(moved, start);
 
-    h.command("edit.undo");
+    h.command(CommandId::EditUndo);
     assert_eq!(h.region_pos(F), start, "one undo reverses the whole drag");
     assert!(!h.sheet().can_undo(), "the drag was a single step");
-    h.command("edit.redo");
+    h.command(CommandId::EditRedo);
     assert_eq!(h.region_pos(F), moved);
 }
 
@@ -243,6 +256,7 @@ fn moving_a_region_does_not_recalculate() {
     let results_before: Vec<_> = {
         let mut v: Vec<_> = h
             .app
+            .state
             .output
             .values
             .iter()
@@ -252,10 +266,10 @@ fn moving_a_region_does_not_recalculate() {
         v
     };
     let eval_before = h.sheet().doc.eval_revision();
-    let requests_before = h.app.revision;
+    let requests_before = h.app.state.calc.revision;
     h.drag(F);
     assert_eq!(
-        h.app.revision, requests_before,
+        h.app.state.calc.revision, requests_before,
         "dragging must not ask the worker to recalculate"
     );
     assert_eq!(
@@ -264,11 +278,12 @@ fn moving_a_region_does_not_recalculate() {
         "a move is not an evaluation change"
     );
     assert!(
-        h.app.status_text().contains("up to date"),
+        h.app.state.status_text().contains("up to date"),
         "no recalculation was started"
     );
     let mut results_after: Vec<_> = h
         .app
+        .state
         .output
         .values
         .iter()
@@ -283,7 +298,7 @@ fn ctrl_z_and_ctrl_y_work_from_the_keyboard() {
     let mut h = Harness::new();
     h.settle();
     let before = h.sheet().doc.regions().len();
-    h.command("insert.plot"); // a plot: no text field takes the keyboard
+    h.command(CommandId::InsertPlot); // a plot: no text field takes the keyboard
     assert_eq!(h.sheet().doc.regions().len(), before + 1);
 
     h.key(Key::Z, Modifiers::COMMAND);
@@ -314,16 +329,16 @@ fn delete_removes_the_selection_dependents_error_and_undo_restores_everything() 
     let order_before: Vec<RegionId> = h.sheet().doc.regions().iter().map(|r| r.id).collect();
     h.click(F);
     assert_eq!(h.sheet().canvas.selection, vec![F]);
-    h.command("region.delete");
+    h.command(CommandId::RegionDelete);
     h.settle();
     assert!(h.sheet().doc.region(F).is_none());
     assert!(h.sheet().canvas.selection.is_empty());
     assert!(
-        h.app.output.values.values().any(Result::is_err),
+        h.app.state.output.values.values().any(Result::is_err),
         "a region that used F should now be an error"
     );
 
-    h.command("edit.undo");
+    h.command(CommandId::EditUndo);
     h.settle();
     let order_after: Vec<RegionId> = h.sheet().doc.regions().iter().map(|r| r.id).collect();
     assert_eq!(
@@ -331,7 +346,7 @@ fn delete_removes_the_selection_dependents_error_and_undo_restores_everything() 
         "back in the same z-order position"
     );
     assert!(
-        h.app.output.values.values().all(Result::is_ok),
+        h.app.state.output.values.values().all(Result::is_ok),
         "undoing the delete recalculated and everything evaluates again"
     );
 }
@@ -340,7 +355,7 @@ fn delete_removes_the_selection_dependents_error_and_undo_restores_everything() 
 fn typing_into_a_region_is_one_undo_step_and_recalculates_live() {
     let mut h = Harness::new();
     h.settle();
-    h.command("insert.math"); // opens the new region for editing with focus
+    h.command(CommandId::InsertMath); // opens the new region for editing with focus
     h.frame();
     for ch in ["q", " ", ":", "=", " ", "7"] {
         h.frame_with(vec![Event::Text(ch.to_owned())]);
@@ -358,7 +373,7 @@ fn typing_into_a_region_is_one_undo_step_and_recalculates_live() {
     assert_eq!(source(&h), "q := 7");
     h.settle();
     assert!(
-        h.app.output.values[&id].is_ok(),
+        h.app.state.output.values[&id].is_ok(),
         "live recalculation evaluated what was typed"
     );
 
@@ -374,21 +389,24 @@ fn switching_sheets_never_shows_another_sheets_results() {
     // the previous sheet would show wrong values on the new one.
     let mut h = Harness::new();
     h.settle();
-    h.command("file.new");
+    h.command(CommandId::FileNew);
     h.settle();
-    assert!(h.app.output.values.is_empty(), "{:?}", h.app.output.values);
+    assert!(
+        h.app.state.output.values.is_empty(),
+        "{:?}",
+        h.app.state.output.values
+    );
 }
 
 #[test]
 fn each_sheet_keeps_its_own_undo_history() {
     let mut h = Harness::new();
     h.settle();
-    h.command("insert.plot");
+    h.command(CommandId::InsertPlot);
     assert!(h.sheet().can_undo());
-    h.command("file.new");
+    h.command(CommandId::FileNew);
     assert!(!h.sheet().can_undo(), "a new sheet starts with no history");
-    h.app.select_sheet(0);
-    h.frame();
+    h.command(CommandId::SelectSheet(0));
     assert!(
         h.sheet().can_undo(),
         "the first sheet still has its history"
@@ -421,11 +439,11 @@ fn worst_case_regions_paint_within_the_main_thread_stack() {
                     Point::new(20.0, 20.0 + 80.0 * i as f32),
                 );
             }
-            h.app.sheets.push(sheet);
-            h.app.select_sheet(1);
+            h.app.state.sheets.push(sheet);
+            h.command(CommandId::SelectSheet(1));
             h.settle();
             // Every region either evaluated or reported an error; none was lost.
-            assert_eq!(h.app.output.values.len(), 6);
+            assert_eq!(h.app.state.output.values.len(), 6);
         })
         .expect("spawn");
     handle.join().expect("the frame must not overflow or panic");
@@ -439,7 +457,9 @@ fn conversions_place_regions_where_the_document_says() {
     h.settle();
     let sheet = h.sheet();
     let r = sheet.doc.region(F).expect("F");
-    let screen = sheet.view.doc_to_screen(pos(r.pos), h.app.viewport.min);
-    let back = sheet.view.screen_to_doc(screen, h.app.viewport.min);
+    let screen = sheet
+        .view
+        .doc_to_screen(pos(r.pos), h.app.state.viewport.min);
+    let back = sheet.view.screen_to_doc(screen, h.app.state.viewport.min);
     assert!((back - pos(r.pos)).length() < 1e-3);
 }

@@ -1,18 +1,13 @@
 //! The OpenCalc ribbon as data (spec section 4.8, "OpenCalc ribbon").
 //!
-//! Icons are placeholder glyphs until the Lucide icon font is bundled
-//! (spec section 4.6).
+//! Items name a command only; their label and icon come from the command table.
 
-use crate::icons;
+use crate::commands::{greek_symbols, CommandId};
 
 use super::{Cell, Column, Item, Panel, Ribbon, Split, Tab};
 
-const fn it(command: &'static str, label: &'static str, icon: char) -> Item {
-    Item {
-        command,
-        label,
-        icon,
-    }
+fn it(command: CommandId) -> Item {
+    Item::of(command)
 }
 
 fn panel(title: &'static str, columns: Vec<Column>) -> Panel {
@@ -46,33 +41,27 @@ fn home() -> Tab {
                 vec![
                     Column::LargeSplit(Split {
                         label: Some("Paste"),
-                        items: vec![it("clipboard.paste", "Paste", icons::PASTE)],
+                        items: vec![it(CommandId::ClipboardPaste)],
                     }),
                     Column::Stack(vec![
-                        it("clipboard.cut", "Cut", icons::CUT),
-                        it("clipboard.copy", "Copy", icons::COPY),
+                        it(CommandId::ClipboardCut),
+                        it(CommandId::ClipboardCopy),
                     ]),
                 ],
             ),
             panel(
                 "Edit",
                 vec![
-                    Column::Stack(vec![
-                        it("edit.undo", "Undo", icons::UNDO),
-                        it("edit.redo", "Redo", icons::REDO),
-                    ]),
-                    Column::Stack(vec![
-                        it("edit.find", "Find", icons::FIND),
-                        it("edit.replace", "Replace", icons::REPLACE),
-                    ]),
+                    Column::Stack(vec![it(CommandId::EditUndo), it(CommandId::EditRedo)]),
+                    Column::Stack(vec![it(CommandId::EditFind), it(CommandId::EditReplace)]),
                 ],
             ),
             panel(
                 "Region",
                 vec![Column::Stack(vec![
-                    it("region.delete", "Delete", icons::DELETE),
-                    it("region.lock", "Lock", icons::LOCK),
-                    it("region.tag", "Tag", icons::TAG),
+                    it(CommandId::RegionDelete),
+                    it(CommandId::RegionLock),
+                    it(CommandId::RegionTag),
                 ])],
             ),
         ],
@@ -80,95 +69,33 @@ fn home() -> Tab {
 }
 
 fn insert() -> Tab {
-    let greek: Vec<Item> = [
-        ("alpha", '\u{03b1}'),
-        ("beta", '\u{03b2}'),
-        ("gamma", '\u{03b3}'),
-        ("delta", '\u{03b4}'),
-        ("epsilon", '\u{03b5}'),
-        ("theta", '\u{03b8}'),
-        ("lambda", '\u{03bb}'),
-        ("mu", '\u{03bc}'),
-        ("pi", '\u{03c0}'),
-        ("rho", '\u{03c1}'),
-        ("sigma", '\u{03c3}'),
-        ("tau", '\u{03c4}'),
-        ("phi", '\u{03c6}'),
-        ("omega", '\u{03c9}'),
-        ("Delta", '\u{0394}'),
-        ("Omega", '\u{03a9}'),
-    ]
-    .into_iter()
-    .map(|(name, ch)| it(greek_command(name), greek_label(name), ch))
-    .collect();
+    let greek: Vec<Item> = greek_symbols()
+        .map(|c| it(CommandId::InsertSymbol(c)))
+        .collect();
     Tab {
         title: "Insert",
         panels: vec![
-            panel(
-                "Math",
-                vec![Column::Large(it("insert.math", "Math region", icons::MATH))],
-            ),
-            panel(
-                "Text",
-                vec![Column::Large(it("insert.text", "Text region", icons::TEXT))],
-            ),
+            panel("Math", vec![Column::Large(it(CommandId::InsertMath))]),
+            panel("Text", vec![Column::Large(it(CommandId::InsertText))]),
             panel(
                 "Layout",
                 vec![
                     Column::Stack(vec![
-                        it("insert.area", "Area", icons::AREA),
-                        it("insert.plot", "Plot", icons::PLOT),
-                        it("insert.table", "Table", icons::TABLE),
+                        it(CommandId::InsertArea),
+                        it(CommandId::InsertPlot),
+                        it(CommandId::InsertTable),
                     ]),
-                    Column::Stack(vec![it("insert.picture", "Picture", icons::PICTURE)]),
+                    Column::Stack(vec![it(CommandId::InsertPicture)]),
                 ],
             ),
             Panel {
                 title: "Symbols",
-                columns: vec![Column::Large(it(
-                    "insert.greek",
-                    "Greek letters",
-                    icons::GREEK,
-                ))],
+                columns: vec![Column::Large(it(CommandId::InsertGreek))],
                 extra: greek,
             },
         ],
     }
 }
-
-/// Command ID and tooltip for a Greek letter, from a static table.
-fn greek_command(name: &str) -> &'static str {
-    GREEK
-        .iter()
-        .find(|(n, _, _)| *n == name)
-        .map_or("insert.greek", |(_, c, _)| *c)
-}
-
-fn greek_label(name: &str) -> &'static str {
-    GREEK
-        .iter()
-        .find(|(n, _, _)| *n == name)
-        .map_or("Greek letter", |(_, _, l)| *l)
-}
-
-pub static GREEK: [(&str, &str, &str); 16] = [
-    ("alpha", "greek.alpha", "alpha"),
-    ("beta", "greek.beta", "beta"),
-    ("gamma", "greek.gamma", "gamma"),
-    ("delta", "greek.delta", "delta"),
-    ("epsilon", "greek.epsilon", "epsilon"),
-    ("theta", "greek.theta", "theta"),
-    ("lambda", "greek.lambda", "lambda"),
-    ("mu", "greek.mu", "mu"),
-    ("pi", "greek.pi", "pi"),
-    ("rho", "greek.rho", "rho"),
-    ("sigma", "greek.sigma", "sigma"),
-    ("tau", "greek.tau", "tau"),
-    ("phi", "greek.phi", "phi"),
-    ("omega", "greek.omega", "omega"),
-    ("Delta", "greek.Delta", "Delta"),
-    ("Omega", "greek.Omega", "Omega"),
-];
 
 fn format() -> Tab {
     Tab {
@@ -177,8 +104,8 @@ fn format() -> Tab {
             panel(
                 "Font",
                 vec![Column::Rows(vec![vec![
-                    Cell::Icon(it("format.bold", "Bold", icons::BOLD)),
-                    Cell::Icon(it("format.italic", "Italic", icons::ITALIC)),
+                    Cell::Icon(it(CommandId::FormatBold)),
+                    Cell::Icon(it(CommandId::FormatItalic)),
                     Cell::Slot {
                         id: "font_size",
                         width: 60.0,
@@ -189,21 +116,21 @@ fn format() -> Tab {
                 "Number",
                 vec![
                     Column::Stack(vec![
-                        it("format.decimals_more", "More decimals", icons::PLUS),
-                        it("format.decimals_less", "Fewer decimals", icons::MINUS),
+                        it(CommandId::FormatDecimalsMore),
+                        it(CommandId::FormatDecimalsLess),
                     ]),
                     Column::Stack(vec![
-                        it("format.scientific", "Scientific", icons::SCIENTIFIC),
-                        it("format.engineering", "Engineering", icons::ENGINEERING),
+                        it(CommandId::FormatScientific),
+                        it(CommandId::FormatEngineering),
                     ]),
                 ],
             ),
             panel(
                 "Arrange",
                 vec![Column::Stack(vec![
-                    it("arrange.align_h", "Align horizontally", icons::ALIGN_H),
-                    it("arrange.align_v", "Align vertically", icons::ALIGN_V),
-                    it("arrange.separate", "Separate regions", icons::SEPARATE),
+                    it(CommandId::ArrangeAlignH),
+                    it(CommandId::ArrangeAlignV),
+                    it(CommandId::ArrangeSeparate),
                 ])],
             ),
         ],
@@ -219,9 +146,9 @@ fn units() -> Tab {
                 vec![Column::LargeSplit(Split {
                     label: None,
                     items: vec![
-                        it("units.si", "SI", icons::RULER),
-                        it("units.uscs", "USCS", icons::RULER),
-                        it("units.cgs", "CGS", icons::RULER),
+                        it(CommandId::UnitsSi),
+                        it(CommandId::UnitsUscs),
+                        it(CommandId::UnitsCgs),
                     ],
                 })],
             ),
@@ -231,30 +158,23 @@ fn units() -> Tab {
                     vec![Cell::Split(Split {
                         label: Some("Length"),
                         items: vec![
-                            it("units.display_m", "Metres", icons::RULER),
-                            it("units.display_mm", "Millimetres", icons::RULER),
-                            it("units.display_in", "Inches", icons::RULER),
+                            it(CommandId::UnitsDisplayM),
+                            it(CommandId::UnitsDisplayMm),
+                            it(CommandId::UnitsDisplayIn),
                         ],
                     })],
                     vec![Cell::IconSplit(Split {
                         label: None,
-                        items: vec![
-                            it("units.display_n", "Force in newtons", icons::CONVERT),
-                            it("units.display_kn", "Force in kilonewtons", icons::CONVERT),
-                        ],
+                        items: vec![it(CommandId::UnitsDisplayN), it(CommandId::UnitsDisplayKn)],
                     })],
-                    vec![Cell::Button(it(
-                        "units.display_reset",
-                        "Reset display",
-                        icons::RESET,
-                    ))],
+                    vec![Cell::Button(it(CommandId::UnitsDisplayReset))],
                 ])],
             ),
             panel(
                 "Custom",
                 vec![Column::Stack(vec![
-                    it("units.define", "Define unit", icons::PLUS),
-                    it("units.manage", "Manage units", icons::LIST),
+                    it(CommandId::UnitsDefine),
+                    it(CommandId::UnitsManage),
                 ])],
             ),
         ],
@@ -268,20 +188,17 @@ fn calculate() -> Tab {
             panel(
                 "Recalculate",
                 vec![
-                    Column::Large(it("calc.all", "Recalculate all", icons::REFRESH)),
-                    Column::Stack(vec![it("calc.changed", "Changed only", icons::PLAY)]),
+                    Column::Large(it(CommandId::CalcAll)),
+                    Column::Stack(vec![it(CommandId::CalcChanged)]),
                 ],
             ),
-            panel(
-                "Check",
-                vec![Column::Large(it("calc.check", "Run checks", icons::CHECK))],
-            ),
+            panel("Check", vec![Column::Large(it(CommandId::CalcCheck))]),
             panel(
                 "Warnings",
                 vec![Column::Stack(vec![
-                    it("warn.list", "List", icons::LIST),
-                    it("warn.next", "Next", icons::ARROW_DOWN),
-                    it("warn.prev", "Previous", icons::ARROW_UP),
+                    it(CommandId::WarnList),
+                    it(CommandId::WarnNext),
+                    it(CommandId::WarnPrev),
                 ])],
             ),
         ],
@@ -296,37 +213,30 @@ fn view() -> Tab {
                 "Zoom",
                 vec![
                     Column::Stack(vec![
-                        it("view.zoom_in", "Zoom in", icons::ZOOM_IN),
-                        it("view.zoom_out", "Zoom out", icons::ZOOM_OUT),
-                        it("view.zoom_fit", "Fit", icons::FIT),
+                        it(CommandId::ViewZoomIn),
+                        it(CommandId::ViewZoomOut),
+                        it(CommandId::ViewZoomFit),
                     ]),
-                    Column::Stack(vec![it("view.zoom_100", "100%", icons::ZOOM_100)]),
+                    Column::Stack(vec![it(CommandId::ViewZoom100)]),
                 ],
             ),
             panel(
                 "Show",
                 vec![Column::Stack(vec![
-                    it("view.grid", "Grid", icons::GRID),
-                    it("view.snap", "Snap", icons::SNAP),
-                    it("view.guides", "Guides", icons::GUIDES),
+                    it(CommandId::ViewGrid),
+                    it(CommandId::ViewSnap),
+                    it(CommandId::ViewGuides),
                 ])],
             ),
             panel(
                 "Panels",
                 vec![Column::Stack(vec![
-                    it("view.names", "Names", icons::NAMES),
-                    it("view.properties", "Properties", icons::PROPERTIES),
-                    it("view.reset_layout", "Reset layout", icons::RESET),
+                    it(CommandId::ViewNames),
+                    it(CommandId::ViewProperties),
+                    it(CommandId::ViewResetLayout),
                 ])],
             ),
-            panel(
-                "Theme",
-                vec![Column::Stack(vec![it(
-                    "view.theme",
-                    "Switch palette",
-                    icons::THEME,
-                )])],
-            ),
+            panel("Theme", vec![Column::Stack(vec![it(CommandId::ViewTheme)])]),
         ],
     }
 }
@@ -337,9 +247,9 @@ fn help() -> Tab {
         panels: vec![panel(
             "Help",
             vec![
-                Column::Large(it("help.shortcuts", "Shortcuts", icons::KEYBOARD)),
-                Column::Large(it("help.guide", "User guide", icons::BOOK)),
-                Column::Large(it("help.about", "About", icons::INFO)),
+                Column::Large(it(CommandId::HelpShortcuts)),
+                Column::Large(it(CommandId::HelpGuide)),
+                Column::Large(it(CommandId::HelpAbout)),
             ],
         )],
     }
@@ -396,7 +306,11 @@ mod tests {
         let r = opencalc_ribbon();
         let mut seen = HashSet::new();
         for i in all_items(&r) {
-            assert!(seen.insert(i.command), "duplicate command id {}", i.command);
+            assert!(
+                seen.insert(i.command),
+                "duplicate command id {:?}",
+                i.command
+            );
         }
     }
 

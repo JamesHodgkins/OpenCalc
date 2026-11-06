@@ -3,7 +3,7 @@
 An original engineering worksheet written in Rust, using egui for the interface.
 Free-form calculation notes with units, live recalculation and document export.
 
-**Status:** Milestone 1 (skeleton): window shell and free-form canvas working. See `docs/SPEC.md` for the full specification and roadmap.
+**Status:** Milestone 1 (skeleton): window shell, free-form canvas and undo/redo working. Phases A and B of the refactor plan (docs/ARCHITECTURE.md) are done. See `docs/SPEC.md` for the full specification and roadmap.
 
 ## Layout
 

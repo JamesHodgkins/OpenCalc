@@ -123,6 +123,11 @@ pub mod metrics {
     pub const CONTROL_HEIGHT: f32 = 26.0;
     pub const WINDOW_RADIUS: u8 = RADIUS + 2;
     pub const SCROLLBAR_WIDTH: f32 = 6.0;
+    /// Heights of the window's horizontal bars (SPEC 4.1).
+    pub const TITLE_BAR: f32 = 32.0;
+    pub const TAB_STRIP: f32 = 25.0;
+    pub const DOC_TAB: f32 = 26.0;
+    pub const STATUS_BAR: f32 = 24.0;
 }
 
 /// Type sizes in px.

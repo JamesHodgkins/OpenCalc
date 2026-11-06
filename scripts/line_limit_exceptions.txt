@@ -1,7 +1,3 @@
 # Files allowed to exceed the 400 production-line limit, with their current size.
 # A ratchet: a file may shrink but never grow, and must be removed from this list
-# once it is within the limit. Both are split in phase B (docs/ARCHITECTURE.md),
-# not trimmed. Phase A grew them slightly (undo/redo plumbing): app.rs 449 -> 458,
-# shell.rs 419 -> 420.
-crates/opencalc-ui/src/app.rs 458
-crates/opencalc-ui/src/shell.rs 420
+# once it is within the limit. Currently empty: phase B split app.rs and shell.rs.
