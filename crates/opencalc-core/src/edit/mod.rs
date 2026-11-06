@@ -10,7 +10,7 @@
 
 mod history;
 
-use crate::document::{Point, Region, RegionId, RegionKind, Size, Worksheet};
+use crate::document::{PlotSpec, Point, Region, RegionId, RegionKind, Size, Worksheet};
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
 
@@ -42,6 +42,11 @@ pub enum Edit {
     SetRegionSize {
         id: RegionId,
         size: Size,
+    },
+    /// Replace what a plot region plots (its sources, title and labels).
+    SetPlot {
+        id: RegionId,
+        spec: PlotSpec,
     },
     /// Display results in another unit system. Does not change any value.
     SetUnitSystem(UnitSystem),
@@ -75,13 +80,14 @@ pub struct Applied {
     pub changed: bool,
 }
 
-/// Whether an edit changes math content: new math source, or math regions added.
+/// Whether an edit changes what the evaluator computes: new math or plot sources,
+/// or math or plot regions added (a plot has results to show, even with no math).
 fn touches_math(edit: &Edit) -> bool {
     match edit {
-        Edit::SetMathSource { .. } | Edit::SetCustomUnits(_) => true,
+        Edit::SetMathSource { .. } | Edit::SetPlot { .. } | Edit::SetCustomUnits(_) => true,
         Edit::InsertRegions { regions } => regions
             .iter()
-            .any(|(_, r)| matches!(r.kind, RegionKind::Math(_))),
+            .any(|(_, r)| matches!(r.kind, RegionKind::Math(_) | RegionKind::Plot(_))),
         _ => false,
     }
 }
@@ -126,6 +132,14 @@ impl Worksheet {
                 };
                 let old = std::mem::replace(current, text.clone());
                 Ok(Edit::SetText { id: *id, text: old })
+            }
+            Edit::SetPlot { id, spec } => {
+                let region = self.region_mut(*id)?;
+                let RegionKind::Plot(current) = &mut region.kind else {
+                    return Err(EditError::WrongKind(*id));
+                };
+                let old = std::mem::replace(current, spec.clone());
+                Ok(Edit::SetPlot { id: *id, spec: old })
             }
             Edit::SetRegionSize { id, size } => {
                 let region = self.region_mut(*id)?;
@@ -289,7 +303,7 @@ mod tests {
         for (i, kind) in [
             RegionKind::math("a := 1"),
             RegionKind::Text { text: "hi".into() },
-            RegionKind::Plot,
+            RegionKind::plot(),
             RegionKind::math("b := a + 1"),
             RegionKind::Table,
         ]
@@ -434,8 +448,8 @@ mod tests {
         let (mut w, ids) = sheet();
         let before = w.clone();
         let existing = w.region(ids[0]).unwrap().clone();
-        let fresh = w.new_region(RegionKind::Plot, Point::default());
-        let fresh2 = w.new_region(RegionKind::Plot, Point::default());
+        let fresh = w.new_region(RegionKind::plot(), Point::default());
+        let fresh2 = w.new_region(RegionKind::plot(), Point::default());
         // Duplicate of an existing ID; duplicate within the edit; index past the end;
         // indices not ascending.
         let cases = [
@@ -482,7 +496,7 @@ mod tests {
     fn eval_revision_moves_only_for_edits_that_can_change_results() {
         let (mut w, ids) = sheet(); // ids: math, text, plot, math, table
         let e0 = w.eval_revision();
-        // Moving, resizing and editing text or deleting a plot never change results.
+        // Moving, resizing, editing text and deleting a table never change results.
         w.apply(Edit::MoveRegions {
             moves: vec![(ids[0], Point::new(9.0, 9.0))],
         })
@@ -497,10 +511,16 @@ mod tests {
             text: "new".into(),
         })
         .unwrap();
-        let plot = w.apply(Edit::DeleteRegions { ids: vec![ids[2]] }).unwrap();
+        let table = w.apply(Edit::DeleteRegions { ids: vec![ids[4]] }).unwrap();
         assert_eq!(w.eval_revision(), e0, "layout-only edits");
-        w.apply(plot.inverse).unwrap(); // putting the plot back: still nothing
+        w.apply(table.inverse).unwrap(); // putting the table back: still nothing
         assert_eq!(w.eval_revision(), e0);
+        // A plot has results to show, so adding one (or restoring a deleted one)
+        // does recalculate; deleting it is harmless either way.
+        let plot = w.apply(Edit::DeleteRegions { ids: vec![ids[2]] }).unwrap();
+        w.apply(plot.inverse).unwrap();
+        assert!(w.eval_revision() > e0);
+        let e0 = w.eval_revision();
         // Changing math source does.
         w.apply(Edit::SetMathSource {
             id: ids[0],

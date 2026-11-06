@@ -20,6 +20,7 @@ enum RunKey {
     Source(RegionId),
     Text(RegionId),
     Size(RegionId),
+    Plot(RegionId),
 }
 
 impl RunKey {
@@ -34,6 +35,7 @@ impl RunKey {
             Edit::SetMathSource { id, .. } => Some(RunKey::Source(*id)),
             Edit::SetText { id, .. } => Some(RunKey::Text(*id)),
             Edit::SetRegionSize { id, .. } => Some(RunKey::Size(*id)),
+            Edit::SetPlot { id, .. } => Some(RunKey::Plot(*id)),
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetUnitSystem(_)
@@ -341,7 +343,7 @@ mod tests {
     fn the_history_is_bounded() {
         let mut w = Worksheet::new("t");
         let mut h = History::new(3);
-        let r = w.new_region(RegionKind::Plot, Point::default());
+        let r = w.new_region(RegionKind::plot(), Point::default());
         let id = r.id;
         h.apply(
             &mut w,
@@ -393,7 +395,7 @@ mod tests {
                             1 => RegionKind::Text {
                                 text: String::new(),
                             },
-                            _ => RegionKind::Plot,
+                            _ => RegionKind::plot(),
                         };
                         let r = w.new_region(kind, Point::new(step as f32, 0.0));
                         let at = next(w.regions().len() + 1);

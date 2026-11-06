@@ -76,6 +76,8 @@ impl App {
             .show(ctx, |ui| panels::status::show(ui, &self.state, &mut cmds));
 
         let dock = Frame::new().fill(theme.surface).inner_margin(8);
+        // Edits the properties panel asks for (it only reads the document).
+        let mut panel_edits: Vec<canvas::CanvasCmd> = Vec::new();
         if self.state.show_names {
             egui::SidePanel::left(egui::Id::new(("names", self.state.layout_gen)))
                 .default_width(width * 0.13)
@@ -95,7 +97,7 @@ impl App {
                 .frame(dock)
                 .show(ctx, |ui| {
                     ui.set_min_width(ui.available_width());
-                    panels::properties::show(ui, &self.state);
+                    panels::properties::show(ui, &self.state, &mut panel_edits);
                 });
         }
 
@@ -105,6 +107,11 @@ impl App {
                 Some(i) => self.show_canvas(ui, i, ctx),
                 None => panels::home::show(ui, &self.state, &mut cmds),
             });
+
+        if let (Some(i), false) = (self.state.active, panel_edits.is_empty()) {
+            let effects = super::dispatch::apply_canvas(&mut self.state, i, panel_edits);
+            self.run_effects(ctx, effects);
+        }
 
         panels::about::show(ctx, &self.state, &mut cmds);
 

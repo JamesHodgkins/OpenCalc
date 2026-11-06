@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::geometry::{Point, Size};
+use super::plot::PlotSpec;
 use crate::expr::Expr;
 use crate::parser::parse;
 
@@ -69,7 +70,7 @@ pub enum RegionKind {
     Math(MathRegion),
     Text { text: String },
     Area { title: String },
-    Plot,
+    Plot(PlotSpec),
     Table,
     Picture,
 }
@@ -79,13 +80,18 @@ impl RegionKind {
         RegionKind::Math(MathRegion::new(source))
     }
 
+    /// An empty X-Y plot.
+    pub fn plot() -> RegionKind {
+        RegionKind::Plot(PlotSpec::default())
+    }
+
     /// Short name of the region type, for display and diagnostics.
     pub fn label(&self) -> &'static str {
         match self {
             RegionKind::Math(_) => "Math",
             RegionKind::Text { .. } => "Text",
             RegionKind::Area { .. } => "Area",
-            RegionKind::Plot => "Plot",
+            RegionKind::Plot(_) => "Plot",
             RegionKind::Table => "Table",
             RegionKind::Picture => "Picture",
         }
@@ -97,7 +103,9 @@ impl RegionKind {
             RegionKind::Math(_) => Size::new(160.0, 32.0),
             RegionKind::Text { .. } => Size::new(240.0, 40.0),
             RegionKind::Area { .. } => Size::new(320.0, 200.0),
-            RegionKind::Plot | RegionKind::Table | RegionKind::Picture => Size::new(260.0, 170.0),
+            RegionKind::Plot(_) | RegionKind::Table | RegionKind::Picture => {
+                Size::new(260.0, 170.0)
+            }
         }
     }
 

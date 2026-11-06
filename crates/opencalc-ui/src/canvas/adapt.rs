@@ -42,7 +42,7 @@ pub fn kind_icon(kind: &RegionKind) -> char {
         RegionKind::Math(_) => icons::MATH,
         RegionKind::Text { .. } => icons::TEXT,
         RegionKind::Area { .. } => icons::AREA,
-        RegionKind::Plot => icons::PLOT,
+        RegionKind::Plot(_) => icons::PLOT,
         RegionKind::Table => icons::TABLE,
         RegionKind::Picture => icons::PICTURE,
     }
@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn fixed_size_regions_ignore_measurements() {
-        let r = region(RegionKind::Plot);
+        let r = region(RegionKind::plot());
         let mut sizes = Sizes::new();
         sizes.insert(r.id, Vec2::new(1.0, 1.0));
         assert_eq!(rect_of(&r, &sizes).size(), vec(r.size));

@@ -91,6 +91,12 @@ fn display_unit(system: UnitSystem, dim: Dimension, magnitude: f64) -> (String, 
     }
 }
 
+/// The unit label and scale (divide SI values by it) to show an axis in, for
+/// data up to `peak` in the given dimension.
+pub fn axis_unit(system: UnitSystem, dim: Dimension, peak: f64) -> (String, f64) {
+    display_unit(system, dim, peak)
+}
+
 fn digits(dim: Dimension) -> usize {
     if dim.is_dimensionless() {
         6

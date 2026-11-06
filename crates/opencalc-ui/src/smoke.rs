@@ -11,7 +11,8 @@
 use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Event, Key, Modifiers, PointerButton, Pos2, RawInput, Rect};
-use opencalc_core::document::{Point, RegionId, RegionKind};
+use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind};
+use opencalc_core::edit::Edit;
 
 use crate::app::App;
 use crate::canvas::adapt::{pos, rect_of};
@@ -174,7 +175,7 @@ fn the_sample_sheet_renders_and_every_region_evaluates() {
     h.settle();
     let sheet = h.sheet();
     let math = sheet.doc.math_regions().len();
-    assert_eq!(math, 6);
+    assert_eq!(math, 7);
     assert_eq!(h.app.state.output.values.len(), math);
     assert!(h.app.state.output.values.values().all(Result::is_ok));
     assert!(h.app.state.output.warnings.is_empty());
@@ -223,6 +224,88 @@ fn inserting_each_region_type_adds_and_selects_it() {
         assert_eq!(sheet.canvas.selection, vec![newest.id], "{command:?}");
     }
     h.settle();
+}
+
+/// The sample sheet's plot region.
+fn plot_id(h: &Harness) -> RegionId {
+    h.sheet()
+        .doc
+        .regions()
+        .iter()
+        .find(|r| matches!(r.kind, RegionKind::Plot(_)))
+        .expect("the sample has a plot")
+        .id
+}
+
+fn edit_plot(h: &mut Harness, spec: PlotSpec) {
+    let id = plot_id(h);
+    let i = h.app.state.active.expect("a sheet");
+    let cmds = vec![
+        crate::canvas::CanvasCmd::Edit(Edit::SetPlot { id, spec }),
+        crate::canvas::CanvasCmd::Seal,
+    ];
+    let fx = crate::app::dispatch::apply_canvas(&mut h.app.state, i, cmds);
+    assert_eq!(fx, vec![crate::app::dispatch::Effect::Recalculate]);
+    h.app.recalculate();
+    h.settle();
+}
+
+fn plot_points(h: &Harness) -> Vec<(f64, f64)> {
+    let data = h.app.state.output.plots[&plot_id(h)]
+        .as_ref()
+        .expect("plot data");
+    data.series[0].points.clone()
+}
+
+#[test]
+fn the_sample_plot_is_evaluated_drawn_and_editable_with_undo() {
+    let mut h = Harness::new();
+    h.settle();
+    // 11 widths from 50 mm to 150 mm, stress F / w^2 for F = 10 kN.
+    let points = plot_points(&h);
+    assert_eq!(points.len(), 11);
+    assert!((points[0].0 - 0.05).abs() < 1e-12);
+    assert!((points[0].1 - 10_000.0 / (0.05 * 0.05)).abs() < 1e-3);
+
+    // Selecting it shows its editor in the properties panel; frames must not panic.
+    let id = plot_id(&h);
+    h.app.state.sheets[0].canvas.selection = vec![id];
+    h.frame();
+    h.frame();
+
+    // Change a series; the worker recalculates and the drawn data follows.
+    let RegionKind::Plot(spec) = h.sheet().doc.region(id).unwrap().kind.clone() else {
+        panic!("a plot");
+    };
+    edit_plot(&mut h, spec.clone().with_series(0, "w"));
+    let (x, y) = plot_points(&h)[3];
+    assert!((x - 0.08).abs() < 1e-12 && (y - 0.08).abs() < 1e-12);
+
+    // A bad source is an error shown in the region, not a crash.
+    edit_plot(&mut h, spec.clone().with_series(0, "nope"));
+    assert!(h.app.state.output.plots[&id].is_err());
+    h.frame();
+
+    // Undo brings back the previous plot, then the original.
+    h.command(CommandId::EditUndo);
+    h.settle();
+    h.command(CommandId::EditUndo);
+    h.settle();
+    assert_eq!(plot_points(&h).len(), 11);
+    assert!((plot_points(&h)[0].1 - 10_000.0 / (0.05 * 0.05)).abs() < 1e-3);
+}
+
+#[test]
+fn a_new_plot_is_blank_and_shows_a_hint_without_error() {
+    let mut h = Harness::new();
+    h.command(CommandId::InsertPlot);
+    h.settle();
+    let id = h.sheet().canvas.selection[0];
+    let data = h.app.state.output.plots[&id]
+        .as_ref()
+        .expect("blank is not an error");
+    assert!(data.is_empty());
+    h.frame();
 }
 
 #[test]

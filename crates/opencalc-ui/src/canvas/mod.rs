@@ -9,6 +9,7 @@
 pub mod adapt;
 pub mod hit;
 mod paint;
+mod plot;
 pub mod view;
 
 use eframe::egui::{

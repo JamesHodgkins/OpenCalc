@@ -5,7 +5,7 @@
 //! - `frame`: lays out the window and gathers commands from panels and keys.
 //! - This module: owns the worker thread and the ribbon, and carries out effects.
 
-mod dispatch;
+pub(crate) mod dispatch;
 mod frame;
 mod state;
 
@@ -50,17 +50,23 @@ impl App {
     }
 
     /// Send the active sheet to the worker under a new revision.
-    fn recalculate(&mut self) {
+    pub(crate) fn recalculate(&mut self) {
         let calc = &mut self.state.calc;
         calc.revision += 1;
-        let (snapshot, units) = self
+        let (snapshot, plots, units) = self
             .state
             .active_sheet()
-            .map(|s| (s.doc.math_regions(), s.doc.units().unwrap_or_default()))
+            .map(|s| {
+                (
+                    s.doc.math_regions(),
+                    s.doc.plot_inputs(),
+                    s.doc.units().unwrap_or_default(),
+                )
+            })
             .unwrap_or_default();
         self.state.calc.worker_ok =
             self.worker
-                .request_with(self.state.calc.revision, snapshot, units);
+                .request_full(self.state.calc.revision, snapshot, plots, units);
     }
 
     /// Take the worker's answer if it is for the revision now on screen.

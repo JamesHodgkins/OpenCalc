@@ -156,7 +156,7 @@ fn kind_of(e: &EvalError) -> &'static str {
         EvalError::Invalid(_) => "invalid",
         EvalError::Internal(_) => "internal",
         // An error inside a function is judged by what went wrong inside it.
-        EvalError::InFunction { error, .. } => kind_of(error),
+        EvalError::InFunction { error, .. } | EvalError::InPlot { error, .. } => kind_of(error),
         EvalError::Value(_) => "value",
     }
 }

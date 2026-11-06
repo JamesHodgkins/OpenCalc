@@ -5,7 +5,7 @@
 //! (rule R2).
 
 use eframe::egui::{Pos2, Rect};
-use opencalc_core::document::{Point, RegionId, RegionKind, Worksheet};
+use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind, Worksheet};
 use opencalc_core::edit::{Edit, History};
 
 use crate::canvas::adapt::{point, rect_of};
@@ -46,11 +46,19 @@ impl OpenSheet {
             ("A := b^2", 400.0, 120.0),
             ("s := sqrt(A)", 400.0, 160.0),
             ("\u{03c3} =", 400.0, 220.0),
+            ("w := 50 mm, 60 mm..150 mm", 40.0, 160.0),
         ] {
             s.add(RegionKind::math(src), Point::new(x, y));
         }
+        // Stress against bar width, to show a plot.
+        let spec = PlotSpec::default()
+            .with_title("Stress against width")
+            .with_x("w")
+            .with_series(0, "F / w ^ 2")
+            .with_labels("width", "stress");
+        s.add(RegionKind::Plot(spec), Point::new(40.0, 300.0));
         // New regions go below the worked example, not on top of it.
-        s.canvas.insert_at = Pos2::new(40.0, 300.0);
+        s.canvas.insert_at = Pos2::new(40.0, 520.0);
         s.history = History::default();
         s
     }
@@ -180,18 +188,18 @@ mod tests {
     fn building_the_sample_is_not_undoable() {
         let s = OpenSheet::sample();
         assert!(!s.can_undo());
-        assert_eq!(s.doc.regions().len(), 7);
-        assert_eq!(math_count(&s), 6);
+        assert_eq!(s.doc.regions().len(), 9);
+        assert_eq!(math_count(&s), 7);
     }
 
     #[test]
     fn insert_selects_the_region_and_undo_removes_it() {
         let mut s = OpenSheet::sample();
-        let id = s.insert(RegionKind::Plot);
+        let id = s.insert(RegionKind::plot());
         assert_eq!(s.canvas.selection, vec![id]);
-        assert_eq!(s.doc.regions().len(), 8);
+        assert_eq!(s.doc.regions().len(), 10);
         assert!(s.undo());
-        assert_eq!(s.doc.regions().len(), 7);
+        assert_eq!(s.doc.regions().len(), 9);
         assert!(
             s.canvas.selection.is_empty(),
             "the selection followed the region away"
@@ -203,8 +211,8 @@ mod tests {
     #[test]
     fn consecutive_inserts_flow_downwards_and_undo_one_at_a_time() {
         let mut s = OpenSheet::new("t");
-        let a = s.insert(RegionKind::Plot);
-        let b = s.insert(RegionKind::Plot);
+        let a = s.insert(RegionKind::plot());
+        let b = s.insert(RegionKind::plot());
         let (pa, pb) = (s.doc.region(a).unwrap().pos, s.doc.region(b).unwrap().pos);
         assert!(
             pb.y > pa.y + 170.0,
@@ -220,7 +228,7 @@ mod tests {
         let before: Vec<RegionId> = s.doc.regions().iter().map(|r| r.id).collect();
         s.canvas.selection = vec![before[1], before[4]];
         assert!(s.delete_selection());
-        assert_eq!(s.doc.regions().len(), 5);
+        assert_eq!(s.doc.regions().len(), 7);
         assert!(s.canvas.selection.is_empty());
         assert!(s.undo());
         let after: Vec<RegionId> = s.doc.regions().iter().map(|r| r.id).collect();
@@ -279,7 +287,7 @@ mod tests {
     #[test]
     fn undo_cancels_an_in_progress_drag_and_forgets_removed_regions() {
         let mut s = OpenSheet::sample();
-        let id = s.insert(RegionKind::Plot);
+        let id = s.insert(RegionKind::plot());
         s.canvas.sizes.insert(id, Vec2::new(1.0, 1.0));
         s.undo();
         assert!(!s.canvas.sizes.contains_key(&id));

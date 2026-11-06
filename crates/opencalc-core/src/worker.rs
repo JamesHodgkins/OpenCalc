@@ -9,7 +9,8 @@ use std::panic::AssertUnwindSafe;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::JoinHandle;
 
-use crate::eval::{all_failed, evaluate_with, Output, RegionId};
+use crate::document::PlotInput;
+use crate::eval::{all_failed, evaluate_all, Output, RegionId};
 use crate::expr::Expr;
 use crate::registry::UnitRegistry;
 
@@ -20,6 +21,7 @@ enum Request {
     Recalculate {
         revision: u64,
         regions: Vec<(RegionId, Expr)>,
+        plots: Vec<(RegionId, PlotInput)>,
         units: UnitRegistry,
     },
     Shutdown,
@@ -62,12 +64,13 @@ impl Worker {
                         Request::Recalculate {
                             revision,
                             regions,
+                            plots,
                             units,
                         } => {
                             // A panic in the evaluator must not end the worker thread: report
                             // it on every region and keep serving requests.
                             let output = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                                evaluate_with(&regions, &units)
+                                evaluate_all(&regions, &plots, &units)
                             }))
                             .unwrap_or_else(|_| all_failed(&regions, "the evaluator panicked"));
                             if res_tx.send(EvalResult { revision, output }).is_err() {
@@ -94,10 +97,22 @@ impl Worker {
         regions: Vec<(RegionId, Expr)>,
         units: UnitRegistry,
     ) -> bool {
+        self.request_full(revision, regions, Vec::new(), units)
+    }
+
+    /// Queue a recalculation of math regions and the plots that read them.
+    pub fn request_full(
+        &self,
+        revision: u64,
+        regions: Vec<(RegionId, Expr)>,
+        plots: Vec<(RegionId, PlotInput)>,
+        units: UnitRegistry,
+    ) -> bool {
         self.tx
             .send(Request::Recalculate {
                 revision,
                 regions,
+                plots,
                 units,
             })
             .is_ok()

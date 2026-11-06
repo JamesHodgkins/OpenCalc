@@ -4,11 +4,13 @@
 //! autosave and the file format share one choke point (rule R3).
 
 mod geometry;
+mod plot;
 mod region;
 
 use serde::{Deserialize, Serialize};
 
 pub use geometry::{Point, Size};
+pub use plot::{PlotInput, PlotSpec, MAX_SERIES};
 pub use region::{MathRegion, Region, RegionId, RegionKind};
 
 use crate::expr::Expr;
@@ -118,6 +120,30 @@ impl Worksheet {
         }
     }
 
+    /// Plot regions in layout order, as the evaluator takes them: the parsed x
+    /// and series expressions of each. Blank series are left out.
+    pub fn plot_inputs(&self) -> Vec<(RegionId, PlotInput)> {
+        self.regions
+            .iter()
+            .filter_map(|r| match &r.kind {
+                RegionKind::Plot(p) => Some((
+                    r.id,
+                    PlotInput {
+                        x: p.x.expr().clone(),
+                        series: p
+                            .series
+                            .iter()
+                            .filter(|s| !s.source().trim().is_empty())
+                            .map(|s| s.expr().clone())
+                            .collect(),
+                        x_blank: p.x.source().trim().is_empty(),
+                    },
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Math regions in layout order, as the evaluator takes them.
     pub fn math_regions(&self) -> Vec<(RegionId, Expr)> {
         self.regions
@@ -137,7 +163,7 @@ mod tests {
     #[test]
     fn new_regions_get_increasing_ids_even_if_never_inserted() {
         let mut w = Worksheet::new("t");
-        let a = w.new_region(RegionKind::Plot, Point::default());
+        let a = w.new_region(RegionKind::plot(), Point::default());
         let b = w.new_region(RegionKind::Table, Point::default());
         assert_eq!((a.id, b.id), (RegionId(1), RegionId(2)));
         assert!(w.regions().is_empty(), "allocating an ID does not add it");
@@ -156,7 +182,7 @@ mod tests {
     fn worksheets_compare_by_content_not_bookkeeping() {
         let mut a = Worksheet::new("t");
         let b = Worksheet::new("t");
-        let _ = a.new_region(RegionKind::Plot, Point::default()); // bumps next_id only
+        let _ = a.new_region(RegionKind::plot(), Point::default()); // bumps next_id only
         a.revision = 9;
         assert_eq!(a, b);
         assert_ne!(Worksheet::new("other"), b);
@@ -166,7 +192,7 @@ mod tests {
     fn only_math_regions_are_evaluated() {
         let mut w = Worksheet::new("t");
         for kind in [
-            RegionKind::Plot,
+            RegionKind::plot(),
             RegionKind::math("a := 1"),
             RegionKind::Text { text: "x".into() },
             RegionKind::math("b := 2"),
@@ -194,7 +220,7 @@ mod tests {
                 },
                 120.0,
             ),
-            (RegionKind::Plot, 160.0),
+            (RegionKind::plot(), 160.0),
             (RegionKind::Table, 200.0),
             (RegionKind::Picture, 240.0),
         ] {
@@ -235,7 +261,7 @@ mod tests {
         // IDs keep counting from where they were, so none is ever reused.
         let mut back = back;
         assert_eq!(
-            back.new_region(RegionKind::Plot, Point::default()).id,
+            back.new_region(RegionKind::plot(), Point::default()).id,
             RegionId(7)
         );
     }

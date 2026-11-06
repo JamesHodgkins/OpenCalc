@@ -82,7 +82,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
                 title: String::new(),
             },
         ),
-        InsertPlot => insert(state, &mut fx, RegionKind::Plot),
+        InsertPlot => insert(state, &mut fx, RegionKind::plot()),
         InsertTable => insert(state, &mut fx, RegionKind::Table),
         InsertPicture => insert(state, &mut fx, RegionKind::Picture),
         RegionDelete => with_eval_check(state, &mut fx, |s| {
@@ -354,16 +354,15 @@ mod tests {
     }
 
     #[test]
-    fn only_inserting_a_math_region_asks_for_a_recalculation() {
+    fn only_inserting_a_math_or_plot_region_asks_for_a_recalculation() {
         let mut s = state();
-        assert_eq!(
-            run(&mut s, CommandId::InsertMath),
-            vec![Effect::Recalculate]
-        );
+        // A plot has results of its own to calculate, even when it is empty.
+        for c in [CommandId::InsertMath, CommandId::InsertPlot] {
+            assert_eq!(run(&mut s, c), vec![Effect::Recalculate], "{}", c.name());
+        }
         for c in [
             CommandId::InsertText,
             CommandId::InsertArea,
-            CommandId::InsertPlot,
             CommandId::InsertTable,
             CommandId::InsertPicture,
         ] {

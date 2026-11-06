@@ -84,7 +84,7 @@ mod tests {
     /// Plot and Table are 260x170. `top` overlaps the lower right of `back`.
     fn regions() -> (Vec<Region>, RegionId, RegionId, RegionId) {
         let v = vec![
-            region(1, 0.0, 0.0, RegionKind::Plot),
+            region(1, 0.0, 0.0, RegionKind::plot()),
             region(2, 200.0, 100.0, RegionKind::Table),
             region(3, 1000.0, 1000.0, RegionKind::Picture),
         ];

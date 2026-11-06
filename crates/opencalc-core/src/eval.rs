@@ -9,10 +9,14 @@ use std::collections::HashMap;
 
 mod graph;
 mod node;
+mod plot;
+
+pub use plot::{PlotData, PlotSeries};
 
 use graph::tarjan;
 use node::{eval_region, Located};
 
+use crate::document::PlotInput;
 use crate::expr::{AssignKind, Expr};
 use crate::registry::UnitRegistry;
 use crate::units::UnitError;
@@ -36,6 +40,9 @@ pub enum EvalError {
     Arity(String, usize),
     #[error("cannot evaluate: {0}")]
     Invalid(String),
+    /// An error in one part of a plot (its x values or a series).
+    #[error("in {part}: {error}")]
+    InPlot { part: String, error: Box<EvalError> },
     /// An error inside a user-defined function's body, reported at the call.
     #[error("in function '{name}': {error}")]
     InFunction { name: String, error: Box<EvalError> },
@@ -104,6 +111,8 @@ pub struct Output {
     /// sub-expression (see [`Expr::at_path`]). Absent when the whole expression
     /// failed at its root, or for a cycle.
     pub error_paths: HashMap<RegionId, Vec<u16>>,
+    /// What each plot region draws, or why it cannot.
+    pub plots: HashMap<RegionId, Result<PlotData, EvalError>>,
 }
 
 /// An output where every region failed with an internal error. Used by the
@@ -125,6 +134,15 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
 
 /// Evaluate regions given in layout order, with the worksheet's units.
 pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Output {
+    evaluate_all(regions, &[], units)
+}
+
+/// Evaluate math regions and then the plots that read their results.
+pub fn evaluate_all(
+    regions: &[(RegionId, Expr)],
+    plots: &[(RegionId, PlotInput)],
+    units: &UnitRegistry,
+) -> Output {
     let mut out = Output::default();
 
     // Variables and functions are separate namespaces. For each name the last
@@ -251,6 +269,17 @@ pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Outp
             }
             out.values.insert(*id, result);
         }
+    }
+    // Plots define nothing, so they are evaluated last, against the final names.
+    let cx = Cx {
+        env: &env,
+        fns: &fns,
+        units,
+        locals: Vec::new(),
+        depth: 0,
+    };
+    for (id, input) in plots {
+        out.plots.insert(*id, plot::evaluate_plot(input, &cx));
     }
     out
 }

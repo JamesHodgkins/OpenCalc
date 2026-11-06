@@ -99,7 +99,13 @@ pub fn region(
             }
             vec(r.size)
         }
-        RegionKind::Plot | RegionKind::Table | RegionKind::Picture => {
+        RegionKind::Plot(spec) => {
+            if !skip_content {
+                super::plot::paint(painter, env, r, spec, top_left, zoom);
+            }
+            vec(r.size)
+        }
+        RegionKind::Table | RegionKind::Picture => {
             if !skip_content {
                 placeholder(painter, env.theme, r, top_left, zoom);
             }
