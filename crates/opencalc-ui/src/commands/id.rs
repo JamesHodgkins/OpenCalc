@@ -8,6 +8,7 @@
 //! what `dispatch` really handles.
 
 use crate::icons;
+use opencalc_core::document::PaperSize;
 
 macro_rules! commands {
     ($($variant:ident: $name:literal, $label:literal, $icon:expr;)*) => {
@@ -22,6 +23,9 @@ macro_rules! commands {
             SelectSheet(usize),
             CloseSheet(usize),
             ZoomTo(u16),
+            PagePaper(PaperSize),
+            PageLandscape(bool),
+            PageMarginMm(u8),
         }
 
         impl CommandId {
@@ -39,6 +43,9 @@ macro_rules! commands {
                     CommandId::SelectSheet(_) => "tab.select",
                     CommandId::CloseSheet(_) => "tab.close",
                     CommandId::ZoomTo(_) => "view.zoom_to",
+                    CommandId::PagePaper(_) => "page.paper",
+                    CommandId::PageLandscape(_) => "page.orientation",
+                    CommandId::PageMarginMm(_) => "page.margin",
                 }
             }
 
@@ -50,6 +57,10 @@ macro_rules! commands {
                     CommandId::SelectSheet(_) => "Select worksheet",
                     CommandId::CloseSheet(_) => "Close worksheet",
                     CommandId::ZoomTo(_) => "Zoom",
+                    CommandId::PagePaper(p) => p.label(),
+                    CommandId::PageLandscape(true) => "Landscape",
+                    CommandId::PageLandscape(false) => "Portrait",
+                    CommandId::PageMarginMm(_) => "Margin",
                 }
             }
 
@@ -60,6 +71,9 @@ macro_rules! commands {
                     CommandId::SelectSheet(_) => icons::HOME,
                     CommandId::CloseSheet(_) => icons::CLOSE,
                     CommandId::ZoomTo(_) => icons::ZOOM_100,
+                    CommandId::PagePaper(_)
+                    | CommandId::PageLandscape(_)
+                    | CommandId::PageMarginMm(_) => icons::FIT,
                 }
             }
         }
@@ -136,6 +150,9 @@ commands! {
     ViewGrid: "view.grid", "Grid", icons::GRID;
     ViewSnap: "view.snap", "Snap", icons::SNAP;
     DocPageSetup: "doc.page_setup", "Page setup", icons::FIT;
+    DocPageSetupClose: "doc.page_setup_close", "Close Page setup", icons::CLOSE;
+    ViewPageView: "view.page_view", "Page View", icons::FIT;
+    ViewDraftView: "view.draft_view", "Draft View", icons::LIST;
     ViewFunctions: "view.functions", "Functions", icons::NAMES;
     ViewProperties: "view.properties", "Properties", icons::PROPERTIES;
     ViewResetLayout: "view.reset_layout", "Reset layout", icons::RESET;
@@ -191,14 +208,15 @@ impl CommandId {
             | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewProperties | ViewResetLayout
             | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs
             | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_)
-            | ZoomTo(_) => true,
+            | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | DocPageSetupClose | ViewPageView | ViewDraftView => true,
             FileOpen | FileSave | ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind
             | EditReplace | RegionLock | RegionTag | InsertGreek | InsertSymbol(_) | FormatBold
             | FormatItalic | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
             | FormatEngineering | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate
             | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
             | UnitsDisplayReset | UnitsDefine | UnitsManage | CalcCheck | WarnNext | WarnPrev
-            | DocPageSetup | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
+            | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
         }
     }
 

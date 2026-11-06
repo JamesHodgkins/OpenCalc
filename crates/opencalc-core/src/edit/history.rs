@@ -21,6 +21,7 @@ enum RunKey {
     Text(RegionId),
     Size(RegionId),
     Plot(RegionId),
+    Page,
 }
 
 impl RunKey {
@@ -36,10 +37,10 @@ impl RunKey {
             Edit::SetText { id, .. } => Some(RunKey::Text(*id)),
             Edit::SetRegionSize { id, .. } => Some(RunKey::Size(*id)),
             Edit::SetPlot { id, .. } => Some(RunKey::Plot(*id)),
+            Edit::SetPageSetup(_) => Some(RunKey::Page),
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetUnitSystem(_)
-            | Edit::SetPageSetup(_)
             | Edit::SetCustomUnits(_) => None,
         }
     }

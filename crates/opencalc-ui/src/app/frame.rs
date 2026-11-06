@@ -114,6 +114,7 @@ impl App {
 
         panels::about::show(ctx, &self.state, &mut cmds);
         panels::options::show(ctx, &self.state, &mut cmds);
+        panels::page_setup::show(ctx, &self.state, &mut cmds);
 
         let mut pending = std::mem::take(&mut self.queue);
         pending.extend(cmds);
@@ -133,6 +134,7 @@ impl App {
             units: state.sheets[sheet].doc.unit_system(),
             show_grid: state.show_grid,
             snap: state.snap,
+            draft: state.draft,
         };
         let open = &mut state.sheets[sheet];
         let out = canvas::show(

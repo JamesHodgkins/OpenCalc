@@ -8,6 +8,7 @@ use super::Commands;
 use crate::app::AppState;
 use crate::canvas::view::{MAX_ZOOM, MIN_ZOOM};
 use crate::commands::CommandId;
+use crate::ribbon::widgets::{self as w, Look};
 use crate::theme::type_size;
 
 pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
@@ -32,6 +33,8 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                 return;
             }
             let percent = state.zoom_percent();
+            ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
+            // Right to left: the slider is placed last, so the view buttons sit left of it.
             let reset = egui::Button::new(format!("{percent:.0}%")).frame(false);
             if ui.add(reset).on_hover_text("Reset zoom to 100%").clicked() {
                 out.push(CommandId::ViewZoom100);
@@ -44,6 +47,23 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                 .show_value(false);
             if ui.add(slider).on_hover_text("Zoom").changed() {
                 out.push(CommandId::ZoomTo(value.round() as u16));
+            }
+            ui.add_space(8.0);
+            // Right to left, so Draft View is placed first and Page View lands left of it.
+            for (command, on) in [
+                (CommandId::ViewDraftView, state.draft),
+                (CommandId::ViewPageView, !state.draft),
+            ] {
+                let look = Look {
+                    enabled: true,
+                    active: on,
+                };
+                let width = w::small_width(ui, true, Some(command.label()));
+                let label = Some(command.label());
+                let button = w::small_button(ui, &theme, look, Some(command.icon()), label, width);
+                if button.clicked() {
+                    out.push(command);
+                }
             }
         });
     });

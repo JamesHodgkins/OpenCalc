@@ -13,6 +13,7 @@ use crate::canvas::CanvasCmd;
 use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
 use crate::theme::{PaletteKey, Theme};
+use opencalc_core::document::PageSetup;
 
 /// Something a command needs done that state alone cannot do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,6 +128,19 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         ThemeSlate => set_palette(state, &mut fx, PaletteKey::Slate),
         AppOptions => state.options_open = true,
         AppOptionsClose => state.options_open = false,
+        DocPageSetup => state.page_setup_open = true,
+        DocPageSetupClose => {
+            state.page_setup_open = false;
+            if let Some(i) = state.active {
+                state.sheets[i].seal();
+            }
+        }
+        ViewPageView => state.draft = false,
+        ViewDraftView => state.draft = true,
+        PagePaper(paper) => set_page(state, true, |p| p.paper = paper),
+        PageLandscape(landscape) => set_page(state, true, |p| p.landscape = landscape),
+        // A drag over the margin box is one undo step (the run merges).
+        PageMarginMm(mm) => set_page(state, false, |p| p.margin_mm = f32::from(mm)),
         HelpAbout => state.about_open = true,
         HelpAboutClose => state.about_open = false,
 
@@ -202,13 +216,29 @@ fn set_unit_system(state: &mut AppState, system: UnitSystem) {
     }
 }
 
+/// Change the active worksheet's page setup. One-off choices (paper, orientation)
+/// are their own undo steps; margin changes merge while the box is being dragged.
+fn set_page(state: &mut AppState, own_step: bool, change: impl FnOnce(&mut PageSetup)) {
+    if let Some(i) = state.active {
+        let sheet = &mut state.sheets[i];
+        let mut page = sheet.doc.page();
+        change(&mut page);
+        if own_step {
+            sheet.seal();
+        }
+        sheet.edit(Edit::SetPageSetup(page));
+        if own_step {
+            sheet.seal();
+        }
+    }
+}
+
 fn insert(state: &mut AppState, fx: &mut Vec<Effect>, kind: RegionKind) {
     with_eval_check(state, fx, |s| {
         s.insert(kind);
     });
 }
 
-/// Zoom the active sheet about the middle of the canvas.
 /// Set the zoom of the active worksheet (clamped by the view), about the centre.
 fn zoom_to(state: &mut AppState, zoom: f32) {
     let (centre, origin) = (state.viewport.center(), state.viewport.min);
@@ -323,6 +353,45 @@ mod tests {
         assert_eq!(s.zoom_percent(), 25.0);
         run(&mut s, CommandId::ZoomTo(900));
         assert_eq!(s.zoom_percent(), 400.0);
+    }
+
+    #[test]
+    fn page_setup_changes_the_page_and_undoes() {
+        use opencalc_core::document::PaperSize;
+        let mut s = state();
+        run(&mut s, CommandId::PagePaper(PaperSize::Letter));
+        run(&mut s, CommandId::PageLandscape(true));
+        let page = s.sheets[0].doc.page();
+        assert_eq!(page.paper, PaperSize::Letter);
+        assert!(page.landscape);
+        run(&mut s, CommandId::EditUndo);
+        assert!(!s.sheets[0].doc.page().landscape);
+        run(&mut s, CommandId::EditUndo);
+        assert_eq!(s.sheets[0].doc.page().paper, PaperSize::A4);
+    }
+
+    #[test]
+    fn dragging_the_margin_is_one_undo_step() {
+        let mut s = state();
+        for mm in [21, 22, 23, 30, 35] {
+            run(&mut s, CommandId::PageMarginMm(mm));
+        }
+        assert_eq!(s.sheets[0].doc.page().margin_mm, 35.0);
+        run(&mut s, CommandId::EditUndo);
+        assert_eq!(s.sheets[0].doc.page().margin_mm, 20.0);
+    }
+
+    #[test]
+    fn page_setup_opens_and_draft_view_toggles() {
+        let mut s = state();
+        run(&mut s, CommandId::DocPageSetup);
+        assert!(s.page_setup_open);
+        run(&mut s, CommandId::DocPageSetupClose);
+        assert!(!s.page_setup_open);
+        run(&mut s, CommandId::ViewDraftView);
+        assert!(s.draft);
+        run(&mut s, CommandId::ViewPageView);
+        assert!(!s.draft);
     }
 
     #[test]

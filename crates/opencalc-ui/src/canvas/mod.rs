@@ -38,6 +38,8 @@ pub struct Env<'a> {
     pub units: UnitSystem,
     pub show_grid: bool,
     pub snap: bool,
+    /// Draft View: one continuous sheet, no page edges or margin box.
+    pub draft: bool,
 }
 
 /// What the canvas asks the app to do after the frame.
@@ -148,7 +150,7 @@ pub fn show(
 
     // The pages, and the grid on them. Pages exist as far down as content reaches.
     let pages = page::page_count(&env.page, page::content_bottom(regions, &st.sizes));
-    for screen in page::paint(&painter, rect, view, origin, &env.page, pages, env.paper) {
+    for screen in page::paint(&painter, rect, view, origin, &env.page, pages, env) {
         if env.show_grid {
             let on_page = painter.with_clip_rect(screen.intersect(rect));
             paint::grid(&on_page, screen, view, origin, env.paper);

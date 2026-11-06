@@ -38,7 +38,12 @@ impl Registry {
     /// are always available; unimplemented ones never are.
     pub fn allows(&self, command: CommandId) -> bool {
         match command {
-            CommandId::SelectSheet(_) | CommandId::CloseSheet(_) | CommandId::ZoomTo(_) => true,
+            CommandId::SelectSheet(_)
+            | CommandId::CloseSheet(_)
+            | CommandId::ZoomTo(_)
+            | CommandId::PagePaper(_)
+            | CommandId::PageLandscape(_)
+            | CommandId::PageMarginMm(_) => true,
             other => self.enabled.contains(&other),
         }
     }
@@ -61,6 +66,9 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | ViewZoomOut
             | ViewZoomFit
             | ViewZoom100
+            | DocPageSetup
+            | ViewPageView
+            | ViewDraftView
             | EditUndo
             | EditRedo
             | RegionDelete

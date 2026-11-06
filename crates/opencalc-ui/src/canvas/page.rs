@@ -10,7 +10,7 @@ use opencalc_core::document::{PageSetup, Region};
 
 use super::adapt::{rect_of, Sizes};
 use super::view::{CanvasView, MAX_ZOOM, MIN_ZOOM};
-use crate::theme::Theme;
+use super::Env;
 
 /// Space between two pages, in document units.
 pub const GAP: f32 = 24.0;
@@ -87,9 +87,20 @@ pub fn paint(
     origin: Pos2,
     setup: &PageSetup,
     count: usize,
-    paper: &Theme,
+    env: &Env,
 ) -> Vec<Rect> {
+    let paper = env.paper;
     let mut drawn = Vec::new();
+    if env.draft {
+        // One unbroken sheet from the top of the first page to the end of the last.
+        let sheet = page_rect(setup, 0).union(page_rect(setup, count.saturating_sub(1)));
+        let screen = view.rect_to_screen(sheet, origin);
+        if screen.intersects(viewport) {
+            painter.rect_filled(screen, 0.0, paper.base);
+            drawn.push(screen);
+        }
+        return drawn;
+    }
     for k in 0..count {
         let screen = view.rect_to_screen(page_rect(setup, k), origin);
         if !screen.intersects(viewport) {

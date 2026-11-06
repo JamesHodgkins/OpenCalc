@@ -211,7 +211,13 @@ fn document() -> Tab {
                     stack(&[CommandId::ViewZoom100]),
                 ],
             ),
-            panel("Page", vec![Column::Large(it(CommandId::DocPageSetup))]),
+            panel(
+                "Page",
+                vec![
+                    Column::Large(it(CommandId::DocPageSetup)),
+                    stack(&[CommandId::ViewPageView, CommandId::ViewDraftView]),
+                ],
+            ),
             panel(
                 "Show",
                 vec![stack(&[CommandId::ViewGrid, CommandId::ViewSnap])],
@@ -359,13 +365,14 @@ mod tests {
         reachable.extend(MENU);
         reachable.extend(QUICK_ACCESS);
         reachable.extend([
-            CommandId::FileClose,       // the worksheet tab's close button, Ctrl+W
-            CommandId::FileExample,     // the Home page
-            CommandId::TabHome,         // the Home tab
-            CommandId::HelpAboutClose,  // the About window
-            CommandId::AppOptionsClose, // the Options window
-            CommandId::ThemeNeutral,    // the Options window
-            CommandId::ThemeSlate,      // the Options window
+            CommandId::FileClose,         // the worksheet tab's close button, Ctrl+W
+            CommandId::FileExample,       // the Home page
+            CommandId::TabHome,           // the Home tab
+            CommandId::HelpAboutClose,    // the About window
+            CommandId::AppOptionsClose,   // the Options window
+            CommandId::DocPageSetupClose, // the Page setup window
+            CommandId::ThemeNeutral,      // the Options window
+            CommandId::ThemeSlate,        // the Options window
         ]);
         for command in CommandId::ALL {
             assert!(reachable.contains(command), "{command:?} cannot be reached");
@@ -400,11 +407,7 @@ mod tests {
 
     #[test]
     fn the_new_controls_that_are_not_built_yet_are_dimmed_not_live() {
-        for command in [
-            CommandId::DocPageSetup,
-            CommandId::InsertMatrix,
-            CommandId::InsertRange,
-        ] {
+        for command in [CommandId::InsertMatrix, CommandId::InsertRange] {
             assert!(!command.is_implemented(), "{command:?}");
         }
     }

@@ -47,6 +47,10 @@ pub struct AppState {
     /// Screen rectangle of the canvas on the last frame.
     pub viewport: Rect,
     pub about_open: bool,
+    /// The Page setup window.
+    pub page_setup_open: bool,
+    /// Draft View (one continuous sheet) instead of Page View.
+    pub draft: bool,
     /// The Options window (settings such as the theme).
     pub options_open: bool,
 }
@@ -75,6 +79,8 @@ impl AppState {
             dock_basis: crate::INITIAL_WIDTH,
             viewport: Rect::from_min_size(Pos2::ZERO, eframe::egui::vec2(800.0, 600.0)),
             about_open: false,
+            page_setup_open: false,
+            draft: false,
             options_open: false,
         }
     }
@@ -114,6 +120,11 @@ impl AppState {
         .into_iter()
         .filter_map(|(on, command)| on.then_some(command))
         .chain(self.unit_system_command())
+        .chain(Some(if self.draft {
+            CommandId::ViewDraftView
+        } else {
+            CommandId::ViewPageView
+        }))
         .chain(Some(match self.palette {
             PaletteKey::Neutral => CommandId::ThemeNeutral,
             PaletteKey::Slate => CommandId::ThemeSlate,
@@ -193,7 +204,7 @@ mod tests {
         let mut s = AppState::new(PaletteKey::Neutral);
         // The grid and both optional panels start off; snapping, automatic
         // calculation, the unit system and the theme choice are on.
-        assert_eq!(s.active_toggles().len(), 4);
+        assert_eq!(s.active_toggles().len(), 5);
         assert!(!s.active_toggles().contains(&CommandId::ViewGrid));
         s.show_grid = true;
         s.snap = false;
