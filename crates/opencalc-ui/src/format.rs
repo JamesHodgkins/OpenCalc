@@ -181,6 +181,7 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
             let size = format!("{}\u{00d7}{}", m.rows(), m.cols());
             with_unit(format!("{size} [{}]", rows.join("; ")), &label)
         }
+        Value::Function { params } => format!("function of {}", params.join(", ")),
         Value::Series(r) => {
             let peak = r
                 .elements()
@@ -296,6 +297,11 @@ mod tests {
         assert_eq!(shown("1 + 0.001 * i"), "1.000000 + 0.001000i");
         // Only noise relative to the neighbouring part is dropped.
         assert_eq!(shown("1e-20 + i"), "0.000000 + 1.000000i");
+    }
+
+    #[test]
+    fn a_function_definition_reads_as_a_function_of_its_parameters() {
+        assert_eq!(shown("f(x, y) := x * y"), "function of x, y");
     }
 
     #[test]

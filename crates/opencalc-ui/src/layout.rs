@@ -89,6 +89,13 @@ impl<'a> Typesetter<'a> {
             }
             Expr::Matrix { rows, cols, cells } => self.matrix(*rows, *cols, cells, size),
             Expr::Index { base, indices } => self.index(base, indices, size),
+            Expr::FunctionDef { name, params, body } => self.row(vec![
+                self.text(&format!("{name}({})", params.join(", ")), size),
+                self.gap(size * 0.3),
+                self.text(":=", size),
+                self.gap(size * 0.3),
+                self.layout(body, size),
+            ]),
             Expr::Range { start, step, end } => self.range(start, step.as_deref(), end, size),
             Expr::Conditional {
                 cond,
@@ -394,6 +401,16 @@ mod tests {
             assert!(v0.baseline == v.baseline);
             let c = t.layout(&parsed("if(a, 1, 2)"), 16.0);
             assert!(c.w > t.layout(&parsed("a"), 16.0).w * 3.0);
+        });
+    }
+
+    #[test]
+    fn a_function_definition_shows_its_signature_then_its_body() {
+        with_fonts(|t| {
+            let body = t.layout(&parsed("x ^ 2"), 16.0);
+            let whole = t.layout(&parsed("f(x) := x ^ 2"), 16.0);
+            assert!(whole.w > body.w * 2.0);
+            assert!(whole.h >= body.h);
         });
     }
 

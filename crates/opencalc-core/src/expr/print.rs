@@ -5,7 +5,7 @@ use super::{AssignKind, BinaryOp, Expr};
 /// Binding strength of an expression when printed, higher binds tighter.
 fn strength(e: &Expr) -> u8 {
     match e {
-        Expr::Assign { .. } | Expr::Range { .. } => 0,
+        Expr::Assign { .. } | Expr::FunctionDef { .. } | Expr::Range { .. } => 0,
         Expr::Binary {
             op:
                 BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Gt | BinaryOp::Le | BinaryOp::Ge,
@@ -141,6 +141,9 @@ impl std::fmt::Display for Expr {
                     AssignKind::Evaluate => "=",
                 };
                 write!(f, "{target} {op} {value}")
+            }
+            Expr::FunctionDef { name, params, body } => {
+                write!(f, "{name}({}) := {body}", params.join(", "))
             }
             Expr::Error(e) => write!(f, "? {e}"),
         }

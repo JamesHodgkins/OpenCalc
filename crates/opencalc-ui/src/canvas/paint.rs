@@ -6,6 +6,7 @@ use eframe::egui::{
     Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Ui, Vec2,
 };
 use opencalc_core::expr::Expr;
+use opencalc_core::value::Value;
 
 use super::adapt::{kind_icon, vec};
 use super::view::{CanvasView, GRID};
@@ -135,6 +136,8 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 t.layout(expr, size),
                 Some(plain(f, "\u{2026}", theme.text_weak, size)),
             ),
+            // A function definition has no value to show next to it.
+            (_, Some(Ok(Value::Function { .. }))) => (t.layout(expr, size), None),
             (_, Some(Ok(q))) => (
                 t.layout(expr, size),
                 Some(plain(

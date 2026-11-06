@@ -17,6 +17,9 @@ fn gather(args: &[Value]) -> Result<(Vec<Complex64>, Dimension)> {
             Value::Scalar(s) => (vec![s.z], s.dim),
             Value::Matrix(m) => (m.elements().to_vec(), m.dim),
             Value::Series(r) => (r.elements().to_vec(), r.dim),
+            Value::Function { .. } => {
+                return Err(ValueError::Unsupported("a function as a value".into()).into())
+            }
         };
         match dim {
             None => dim = Some(d),

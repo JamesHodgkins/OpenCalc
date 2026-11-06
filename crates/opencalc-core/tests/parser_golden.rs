@@ -72,6 +72,9 @@ fn sexp(e: &Expr) -> String {
             let idx: Vec<String> = indices.iter().map(sexp).collect();
             format!("(index {} {})", sexp(base), idx.join(" "))
         }
+        Expr::FunctionDef { name, params, body } => {
+            format!("(defn {name} ({}) {})", params.join(" "), sexp(body))
+        }
         Expr::Range { start, step, end } => match step {
             Some(step) => format!("(range {} {} {})", sexp(start), sexp(step), sexp(end)),
             None => format!("(range {} {})", sexp(start), sexp(end)),
@@ -167,8 +170,23 @@ const INPUTS: &[&str] = &[
     "0, 2",
     "0, 2 ..",
     "f(0, 2..10)",
+    // Function definitions and calls.
+    "f(x) := x ^ 2",
+    "area(w, h) := w * h",
+    "g(a, b, c) := if(a > b, c, 0)",
+    "h(x) := 0..x",
+    "f(x) := g(x) + g(x + 1)",
+    "f(2) =",
+    "f(x) = x",
+    "f(x)[0]",
+    "2 f(3)",
     // Errors.
     "",
+    "f() := 1",
+    "f(x, x) := 1",
+    "f(1) := 2",
+    "f(x + 1) := 2",
+    "f(x) := ",
     "1 +",
     "(1 + 2",
     "1 + * 2",

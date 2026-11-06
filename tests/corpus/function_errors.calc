@@ -1,0 +1,32 @@
+# source: original; each line is meant to fail in a particular, reportable way
+bad_body(x) := x + nope
+use_bad := bad_body(1)
+area(w, h) := w * h
+arity := area(1)
+lerp(a, b, t) := a + (b - a) * t
+mismatch := lerp(1 m, 2 s, 0.5)
+recursive(n) := if(n <= 0, 1, n * recursive(n - 1))
+use_recursive := recursive(3)
+mutual_a(x) := mutual_b(x)
+mutual_b(x) := mutual_a(x)
+sin(x) := x
+dup(x, x) := x
+literal(1) := 2
+empty() := 1
+undefined_call := ghost(1)
+too_many := area(1, 2, 3)
+list_arity := area(0..2)
+!> use_bad : undefined
+!> arity : arity
+!> mismatch : mismatch
+!> recursive : cycle
+!> use_recursive : cycle
+!> mutual_a : cycle
+!> mutual_b : cycle
+!> sin : invalid
+!> #12 : invalid
+!> #13 : invalid
+!> #14 : invalid
+!> undefined_call : unknown-function
+!> too_many : arity
+!> list_arity : arity

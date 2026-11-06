@@ -155,6 +155,8 @@ fn kind_of(e: &EvalError) -> &'static str {
         EvalError::Arity(..) => "arity",
         EvalError::Invalid(_) => "invalid",
         EvalError::Internal(_) => "internal",
+        // An error inside a function is judged by what went wrong inside it.
+        EvalError::InFunction { error, .. } => kind_of(error),
         EvalError::Value(_) => "value",
     }
 }
@@ -180,6 +182,8 @@ fn region_for(sources: &[String], regions: &[(RegionId, Expr)], t: &Target) -> O
                 target,
                 ..
             } if target == name => Some(*id),
+            // A function is named by its name alone: `!> area : ...`.
+            Expr::FunctionDef { name: f, .. } if f == name => Some(*id),
             _ => None,
         }),
     }
@@ -226,6 +230,7 @@ fn differs(got: &Value, want: &Value, tol: f64) -> Option<String> {
                 out.extend(r.elements().iter().flat_map(|z| [z.re, z.im]));
                 out
             }
+            Value::Function { params } => vec![-2.0, params.len() as f64],
         }
     };
     let (g, w) = (parts(got), parts(want));

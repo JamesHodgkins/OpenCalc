@@ -41,6 +41,11 @@ pub enum Value {
     Scalar(Scalar),
     Matrix(Matrix),
     Series(Series),
+    /// What a function definition evaluates to: the function itself has no number,
+    /// only the names of its parameters. Never an operand.
+    Function {
+        params: Vec<String>,
+    },
 }
 
 impl From<Quantity> for Value {
@@ -73,6 +78,7 @@ impl Value {
             Value::Scalar(s) => s.is_finite(),
             Value::Matrix(m) => m.is_finite(),
             Value::Series(r) => r.is_finite(),
+            Value::Function { .. } => true,
         }
     }
 
@@ -81,6 +87,7 @@ impl Value {
             Value::Scalar(s) => s.dim,
             Value::Matrix(m) => m.dim,
             Value::Series(r) => r.dim,
+            Value::Function { .. } => Dimension::NONE,
         }
     }
 
@@ -88,7 +95,7 @@ impl Value {
     pub fn as_real(&self) -> Option<Quantity> {
         match self {
             Value::Scalar(s) => s.as_real(),
-            Value::Matrix(_) | Value::Series(_) => None,
+            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } => None,
         }
     }
 
@@ -100,6 +107,7 @@ impl Value {
                 Series::new(r.elements().iter().map(|z| -*z).collect(), r.dim)
                     .expect("negation keeps the length"),
             ),
+            Value::Function { .. } => self.clone(),
         }
     }
 
@@ -151,7 +159,7 @@ impl Value {
                 Ok(Value::Matrix(m.scaled(*s)?))
             }
             (Value::Matrix(a), Value::Matrix(b)) => Ok(Value::Matrix(a.product(b)?)),
-            _ => unreachable!("series cases are handled by pairwise"),
+            _ => Err(ValueError::Unsupported("multiplying this value".into())),
         }
     }
 
@@ -195,7 +203,7 @@ impl Value {
             (Value::Series(_), _) => {
                 Err(ValueError::Shape("a list of values takes one index".into()))
             }
-            (Value::Scalar(_), _) => Err(ValueError::Shape(
+            (Value::Scalar(_) | Value::Function { .. }, _) => Err(ValueError::Shape(
                 "only a matrix or list can be indexed".into(),
             )),
         }

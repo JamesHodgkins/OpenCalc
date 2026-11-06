@@ -763,3 +763,59 @@ proptest! {
         prop_assert!((have - want).abs() <= 1e-9 * (1.0 + want.abs()), "{have} vs {want}");
     }
 }
+
+// -------------------------------------------------------------- functions
+
+proptest! {
+    /// Calling a function is the same as evaluating its body with the argument
+    /// in place of the parameter, wherever the definition sits in the layout.
+    #[test]
+    fn a_call_equals_the_body_with_the_argument_substituted(
+        a in -30i32..30,
+        b in 1i32..30,
+        which in 0usize..6,
+        definition_last in any::<bool>(),
+    ) {
+        const BODIES: [&str; 6] = [
+            "x ^ 2 + y",
+            "(x - y) / y",
+            "sqrt(x * x + y * y)",
+            "if(x > y, x, y)",
+            "sum(x, y, x * y)",
+            "abs(x) - y ^ 2",
+        ];
+        let body = BODIES[which];
+        let define = format!("f(x, y) := {body}");
+        let call = format!("r := f({a}, {b})");
+        let lines: Vec<&str> = if definition_last { vec![&call, &define] } else { vec![&define, &call] };
+        let called = evaluate_all(&lines);
+        let call_at = if definition_last { 1 } else { 2 };
+        // The same body with the arguments written in, evaluated as a variable.
+        let inline = body.replace('x', &format!("({a})")).replace('y', &format!("({b})"));
+        let direct = evaluate_all(&[&format!("r := {inline}")]);
+        prop_assert_eq!(
+            called.values[&RegionId(call_at)].clone(),
+            direct.values[&RegionId(1)].clone(),
+            "{} called as f({}, {})", body, a, b
+        );
+    }
+
+    /// A parameter hides a variable or unit of the same name inside the body only.
+    #[test]
+    fn parameters_shadow_outer_names_only_inside_the_function(v in 1i32..50, arg in 1i32..50) {
+        let out = evaluate_all(&[
+            &format!("m := {v}"),
+            "f(m) := m * 2",
+            &format!("inside := f({arg})"),
+            "outside := m",
+            &format!("unit_inside := f({arg} m)"),
+        ]);
+        let real = |n: u64| out.values[&RegionId(n)].clone().unwrap().as_real().unwrap();
+        prop_assert_eq!(real(3).si, f64::from(2 * arg));
+        prop_assert_eq!(real(4).si, f64::from(v));
+        // `arg m` is a number with the unit metre wherever it is written (the
+        // parser decides that), so the parameter is the quantity, not `m` times it.
+        prop_assert_eq!(real(5).si, f64::from(2 * arg));
+        prop_assert_eq!(real(5).dim, opencalc_core::units::Dimension::LENGTH);
+    }
+}

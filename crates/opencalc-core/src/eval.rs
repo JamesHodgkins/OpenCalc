@@ -36,6 +36,9 @@ pub enum EvalError {
     Arity(String, usize),
     #[error("cannot evaluate: {0}")]
     Invalid(String),
+    /// An error inside a user-defined function's body, reported at the call.
+    #[error("in function '{name}': {error}")]
+    InFunction { name: String, error: Box<EvalError> },
     /// Division by zero, overflow, or a domain error such as `ln(0)`. Never
     /// returned as a number: a silent NaN or infinity is a wrong answer.
     #[error("result is not a finite number")]
@@ -56,10 +59,32 @@ impl From<ValueError> for EvalError {
 
 type Env = HashMap<String, Result<Value, EvalError>>;
 
-/// What an expression is evaluated against: the defined names and the units.
+/// A user-defined function: its parameter names and its body.
+struct UserFn<'a> {
+    params: &'a [String],
+    body: &'a Expr,
+    /// The definition is part of a circular reference, so calling it is too.
+    circular: bool,
+}
+
+type Fns<'a> = HashMap<&'a str, UserFn<'a>>;
+
+/// Functions may call other functions this many levels deep. Recursion is not
+/// supported (a function that reaches itself is a circular reference), so this
+/// only bounds chains of different functions; it keeps the stack use of nested
+/// calls inside the worker thread's stack (see the test in `eval::tests`).
+const MAX_CALL_DEPTH: usize = 12;
+
+/// What an expression is evaluated against: the defined names, the user's
+/// functions, the units, and, inside a call, the function's parameters.
 struct Cx<'a> {
-    env: Env,
+    env: &'a Env,
+    fns: &'a Fns<'a>,
     units: &'a UnitRegistry,
+    /// Parameters of the function being evaluated, innermost scope only. They
+    /// shadow everything else.
+    locals: Vec<(String, Value)>,
+    depth: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -102,35 +127,46 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
 pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Output {
     let mut out = Output::default();
 
-    // name -> definer; last definition in layout order wins.
-    let mut definers: HashMap<&str, Vec<RegionId>> = HashMap::new();
+    // Variables and functions are separate namespaces. For each name the last
+    // definition in layout order wins.
+    let mut var_definers: HashMap<&str, Vec<RegionId>> = HashMap::new();
+    let mut fn_definers: HashMap<&str, Vec<RegionId>> = HashMap::new();
     for (id, expr) in regions {
-        if let Expr::Assign {
-            kind: AssignKind::Define,
-            target,
-            ..
-        } = expr
-        {
-            definers.entry(target.as_str()).or_default().push(*id);
+        match expr {
+            Expr::Assign {
+                kind: AssignKind::Define,
+                target,
+                ..
+            } => var_definers.entry(target.as_str()).or_default().push(*id),
+            Expr::FunctionDef { name, .. } => {
+                fn_definers.entry(name.as_str()).or_default().push(*id)
+            }
+            _ => {}
         }
     }
-    let mut names: Vec<&&str> = definers.keys().collect();
-    names.sort();
-    for name in names {
-        let ids = &definers[*name];
-        if ids.len() > 1 {
-            out.warnings.push(Warning::Redefinition {
-                name: (**name).to_owned(),
-                regions: ids.clone(),
-            });
+    for definers in [&var_definers, &fn_definers] {
+        let mut names: Vec<&&str> = definers.keys().collect();
+        names.sort();
+        for name in names {
+            let ids = &definers[*name];
+            if ids.len() > 1 {
+                out.warnings.push(Warning::Redefinition {
+                    name: (**name).to_owned(),
+                    regions: ids.clone(),
+                });
+            }
         }
     }
-    let winner: HashMap<&str, RegionId> = definers
-        .iter()
-        .filter_map(|(n, ids)| ids.last().map(|id| (*n, *id)))
-        .collect();
+    let last = |definers: &HashMap<&str, Vec<RegionId>>| -> HashMap<String, RegionId> {
+        definers
+            .iter()
+            .filter_map(|(n, ids)| ids.last().map(|id| ((*n).to_owned(), *id)))
+            .collect()
+    };
+    let (var_winner, fn_winner) = (last(&var_definers), last(&fn_definers));
 
-    // Edges: region index -> indices of the regions it depends on.
+    // Edges: region index -> indices of the regions it depends on: the definers
+    // of the variables it reads and of the functions it calls.
     let index_of: HashMap<RegionId, usize> = regions
         .iter()
         .enumerate()
@@ -139,25 +175,61 @@ pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Outp
     let edges: Vec<Vec<usize>> = regions
         .iter()
         .map(|(_, e)| {
-            e.free_names()
-                .iter()
-                .filter_map(|n| winner.get(n.as_str()))
-                .map(|id| index_of[id])
-                .collect()
+            let variables = e.free_names();
+            let functions = e.called_names();
+            let reads = variables.iter().filter_map(|n| var_winner.get(n));
+            let calls = functions.iter().filter_map(|n| fn_winner.get(n));
+            reads.chain(calls).map(|id| index_of[id]).collect()
         })
         .collect();
 
-    let mut cx = Cx {
-        env: HashMap::new(),
-        units,
+    let components = tarjan(&edges);
+    let circular = |i: usize, component: &[usize]| component.len() > 1 || edges[i].contains(&i);
+    let in_cycle: Vec<bool> = {
+        let mut flags = vec![false; regions.len()];
+        for component in &components {
+            for &i in component {
+                flags[i] = circular(i, component);
+            }
+        }
+        flags
     };
-    for component in tarjan(&edges) {
-        let cyclic = component.len() > 1 || edges[component[0]].contains(&component[0]);
-        for &i in &component {
+
+    // Winning definitions of functions, ready to be called.
+    let fns: Fns = regions
+        .iter()
+        .enumerate()
+        .filter_map(|(i, (id, e))| match e {
+            Expr::FunctionDef { name, params, body } if fn_winner.get(name) == Some(id) => {
+                let circular = in_cycle[i];
+                Some((
+                    name.as_str(),
+                    UserFn {
+                        params,
+                        body,
+                        circular,
+                    },
+                ))
+            }
+            _ => None,
+        })
+        .collect();
+
+    let mut env: Env = HashMap::new();
+    for component in &components {
+        let cyclic = in_cycle[component[0]];
+        for &i in component {
             let (id, expr) = &regions[i];
             let result = if cyclic {
                 Err(Located::here(EvalError::Cycle))
             } else {
+                let cx = Cx {
+                    env: &env,
+                    fns: &fns,
+                    units,
+                    locals: Vec::new(),
+                    depth: 0,
+                };
                 eval_region(expr, &cx)
             };
             let result = result.map_err(|l| {
@@ -173,8 +245,8 @@ pub fn evaluate_with(regions: &[(RegionId, Expr)], units: &UnitRegistry) -> Outp
                 ..
             } = expr
             {
-                if winner.get(target.as_str()) == Some(id) {
-                    cx.env.insert(target.clone(), result.clone());
+                if var_winner.get(target.as_str()) == Some(id) {
+                    env.insert(target.clone(), result.clone());
                 }
             }
             out.values.insert(*id, result);
@@ -514,5 +586,53 @@ mod tests {
             .unwrap();
         assert_eq!(q.dim, Dimension::LENGTH);
         assert!((q.si - 3.0).abs() < 1e-12);
+    }
+
+    /// A chain of `levels` functions, each body the deepest expression allowed
+    /// (a run of negations) around a call of the previous one.
+    fn deep_chain(levels: usize) -> Vec<(RegionId, Expr)> {
+        let minuses = "-".repeat(crate::parser::MAX_SYMBOLS - 12);
+        let mut lines = vec!["f0(x) := x".to_owned()];
+        for k in 1..levels {
+            lines.push(format!("f{k}(x) := {minuses}f{}(x)", k - 1));
+        }
+        lines.push(format!("answer := f{}(1)", levels - 1));
+        lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| (id(i as u64 + 1), crate::parser::parse(l)))
+            .collect()
+    }
+
+    /// Evaluate on a thread with a stack of `kb` kilobytes.
+    fn evaluate_on_stack(regions: Vec<(RegionId, Expr)>, kb: usize) -> Output {
+        std::thread::Builder::new()
+            .stack_size(kb * 1024)
+            .spawn(move || evaluate(&regions))
+            .unwrap()
+            .join()
+            .unwrap()
+    }
+
+    #[test]
+    fn nested_calls_at_the_depth_limit_fit_in_half_the_worker_stack() {
+        // The worker thread has 8 MB (see `worker::WORKER_STACK`); this must fit in
+        // half of it, in a debug build, which uses the most stack.
+        let regions = deep_chain(MAX_CALL_DEPTH);
+        let last = id(regions.len() as u64);
+        let out = evaluate_on_stack(regions, 4 * 1024);
+        // Even number of negations per level, so the value is unchanged.
+        assert_eq!(si(&out, last.0), 1.0);
+    }
+
+    #[test]
+    fn calls_nested_past_the_limit_are_an_error_not_a_crash() {
+        let regions = deep_chain(MAX_CALL_DEPTH + 2);
+        let last = id(regions.len() as u64);
+        let out = evaluate_on_stack(regions, 4 * 1024);
+        assert!(matches!(
+            &out.values[&last],
+            Err(EvalError::InFunction { .. })
+        ));
     }
 }

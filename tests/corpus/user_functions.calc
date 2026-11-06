@@ -1,0 +1,37 @@
+# source: original; user-defined functions, worked by hand
+area(w, h) := w * h
+hyp(a, b) := sqrt(a ^ 2 + b ^ 2)
+stress(F, A) := F / A
+lerp(a, b, t) := a + (b - a) * t
+sq(x) := x ^ 2
+quad(x) := sq(x) + sq(x + 1)
+shift := 10
+add_shift(x) := x + shift
+scale(m) := m * 2
+shift2(shift) := shift + 1
+tri := hyp(3, 4)
+box := area(2 m, 3 m)
+sigma := stress(10 kN, 100 mm * 100 mm)
+halfway := lerp(10 m, 20 m, 0.5)
+nested := quad(2)
+shifted := add_shift(5)
+vectorised := sum(sq(0..4))
+composed := hyp(area(1, 3), area(2, 2))
+param_over_unit := scale(4)
+param_over_global := shift2(1)
+global_still_there := shift
+argument_is_an_expression := sq(1 + 2)
+used_twice := sq(3) + sq(4)
+=> tri = 5
+=> box = 6 m^2
+=> sigma = 1000000 Pa
+=> halfway = 15 m
+=> nested = 13
+=> shifted = 15
+=> vectorised = 30
+=> composed = 5
+=> param_over_unit = 8
+=> param_over_global = 2
+=> global_still_there = 10
+=> argument_is_an_expression = 9
+=> used_twice = 25

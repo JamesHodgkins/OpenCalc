@@ -1,7 +1,7 @@
 //! Evaluating one expression: the recursion over the tree, with the location of
 //! any error. Kept apart from the dependency graph in `eval`.
 
-use super::{Cx, EvalError};
+use super::{Cx, EvalError, UserFn, MAX_CALL_DEPTH};
 use crate::expr::{BinaryOp, Expr, UnaryOp, ORIGIN};
 use crate::functions;
 use crate::value::{Comparison, Matrix, Series, Value, ValueError};
@@ -39,6 +39,16 @@ pub(super) type Evaluated = Result<Value, Located>;
 
 pub(super) fn eval_region(expr: &Expr, cx: &Cx) -> Evaluated {
     match expr {
+        Expr::FunctionDef { name, params, .. } => {
+            if name == "if" || functions::lookup(name).is_some() {
+                return Err(Located::here(EvalError::Invalid(format!(
+                    "'{name}' is a built-in function and cannot be redefined"
+                ))));
+            }
+            Ok(Value::Function {
+                params: params.clone(),
+            })
+        }
         Expr::Assign { value, .. } => eval(value, cx).map_err(|l| l.under(0)),
         other => eval(other, cx),
     }
@@ -87,6 +97,9 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
             otherwise,
         } => conditional(cond, then, otherwise, cx),
         Expr::Assign { value, .. } => child(value, 0, cx),
+        Expr::FunctionDef { .. } => Err(Located::here(EvalError::Invalid(
+            "a function can only be defined at the top of a region".into(),
+        ))),
         Expr::Error(e) => Err(Located::here(EvalError::Invalid(e.message.clone()))),
     }
 }
@@ -98,7 +111,7 @@ fn literal(rows: usize, cols: usize, cells: &[Expr], cx: &Cx) -> Evaluated {
     for (i, cell) in cells.iter().enumerate() {
         match child(cell, i, cx)? {
             Value::Scalar(s) => items.push(s),
-            Value::Matrix(_) | Value::Series(_) => {
+            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } => {
                 return Err(Located::here(ValueError::Shape(
                     "a matrix cell must be a single number".into(),
                 ))
@@ -107,6 +120,44 @@ fn literal(rows: usize, cols: usize, cells: &[Expr], cx: &Cx) -> Evaluated {
         }
     }
     Ok(Value::Matrix(Matrix::from_scalars(rows, cols, &items)?))
+}
+
+/// Call a user-defined function: evaluate the arguments where the call is, bind
+/// them to the parameters, and evaluate the body with only those bound.
+#[inline(never)]
+fn call_user(name: &str, f: &UserFn, args: &[Expr], cx: &Cx) -> Evaluated {
+    if f.circular {
+        return Err(Located::here(EvalError::Cycle));
+    }
+    if args.len() != f.params.len() {
+        return Err(Located::here(EvalError::Arity(
+            name.to_owned(),
+            f.params.len(),
+        )));
+    }
+    if cx.depth >= MAX_CALL_DEPTH {
+        return Err(Located::here(EvalError::Invalid(
+            "functions call each other too deeply".into(),
+        )));
+    }
+    let mut locals = Vec::with_capacity(args.len());
+    for (i, (param, arg)) in f.params.iter().zip(args).enumerate() {
+        locals.push((param.clone(), child(arg, i, cx)?));
+    }
+    let inner = Cx {
+        env: cx.env,
+        fns: cx.fns,
+        units: cx.units,
+        locals,
+        depth: cx.depth + 1,
+    };
+    // An error in the body is reported at the call, with the function's name.
+    eval(f.body, &inner).map_err(|l| {
+        Located::here(EvalError::InFunction {
+            name: name.to_owned(),
+            error: Box::new(l.error),
+        })
+    })
 }
 
 /// `a..b` or `a, b..c`: a list of values.
@@ -189,6 +240,9 @@ fn conditional(cond: &Expr, then: &Expr, otherwise: &Expr, cx: &Cx) -> Evaluated
 /// imaginary unit `i`.
 #[inline(never)]
 fn name(n: &str, cx: &Cx) -> Evaluated {
+    if let Some((_, value)) = cx.locals.iter().find(|(p, _)| p == n) {
+        return Ok(value.clone());
+    }
     match cx.env.get(n) {
         Some(r) => r.clone().map_err(Located::here),
         None => cx
@@ -220,6 +274,11 @@ fn apply(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
     if name == "if" {
         // The parser makes a Conditional from exactly three arguments.
         return Err(Located::here(EvalError::Arity("if".into(), 3)));
+    }
+    if functions::lookup(name).is_none() {
+        if let Some(f) = cx.fns.get(name) {
+            return call_user(name, f, args, cx);
+        }
     }
     let values = args
         .iter()

@@ -102,6 +102,13 @@ pub enum Expr {
         base: Box<Expr>,
         indices: Vec<Expr>,
     },
+    /// `f(x, y) := body`. Only ever the top of a region. The body is not evaluated
+    /// here; it runs, with the parameters bound, each time `f` is called.
+    FunctionDef {
+        name: String,
+        params: Vec<String>,
+        body: Box<Expr>,
+    },
     /// `start..end`, or `start, next..end`, where `next - start` is the step.
     Range {
         start: Box<Expr>,
@@ -188,6 +195,7 @@ impl Expr {
                 otherwise,
             } => vec![cond, then, otherwise],
             Expr::Assign { value, .. } => vec![value],
+            Expr::FunctionDef { body, .. } => vec![body],
             Expr::Number(_) | Expr::Name(_) | Expr::Quantity { .. } | Expr::Error(_) => vec![],
         }
     }
@@ -197,6 +205,25 @@ impl Expr {
         match path.split_first() {
             None => Some(self),
             Some((first, rest)) => self.children().get(usize::from(*first))?.at_path(rest),
+        }
+    }
+
+    /// Names of the functions this expression calls, in first-seen order. The
+    /// evaluator uses it to order definitions before their callers.
+    pub fn called_names(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        self.collect_called(&mut out);
+        out
+    }
+
+    fn collect_called(&self, out: &mut Vec<String>) {
+        if let Expr::Call { name, .. } = self {
+            if !out.contains(name) {
+                out.push(name.clone());
+            }
+        }
+        for c in self.children() {
+            c.collect_called(out);
         }
     }
 
@@ -246,6 +273,17 @@ impl Expr {
                 otherwise.collect_names(out);
             }
             Expr::Assign { value, .. } => value.collect_names(out),
+            // The parameters are the function's own; everything else it reads is
+            // a dependency of the definition.
+            Expr::FunctionDef { params, body, .. } => {
+                let mut inner = Vec::new();
+                body.collect_names(&mut inner);
+                for n in inner {
+                    if !params.contains(&n) && !out.contains(&n) {
+                        out.push(n);
+                    }
+                }
+            }
             Expr::Fraction { num, den } => {
                 num.collect_names(out);
                 den.collect_names(out);
@@ -297,6 +335,9 @@ mod tests {
             "a - (b < c)",
             "2 * (a == b)",
             "[a < b, c]",
+            "f(x) := x ^ 2 + 1",
+            "area(w, h) := if(w > h, w, h)",
+            "g(a) := 0..a",
         ] {
             let e = parse(src);
             assert!(!matches!(e, Expr::Error(_)), "{src}");

@@ -25,13 +25,14 @@ pub fn show(ui: &mut Ui, state: &AppState) {
         let RegionKind::Math(m) = &r.kind else {
             continue;
         };
-        let Expr::Assign {
-            kind: AssignKind::Define,
-            target,
-            ..
-        } = m.expr()
-        else {
-            continue;
+        let target = match m.expr() {
+            Expr::Assign {
+                kind: AssignKind::Define,
+                target,
+                ..
+            } => target.clone(),
+            Expr::FunctionDef { name, params, .. } => format!("{name}({})", params.join(", ")),
+            _ => continue,
         };
         any = true;
         let value = match state.output.values.get(&r.id) {

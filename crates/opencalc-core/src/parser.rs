@@ -92,6 +92,18 @@ impl Parser {
         }
         let lhs = self.range_expr(true)?;
         let result = match self.peek() {
+            Some(Tok::Define) if matches!(lhs, Expr::Call { .. }) => {
+                // `f(x, y) := body`. Checked first, while the position is still
+                // on the `:=`.
+                let (name, params) = function_signature(&lhs)?;
+                self.pos += 1;
+                let body = self.range_expr(true)?;
+                Expr::FunctionDef {
+                    name,
+                    params,
+                    body: Box::new(body),
+                }
+            }
             Some(Tok::Define) => {
                 // Checked first, while the position is still on the `:=`.
                 let target = target_name(&lhs)?;
@@ -342,6 +354,27 @@ fn call(name: String, mut args: Vec<Expr>) -> Expr {
         }
     }
     Expr::Call { name, args }
+}
+
+/// The name and parameters of `f(x, y)` on the left of `:=`.
+fn function_signature(lhs: &Expr) -> Result<(String, Vec<String>), String> {
+    let Expr::Call { name, args } = lhs else {
+        return Err("left of ':=' must be a name or a function like f(x)".into());
+    };
+    let mut params: Vec<String> = Vec::new();
+    for arg in args {
+        let Expr::Name(p) = arg else {
+            return Err(format!("the parameters of '{name}' must be plain names"));
+        };
+        if params.contains(p) {
+            return Err(format!("'{name}' has the parameter '{p}' twice"));
+        }
+        params.push(p.clone());
+    }
+    if params.is_empty() {
+        return Err(format!("'{name}' needs at least one parameter"));
+    }
+    Ok((name.clone(), params))
 }
 
 fn target_name(lhs: &Expr) -> Result<String, String> {
