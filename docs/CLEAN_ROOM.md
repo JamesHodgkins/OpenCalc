@@ -20,6 +20,7 @@ clean-room rules in `SPEC.md` section 9.1.
 | 2026-11-05 | Public alternatives list (AlternativeTo) | Competitor survey | Summary only |
 | 2026-11-06 | SMath Studio vs Mathcad comparison (vendor page) | Comparison of feature claims | Vendor-authored; reference only |
 | 2026-11-06 | TriStar comparison article | Comparison of feature claims | Reference only |
+| 2026-11-06 | PTC Mathcad Prime help: About the Workspace, About Worksheets and Regions, To Use KeyTips; PTC Mathcad Prime guide tables of contents (tab names) | Window parts and ribbon tab names, for `docs/UI_ALIGNMENT.md` | Public documentation only; behaviours noted, nothing copied. Panel contents of each tab were not confirmed and are marked inferred |
 | 2026-11-06 | OpenDraft desktop app (the owner's own project, GPL-3.0-or-later): `crates/od-ui` theme, ribbon, menus, document tabs; `ui_plan.md`; `CLAUDE.md` | Visual style tokens, ribbon structure and sizes, window layout, engineering conventions | Read for design only. No code copied (decided: SPEC section 4.11, option 1). |
 
 ## Code provenance
