@@ -1,6 +1,6 @@
 # Making the window and behaviour closer to Mathcad
 
-Status: **proposed**. For review before any change.
+Status: **proposed**, updated after the owner's first review (Home tab stays; documents should look like paper documents; SMath was tested and is not order-evaluated).
 
 ## 1. Why this note exists
 
@@ -61,7 +61,7 @@ Decision key: **Align** = change to match Mathcad. **Keep** = a deliberate diffe
 | 1 | Docks open by default | **Align**: closed, and no permanent Names or Properties panes | Plot editing moves into the plot itself (see 3 below); until then Properties opens only while a plot is selected |
 | 2 | Names browser | **Align**: remove. Replace with a **Functions window**: optional, searchable, from the Functions tab, built from the `FUNCTIONS` table (signature and summary), click to insert | |
 | 3 | Plot editing in a side pane | **Align** (with the editor): a plot has editable placeholders for its x and y expressions on the plot, and a title; no side pane | Needs editor step E4 |
-| 4 | Home page tab; sample opens at startup | **Align**: open one blank *Untitled* worksheet; no Home tab. The example moves to File > Example | |
+| 4 | Home page tab; sample opens at startup | **Home tab stays (owner decision).** Start with a blank *Untitled* worksheet open beside it; the example moves to File > Example | |
 | 5 | Ribbon tabs from OpenDraft | **Align**: Math, Functions, Matrices/Tables, Plots, Math Formatting, Calculation, Document (Input/Output when import and export exist). Content is mapped in section 5 | Panel contents are **[inferred]**; review before building |
 | 6 | Definitions show their value | **Align**: `x := 5` shows only the definition; `x =` shows `x = 5` | **[inferred]** from how Mathcad worksheets read. Large visible change; see decision B |
 | 7 | Four decimals, trailing zeros | **Align**: three decimals, trailing zeros not shown (`10 kN`, `0.333`) | **[inferred]**; the Math Formatting tab changes it |
@@ -69,8 +69,8 @@ Decision key: **Align** = change to match Mathcad. **Keep** = a deliberate diffe
 | 9 | Typing `:` gives `:=` | **Align** (input rule, with E5) | **[inferred]** |
 | 10 | Grid on and Snap in the status bar | **Align**: grid off by default; the options move to the Document tab. Status bar becomes: calculation state, Find, zoom slider, Page and Draft view | |
 | 11 | Warnings count in the status bar | **Align**: errors show on the region itself (red, with the message) as in Mathcad; the Calculation tab can step through them | |
-| 12 | Infinite canvas | **Later**: Mathcad worksheets are paged (Page View) with a Draft View. Paging arrives with print and PDF export (Milestone 3) | |
-| 13 | Evaluation order | **Decision A** below | |
+| 12 | Infinite dark canvas | **Align, now (owner decision): documents look like documents.** White paper pages on a grey desk, black maths on the page whatever the app theme, page numbers, Page View and Draft View. Details in section 8 | Moved up from Later: it changes how everything is drawn, so it is better done before more is built on the canvas |
+| 13 | Evaluation order | **Keep the dependency graph** (owner tested SMath: it is not order-evaluated either, so the graph matches SMath and differs only from Mathcad). See A below | |
 | 14 | Quick Access Toolbar and app button | **Keep** (already match) | |
 
 ## 5. Ribbon content (proposed, to be reviewed)
@@ -88,33 +88,57 @@ Decision key: **Align** = change to match Mathcad. **Keep** = a deliberate diffe
 
 ## 6. Decisions needed
 
-**A. Evaluation order.** Mathcad evaluates **top to bottom, left to right**: a name
-must be defined above or to the left of where it is used, otherwise the region shows
-an error. OpenCalc's spec instead chose **order-independent** evaluation by a
-dependency graph (a region can use a name defined below it), and it is built and
-tested that way. The practical differences: in Mathcad, redefining `x` partway down
-gives later regions the new value and earlier ones the old; in OpenCalc the last
-definition applies everywhere and a warning is shown. Options:
-1. **Keep the dependency graph** (recommended: more forgiving and already proven), and
-   record it as a deliberate difference, or
-2. **Switch to Mathcad's order**, which means worksheets from Mathcad behave the same
-   but a name used before it is defined becomes an error.
+**A. Evaluation order: decided, keep the dependency graph.** Mathcad evaluates top to
+bottom, left to right (a name must be defined above or to the left of its use). The
+owner tested SMath and found it is *not* order-evaluated, so OpenCalc's
+dependency-graph evaluation matches SMath and differs from Mathcad in one way:
+redefining a name partway down. In Mathcad earlier regions keep the old value; in
+OpenCalc the last definition applies everywhere and a redefinition warning is shown.
+This is recorded as a deliberate difference. If Mathcad-order is wanted later it could
+be an optional worksheet mode (a setting), not a rewrite.
 
 **B. Definitions show no value** (item 6). It is closest to Mathcad but removes the
 at-a-glance value beside each definition. A middle path is a Document option "show
 values next to definitions", off by default.
 
-**C. Start with a blank Untitled worksheet and no Home tab** (item 4).
+**C. Decided:** the Home tab stays; a blank Untitled worksheet opens beside it (item 4).
 
 ## 7. Phases
 
 | Phase | Content |
 |---|---|
-| U1 | Remove default docks and the Names pane; blank Untitled at startup; no Home tab; grid off by default; add the Functions window. Properties opens only for a selected plot |
+| P1 | **Paper pages** (section 8): page setup in the document, white pages on a grey desk, paper palette for page content, page numbers |
+| U1 | Remove default docks and the Names pane; blank Untitled worksheet at startup (Home tab stays); grid off by default; add the Functions window. Properties opens only for a selected plot |
 | U2 | Ribbon rebuilt to the tabs above (commands unchanged, rearranged and renamed) |
 | U3 | Results only on `=` regions (if B is agreed); three-decimal default; errors on the region |
 | U4 | Status bar to Mathcad's items, with a zoom slider |
-| later | Click-and-type region creation, `:` to `:=`, in-plot placeholders (with the editor); paging (with export) |
+| P2 | Page View and Draft View toggle, zoom slider and fit-to-width; page setup dialog on the Document tab |
+| later | Click-and-type region creation, `:` to `:=`, in-plot placeholders (with the editor); print and PDF export from the same page layout (Milestone 3) |
 
 The editor work (E2 to E6) continues after U1 to U3, because U1 to U3 change what the
 user sees first and the editor steps are internal until E4.
+
+## 8. Documents that look like documents
+
+What changes, proposed (the look of a page, not Mathcad's exact styling):
+
+- **Page setup is part of the worksheet** (saved, changed by an undoable edit, like the
+  unit system): paper size (A4 by default, Letter available), portrait or landscape,
+  margins (20 mm by default).
+- **Pages:** white sheets with a thin shadow, stacked vertically on a mid-grey desk, a
+  small gap between them. A worksheet always has at least one page, and gets another
+  whenever a region reaches below the last page, so pages grow with the content.
+- **Paper palette:** everything drawn on a page (maths, text, results, plots, errors)
+  uses a paper palette: black text on white, with error red and plot line colours that
+  read on white. It does not follow the dark app theme, exactly as a printed page
+  would not. The ribbon, tabs and status bar keep the app theme.
+- **Margins** are shown as faint corner marks in Page View. Regions may sit anywhere
+  on a page; one that crosses a page edge is flagged, not moved.
+- **Draft View** hides page edges and shows one continuous sheet (useful while working);
+  **Page View** is the default.
+- **Page numbers** appear in the status bar ("Page 2 of 3" for the page in view).
+- **Grid** is off by default and drawn faintly on the paper when on.
+- The same page layout is what print and PDF export will use in Milestone 3, so a
+  region is in the same place on screen and in the file.
+- Nothing about regions or evaluation changes: positions are still document
+  coordinates; pages are a background and a measure.
