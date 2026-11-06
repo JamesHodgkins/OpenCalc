@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/opencalc-core",
+    "crates/opencalc-ui",
+    "crates/opencalc-cli",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+
+[workspace.dependencies]
+eframe = { version = "0.31", features = ["persistence"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+opencalc-core = { path = "crates/opencalc-core" }
+
+[profile.dev.package."*"]
+opt-level = 2

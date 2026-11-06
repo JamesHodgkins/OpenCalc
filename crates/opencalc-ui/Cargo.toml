@@ -1,0 +1,15 @@
+[package]
+name = "opencalc-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "OpenCalc desktop application (egui / eframe)."
+
+[[bin]]
+name = "opencalc"
+path = "src/main.rs"
+
+[dependencies]
+eframe.workspace = true
+opencalc-core.workspace = true

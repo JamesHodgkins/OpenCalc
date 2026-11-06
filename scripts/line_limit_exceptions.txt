@@ -1,0 +1,6 @@
+# Files allowed to exceed the 400 production-line limit, with their current size.
+# A ratchet: a file may shrink but never grow, and must be removed from this list
+# once it is within the limit. Both are scheduled for the splits in
+# docs/ARCHITECTURE.md (phase B), not for incremental trimming.
+crates/opencalc-ui/src/app.rs 488
+crates/opencalc-ui/src/shell.rs 419

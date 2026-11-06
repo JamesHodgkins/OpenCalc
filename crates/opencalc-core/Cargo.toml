@@ -1,0 +1,11 @@
+[package]
+name = "opencalc-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "OpenCalc document model, parser, evaluator and units. No UI code."
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
