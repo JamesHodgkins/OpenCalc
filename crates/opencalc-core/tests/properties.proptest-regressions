@@ -7,3 +7,4 @@
 cc 77c10c59fe0d4e5e60417a2d3a5b9caef70b6b1f4c7cd27bc7b2189ab0071e87 # shrinks to a = Dimension { length: 0, mass: 0, time: 0, current: 0, temperature: 0, amount: 0, luminosity: 125 }, b = Dimension { length: 0, mass: 0, time: 0, current: 0, temperature: 0, amount: 0, luminosity: 3 }, n = 0
 cc 6afa490af3eecf922100888e9a203458ceb3de10dcb73cee508b126adf00a45e # shrinks to a = -44, b = -85
 cc 30f7e6d342f137dc5cf0cec7f71695c60a5d27144050b3bb6e123e8f249dc94b # shrinks to t = Bin(Neg(Num("1", 1.0)), "^", Num("2", 2.0))
+cc 2dbe08ee8248609047a8eca8632ab1bccaaefe2dfce6070cd3a32d55eb046f1b # shrinks to t = Bin(Num("0", 0.0), "+", Call("sqrt", Bin(Num("1", 1.0), "/", Num("1e155", 1e155))))

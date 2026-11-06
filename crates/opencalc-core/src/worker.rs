@@ -147,7 +147,15 @@ mod tests {
         assert!(w.request(7, vec![(RegionId(1), Expr::define("x", Expr::num(2.0)))]));
         let r = wait(&w);
         assert_eq!(r.revision, 7);
-        assert_eq!(r.output.values[&RegionId(1)].as_ref().unwrap().si, 2.0);
+        assert_eq!(
+            r.output.values[&RegionId(1)]
+                .as_ref()
+                .unwrap()
+                .as_real()
+                .unwrap()
+                .si,
+            2.0
+        );
         assert!(calls.load(Ordering::SeqCst) >= 1);
     }
 
@@ -192,7 +200,15 @@ mod tests {
         }
         let r = got.expect("result for the current revision");
         assert_eq!(r.revision, 2);
-        assert_eq!(r.output.values[&RegionId(1)].as_ref().unwrap().si, 2.0);
+        assert_eq!(
+            r.output.values[&RegionId(1)]
+                .as_ref()
+                .unwrap()
+                .as_real()
+                .unwrap()
+                .si,
+            2.0
+        );
     }
 
     #[test]

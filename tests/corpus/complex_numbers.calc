@@ -1,0 +1,31 @@
+# source: original; complex arithmetic worked by hand (z = 3 + 4i, w = 1 - 2i)
+z := 3 + 4 * i
+w := 1 - 2 * i
+root := sqrt(0 - 4)
+root_minus_nine := sqrt(0 - 9)
+sum := z + w
+prod := z * w
+quot := z / w
+modulus := abs(z)
+real_part := re(z)
+imag_part := im(z)
+conjugate := conj(z)
+i_squared := i * i
+euler := exp(i * 3.141592653589793)
+cube_root_of_minus_eight := (0 - 8) ^ (1 / 3)
+log_minus_one := ln(0 - 1)
+real_power_stays_real := 2 ^ 0.5
+=> root = 2 * i
+=> root_minus_nine = 3 * i
+=> sum = 4 + 2 * i
+=> prod = 11 - 2 * i
+=> quot = (0 - 1) + 2 * i
+=> modulus = 5
+=> real_part = 3
+=> imag_part = 4
+=> conjugate = 3 - 4 * i
+=> i_squared = 0 - 1
+=> euler = 0 - 1
+=> cube_root_of_minus_eight = 1 + sqrt(3) * i
+=> log_minus_one = 3.141592653589793 * i
+=> real_power_stays_real = sqrt(2)

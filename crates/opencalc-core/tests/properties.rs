@@ -209,9 +209,49 @@ proptest! {
 
 fn token() -> impl Strategy<Value = &'static str> {
     prop::sample::select(vec![
-        "0", "1", "2.5", "1e3", "1e308", "100", "a", "b", "x1", "m", "kg", "kN", "s", "mm", "+",
-        "-", "*", "/", "^", "(", ")", ",", ":=", "=", "sin(", "sqrt(", "ln(", "abs(", "foo(", "e",
-        "1e", ".", "\u{3c3}", "$",
+        "0",
+        "1",
+        "2.5",
+        "1e3",
+        "1e308",
+        "100",
+        "a",
+        "b",
+        "x1",
+        "m",
+        "kg",
+        "kN",
+        "s",
+        "mm",
+        "+",
+        "-",
+        "*",
+        "/",
+        "^",
+        "(",
+        ")",
+        ",",
+        ":=",
+        "=",
+        "sin(",
+        "sqrt(",
+        "ln(",
+        "abs(",
+        "foo(",
+        "e",
+        "1e",
+        ".",
+        "\u{3c3}",
+        "$",
+        "i",
+        "vec(",
+        "mat(",
+        "det(",
+        "norm(",
+        "transpose(",
+        "dot(",
+        "conj(",
+        "re(",
     ])
 }
 
@@ -233,7 +273,7 @@ proptest! {
         prop_assert_eq!(out.values.len(), lines.len());
         for (id, result) in &out.values {
             if let Ok(q) = result {
-                prop_assert!(q.si.is_finite(), "{:?} gave a non-finite value from {:?}", id, lines);
+                prop_assert!(q.is_finite(), "{:?} gave a non-finite value from {:?}", id, lines);
             }
         }
         // Deterministic: evaluating again gives exactly the same answers.
@@ -260,14 +300,14 @@ proptest! {
     fn a_decimal_number_parses_back_to_exactly_itself(x in 0f64..1e12) {
         let regions = vec![(RegionId(1), parse(&format!("{x}")))];
         let got = evaluate(&regions).values[&RegionId(1)].clone();
-        prop_assert_eq!(got, Ok(Quantity::dimensionless(x)));
+        prop_assert_eq!(got, Ok(Quantity::dimensionless(x).into()));
     }
 
     #[test]
     fn a_number_followed_by_a_unit_is_that_quantity(sym in symbol(), v in 0f64..1e6) {
         let regions = vec![(RegionId(1), parse(&format!("{v} {sym}")))];
         let got = evaluate(&regions).values[&RegionId(1)].clone();
-        prop_assert_eq!(got, Ok(Quantity::from_unit(v, sym).expect("unit")));
+        prop_assert_eq!(got, Ok(Quantity::from_unit(v, sym).expect("unit").into()));
     }
 
     /// Typed exponents reach the dimension arithmetic: results are exact or an
@@ -279,7 +319,7 @@ proptest! {
             let regions = vec![(RegionId(1), parse(&src))];
             match &evaluate(&regions).values[&RegionId(1)] {
                 Ok(q) => {
-                    prop_assert_eq!(i32::from(q.dim.length), want, "{}", src);
+                    prop_assert_eq!(i32::from(q.dim().length), want, "{}", src);
                 }
                 Err(EvalError::Unit(UnitError::DimensionOverflow)) => {
                     prop_assert!(want.abs() > 127, "{} reported overflow for a representable exponent {}", src, want);
@@ -385,33 +425,59 @@ fn render(t: &Tree) -> String {
     }
 }
 
-/// What the engine must answer: the value, or `None` if any step along the way is
-/// not a finite number (division by zero, overflow, `sqrt(-1)`, `ln(0)`).
-fn reference(t: &Tree) -> Option<f64> {
-    let finite = |x: f64| x.is_finite().then_some(x);
+/// What the reference says about an expression.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Ref {
+    /// A finite real number, exactly.
+    Real(f64),
+    /// Some step is not a finite number (division by zero, overflow, `ln(0)`).
+    Bad,
+    /// Some step leaves the real numbers (`sqrt(-1)`); the reference is real-only,
+    /// so it makes no claim about the value.
+    Complex,
+}
+
+/// What the engine must answer. `Bad` dominates `Complex`: both branches of an
+/// operation are evaluated, and either failing makes the whole region an error.
+fn reference(t: &Tree) -> Ref {
+    let finite = |x: f64| {
+        if x.is_finite() {
+            Ref::Real(x)
+        } else {
+            Ref::Bad
+        }
+    };
+    let combine = |a: Ref, b: Ref, f: &dyn Fn(f64, f64) -> Ref| match (a, b) {
+        (Ref::Bad, _) | (_, Ref::Bad) => Ref::Bad,
+        (Ref::Complex, _) | (_, Ref::Complex) => Ref::Complex,
+        (Ref::Real(x), Ref::Real(y)) => f(x, y),
+    };
     match t {
-        Tree::Num(_, v) => Some(*v),
-        Tree::Neg(a) => reference(a).map(|x| -x),
-        Tree::Bin(a, op, b) => {
-            let (x, y) = (reference(a)?, reference(b)?);
-            finite(match *op {
-                "+" => x + y,
-                "-" => x - y,
-                "*" => x * y,
-                "/" => x / y,
-                _ => x.powf(y),
-            })
-        }
-        Tree::Call(f, a) => {
-            let x = reference(a)?;
-            finite(match *f {
-                "sqrt" => x.sqrt(),
-                "ln" => x.ln(),
-                "exp" => x.exp(),
-                "sin" => x.sin(),
-                _ => x.abs(),
-            })
-        }
+        Tree::Num(_, v) => Ref::Real(*v),
+        Tree::Neg(a) => match reference(a) {
+            Ref::Real(x) => Ref::Real(-x),
+            other => other,
+        },
+        Tree::Bin(a, op, b) => combine(reference(a), reference(b), &|x, y| match *op {
+            "+" => finite(x + y),
+            "-" => finite(x - y),
+            "*" => finite(x * y),
+            "/" => finite(x / y),
+            _ if x < 0.0 && y.fract() != 0.0 => Ref::Complex,
+            _ => finite(x.powf(y)),
+        }),
+        Tree::Call(f, a) => match reference(a) {
+            Ref::Real(x) => match *f {
+                "sqrt" if x < 0.0 => Ref::Complex,
+                "ln" if x < 0.0 => Ref::Complex,
+                "sqrt" => finite(x.sqrt()),
+                "ln" => finite(x.ln()),
+                "exp" => finite(x.exp()),
+                "sin" => finite(x.sin()),
+                _ => finite(x.abs()),
+            },
+            other => other,
+        },
     }
 }
 
@@ -427,8 +493,108 @@ proptest! {
         prop_assume!(!matches!(parsed, Expr::Error(_)));
         let got = evaluate(&[(RegionId(1), parsed)]).values[&RegionId(1)].clone();
         match reference(&t) {
-            Some(v) => prop_assert_eq!(got, Ok(Quantity::dimensionless(v)), "{}", src),
-            None => prop_assert_eq!(got, Err(EvalError::NotFinite), "{}", src),
+            Ref::Real(v) => prop_assert_eq!(got, Ok(Quantity::dimensionless(v).into()), "{}", src),
+            Ref::Bad => prop_assert_eq!(got, Err(EvalError::NotFinite), "{}", src),
+            // A complex intermediate may overflow or come back to the reals; the
+            // value is covered by the corpus. It must still be a clean answer.
+            Ref::Complex => prop_assert!(
+                matches!(&got, Ok(v) if v.is_finite()) || got == Err(EvalError::NotFinite),
+                "{}: {:?}", src, got
+            ),
         }
+    }
+}
+
+// ------------------------------------------------- complex numbers, matrices
+
+/// Evaluate one expression to a value (a failure is a test failure).
+fn value_of(src: &str) -> opencalc_core::value::Value {
+    let regions = vec![(RegionId(1), parse(src))];
+    match evaluate(&regions).values.remove(&RegionId(1)) {
+        Some(Ok(v)) => v,
+        other => panic!("{src} did not evaluate: {other:?}"),
+    }
+}
+
+/// The real and imaginary parts of a scalar result.
+fn parts(src: &str) -> (f64, f64) {
+    match value_of(src) {
+        opencalc_core::value::Value::Scalar(s) => (s.z.re, s.z.im),
+        other => panic!("{src} is not a scalar: {other:?}"),
+    }
+}
+
+fn near(a: f64, b: f64) -> bool {
+    (a - b).abs() <= 1e-9 * (1.0 + a.abs().max(b.abs()))
+}
+
+fn small() -> impl Strategy<Value = i32> {
+    -20i32..=20
+}
+
+fn matrix_source(rows: usize, cols: usize, items: &[i32]) -> String {
+    let list: Vec<String> = items.iter().map(|x| format!("({x})")).collect();
+    format!("mat({rows}, {cols}, {})", list.join(", "))
+}
+
+proptest! {
+    /// Complex arithmetic obeys the field identities (within rounding).
+    #[test]
+    fn complex_arithmetic_obeys_the_field_identities(
+        (a, b, c, d) in (small(), small(), small(), small()),
+    ) {
+        prop_assume!(c != 0 || d != 0);
+        let z = format!("(({a}) + ({b}) * i)");
+        let w = format!("(({c}) + ({d}) * i)");
+        // (z * w) / w == z
+        let (re, im) = parts(&format!("({z} * {w}) / {w}"));
+        prop_assert!(near(re, f64::from(a)) && near(im, f64::from(b)), "{re} {im}");
+        // |z|^2 == re^2 + im^2
+        let (m2, _) = parts(&format!("abs({z}) ^ 2"));
+        prop_assert!(near(m2, f64::from(a * a + b * b)));
+        // conj(z * w) == conj(z) * conj(w)
+        let lhs = parts(&format!("conj({z} * {w})"));
+        let rhs = parts(&format!("conj({z}) * conj({w})"));
+        prop_assert!(near(lhs.0, rhs.0) && near(lhs.1, rhs.1));
+        // sqrt(z)^2 == z
+        let (re, im) = parts(&format!("sqrt({z}) ^ 2"));
+        prop_assert!(near(re, f64::from(a)) && near(im, f64::from(b)), "{re} {im}");
+    }
+
+    /// Matrix identities: det(A B) = det A det B, transposing twice is the
+    /// identity, and det(A^T) = det A.
+    #[test]
+    fn matrix_identities_hold(a in prop::collection::vec(small(), 9), b in prop::collection::vec(small(), 9)) {
+        let (ma, mb) = (matrix_source(3, 3, &a), matrix_source(3, 3, &b));
+        let (lhs, _) = parts(&format!("det({ma} * {mb})"));
+        let (da, _) = parts(&format!("det({ma})"));
+        let (db, _) = parts(&format!("det({mb})"));
+        prop_assert!(near(lhs, da * db), "{lhs} vs {}", da * db);
+        let (dt, _) = parts(&format!("det(transpose({ma}))"));
+        prop_assert!(near(dt, da));
+        prop_assert_eq!(value_of(&format!("transpose(transpose({ma}))")), value_of(&ma));
+    }
+
+    /// Shapes that do not fit are reported, never panic or produce garbage.
+    #[test]
+    fn mismatched_shapes_are_errors(r1 in 1usize..4, c1 in 1usize..4, r2 in 1usize..4, c2 in 1usize..4) {
+        let a = matrix_source(r1, c1, &vec![1; r1 * c1]);
+        let b = matrix_source(r2, c2, &vec![2; r2 * c2]);
+        let regions = vec![(RegionId(1), parse(&format!("{a} * {b}"))), (RegionId(2), parse(&format!("{a} + {b}")))];
+        let out = evaluate(&regions);
+        prop_assert_eq!(out.values[&RegionId(1)].is_ok(), c1 == r2);
+        prop_assert_eq!(out.values[&RegionId(2)].is_ok(), (r1, c1) == (r2, c2));
+    }
+
+    /// A matrix keeps one dimension: scaling by a quantity multiplies it in, and
+    /// elements of different dimensions are rejected.
+    #[test]
+    fn matrix_dimensions_follow_the_elements(n in 1usize..5, x in small()) {
+        let items = vec![format!("{x} m"); n].join(", ");
+        let v = value_of(&format!("vec({items}) * 2 kg"));
+        prop_assert_eq!(v.dim().length, 1);
+        prop_assert_eq!(v.dim().mass, 1);
+        let mixed = vec![(RegionId(1), parse("vec(1 m, 2 s)"))];
+        prop_assert!(evaluate(&mixed).values[&RegionId(1)].is_err());
     }
 }

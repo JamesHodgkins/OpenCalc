@@ -1,0 +1,40 @@
+# source: original; small linear-algebra exercises worked by hand
+v := vec(3, 4)
+u := vec(1, 0)
+force := vec(3 N, 4 N)
+A := mat(2, 2, 1, 2, 3, 4)
+B := mat(2, 2, 0, 1, 1, 0)
+length := norm(v)
+dotted := dot(v, u)
+det_a := det(A)
+det_b := det(B)
+n_rows := rows(A)
+n_cols := cols(mat(2, 3, 1, 2, 3, 4, 5, 6))
+magnitude := norm(force)
+scaled := 2 * v
+sum := v + u
+product := A * B
+transposed := transpose(A)
+traction := det(mat(2, 2, 2 m, 0 m, 0 m, 3 m))
+bad_shape := A * vec(1, 2, 3)
+bad_add := v + 1
+bad_units := vec(1 m, 2 s)
+=> length = 5
+=> dotted = 3
+=> det_a = 0 - 2
+=> det_b = 0 - 1
+=> n_rows = 2
+=> n_cols = 3
+=> magnitude = 5 N
+=> scaled = vec(6, 8)
+=> sum = vec(4, 4)
+=> product = mat(2, 2, 2, 1, 4, 3)
+=> transposed = mat(2, 2, 1, 3, 2, 4)
+=> traction = 6 m^2
+!> bad_shape : value
+!> bad_add : value
+!> bad_units : mismatch
+work := dot(vec(3 N, 4 N), vec(2 m, 1 m))
+inner := mat(1, 2, 1 m, 2 m) * mat(2, 1, 3 m, 4 m)
+=> work = 10 N*m
+=> inner = mat(1, 1, 11 m^2)

@@ -8,7 +8,9 @@
 use std::collections::HashMap;
 
 use crate::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
-use crate::units::{Dimension, Quantity, UnitError};
+use crate::functions;
+use crate::units::{Quantity, UnitError};
+use crate::value::{Value, ValueError};
 
 pub use crate::document::RegionId;
 
@@ -18,6 +20,8 @@ pub enum EvalError {
     Undefined(String),
     #[error(transparent)]
     Unit(#[from] UnitError),
+    #[error(transparent)]
+    Value(ValueError),
     #[error("circular reference")]
     Cycle,
     #[error("unknown function '{0}'")]
@@ -26,15 +30,25 @@ pub enum EvalError {
     Arity(String, usize),
     #[error("cannot evaluate: {0}")]
     Invalid(String),
-    /// Division by zero, overflow, or a domain error such as `sqrt(-4)` or `ln(0)`.
-    /// Never returned as a number: a silent NaN or infinity is a wrong answer.
-    /// Revisit when complex numbers arrive (`sqrt(-4)` becomes `2i`).
+    /// Division by zero, overflow, or a domain error such as `ln(0)`. Never
+    /// returned as a number: a silent NaN or infinity is a wrong answer.
     #[error("result is not a finite number")]
     NotFinite,
     /// A bug in the evaluator was caught. The worker survives and reports this.
     #[error("internal error: {0}")]
     Internal(String),
 }
+
+impl From<ValueError> for EvalError {
+    fn from(e: ValueError) -> EvalError {
+        match e {
+            ValueError::Unit(u) => EvalError::Unit(u),
+            other => EvalError::Value(other),
+        }
+    }
+}
+
+type Env = HashMap<String, Result<Value, EvalError>>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Warning {
@@ -47,7 +61,7 @@ pub enum Warning {
 
 #[derive(Debug, Default)]
 pub struct Output {
-    pub values: HashMap<RegionId, Result<Quantity, EvalError>>,
+    pub values: HashMap<RegionId, Result<Value, EvalError>>,
     pub warnings: Vec<Warning>,
 }
 
@@ -112,7 +126,7 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
         })
         .collect();
 
-    let mut env: HashMap<String, Result<Quantity, EvalError>> = HashMap::new();
+    let mut env: Env = HashMap::new();
     for component in tarjan(&edges) {
         let cyclic = component.len() > 1 || edges[component[0]].contains(&component[0]);
         for &i in &component {
@@ -138,10 +152,7 @@ pub fn evaluate(regions: &[(RegionId, Expr)]) -> Output {
     out
 }
 
-fn eval_region(
-    expr: &Expr,
-    env: &HashMap<String, Result<Quantity, EvalError>>,
-) -> Result<Quantity, EvalError> {
+fn eval_region(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
     match expr {
         Expr::Assign { value, .. } => eval(value, env),
         other => eval(other, env),
@@ -150,98 +161,63 @@ fn eval_region(
 
 /// Evaluate one expression. The single choke point that rejects non-finite
 /// results, so they cannot reach a displayed value.
-fn eval(
-    expr: &Expr,
-    env: &HashMap<String, Result<Quantity, EvalError>>,
-) -> Result<Quantity, EvalError> {
-    let q = eval_node(expr, env)?;
-    if q.si.is_finite() {
-        Ok(q)
+fn eval(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
+    let v = eval_node(expr, env)?;
+    if v.is_finite() {
+        Ok(v)
     } else {
         Err(EvalError::NotFinite)
     }
 }
 
-fn eval_node(
-    expr: &Expr,
-    env: &HashMap<String, Result<Quantity, EvalError>>,
-) -> Result<Quantity, EvalError> {
+fn eval_node(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
     match expr {
-        Expr::Number(v) => Ok(Quantity::dimensionless(*v)),
-        Expr::Quantity { value, unit } => Ok(Quantity::from_unit(*value, unit)?),
-        // A defined variable shadows a unit of the same name.
+        Expr::Number(v) => Ok(Value::dimensionless(*v)),
+        Expr::Quantity { value, unit } => Ok(Quantity::from_unit(*value, unit)?.into()),
+        // A defined variable shadows a unit of the same name, and a unit shadows
+        // the imaginary unit `i`.
         Expr::Name(n) => match env.get(n) {
             Some(r) => r.clone(),
-            None => Quantity::from_unit(1.0, n).map_err(|_| EvalError::Undefined(n.clone())),
+            None => Quantity::from_unit(1.0, n)
+                .map(Value::from)
+                .or_else(|_| constant(n))
+                .map_err(|_| EvalError::Undefined(n.clone())),
         },
         Expr::Unary {
             op: UnaryOp::Neg,
             arg,
         } => Ok(eval(arg, env)?.negated()),
-        Expr::Binary { op, lhs, rhs } => binary(*op, eval(lhs, env)?, eval(rhs, env)?),
-        Expr::Fraction { num, den } => binary(BinaryOp::Div, eval(num, env)?, eval(den, env)?),
-        Expr::Root { radicand } => sqrt(eval(radicand, env)?),
-        Expr::Call { name, args } => call(name, args, env),
+        Expr::Binary { op, lhs, rhs } => binary(*op, &eval(lhs, env)?, &eval(rhs, env)?),
+        Expr::Fraction { num, den } => binary(BinaryOp::Div, &eval(num, env)?, &eval(den, env)?),
+        Expr::Root { radicand } => functions::call("sqrt", &[eval(radicand, env)?]),
+        Expr::Call { name, args } => {
+            let values = args
+                .iter()
+                .map(|a| eval(a, env))
+                .collect::<Result<Vec<_>, _>>()?;
+            functions::call(name, &values)
+        }
         Expr::Assign { value, .. } => eval(value, env),
         Expr::Error(msg) => Err(EvalError::Invalid(msg.clone())),
     }
 }
 
-fn binary(op: BinaryOp, a: Quantity, b: Quantity) -> Result<Quantity, EvalError> {
+/// Built-in named constants, used when no variable or unit has the name.
+fn constant(name: &str) -> Result<Value, ()> {
+    match name {
+        "i" => Ok(Value::complex(0.0, 1.0)),
+        _ => Err(()),
+    }
+}
+
+fn binary(op: BinaryOp, a: &Value, b: &Value) -> Result<Value, EvalError> {
     Ok(match op {
-        BinaryOp::Add => a.try_add(b)?,
-        BinaryOp::Sub => a.try_sub(b)?,
-        BinaryOp::Mul => a.times(b)?,
-        BinaryOp::Div => a.over(b)?,
+        BinaryOp::Add => a.add(b)?,
+        BinaryOp::Sub => a.sub(b)?,
+        BinaryOp::Mul => a.mul(b)?,
+        BinaryOp::Div => a.div(b)?,
         BinaryOp::Pow => a.pow(b)?,
     })
-}
-
-fn sqrt(q: Quantity) -> Result<Quantity, EvalError> {
-    match q.dim.halved() {
-        Some(dim) => Ok(Quantity {
-            si: q.si.sqrt(),
-            dim,
-        }),
-        None => Err(UnitError::NotDimensionless("sqrt".into()).into()),
-    }
-}
-
-fn call(
-    name: &str,
-    args: &[Expr],
-    env: &HashMap<String, Result<Quantity, EvalError>>,
-) -> Result<Quantity, EvalError> {
-    let f: fn(f64) -> f64 = match name {
-        "sqrt" | "abs" => {
-            let [arg] = args else {
-                return Err(EvalError::Arity(name.to_owned(), 1));
-            };
-            let q = eval(arg, env)?;
-            return if name == "sqrt" {
-                sqrt(q)
-            } else {
-                Ok(Quantity {
-                    si: q.si.abs(),
-                    dim: q.dim,
-                })
-            };
-        }
-        "sin" => f64::sin,
-        "cos" => f64::cos,
-        "tan" => f64::tan,
-        "ln" => f64::ln,
-        "exp" => f64::exp,
-        _ => return Err(EvalError::UnknownFunction(name.to_owned())),
-    };
-    let [arg] = args else {
-        return Err(EvalError::Arity(name.to_owned(), 1));
-    };
-    let q = eval(arg, env)?;
-    if q.dim != Dimension::NONE {
-        return Err(UnitError::NotDimensionless(name.to_owned()).into());
-    }
-    Ok(Quantity::dimensionless(f(q.si)))
 }
 
 /// Tarjan's SCC over `edges[i]` = nodes that `i` points to. Components are
@@ -310,13 +286,14 @@ fn tarjan(edges: &[Vec<usize>]) -> Vec<Vec<usize>> {
 mod tests {
     use super::*;
     use crate::expr::BinaryOp::*;
+    use crate::units::Dimension;
 
     fn id(n: u64) -> RegionId {
         RegionId(n)
     }
 
     fn si(out: &Output, n: u64) -> f64 {
-        out.values[&id(n)].as_ref().unwrap().si
+        out.values[&id(n)].as_ref().unwrap().as_real().unwrap().si
     }
 
     #[test]
@@ -433,7 +410,11 @@ mod tests {
                 Expr::evaluate("s", Expr::bin(Div, Expr::name("F"), Expr::name("A"))),
             ),
         ];
-        let q = *evaluate(&regions).values[&id(3)].as_ref().unwrap();
+        let q = evaluate(&regions).values[&id(3)]
+            .as_ref()
+            .unwrap()
+            .as_real()
+            .unwrap();
         assert!((q.in_unit("MPa").unwrap() - 100.0).abs() < 1e-9);
     }
 
@@ -452,9 +433,17 @@ mod tests {
         assert!(evaluate(&regions).values[&id(1)].is_err());
     }
 
-    fn run_src(src: &str) -> Result<Quantity, EvalError> {
+    fn run_value(src: &str) -> Result<Value, EvalError> {
         let regions = vec![(id(1), crate::parser::parse(src))];
         evaluate(&regions).values.remove(&id(1)).unwrap()
+    }
+
+    /// A real result; a complex or matrix result is an error here.
+    fn run_src(src: &str) -> Result<Quantity, EvalError> {
+        run_value(src).and_then(|v| {
+            v.as_real()
+                .ok_or_else(|| EvalError::Invalid("not a real number".into()))
+        })
     }
 
     #[test]
@@ -477,11 +466,11 @@ mod tests {
         for src in [
             "1 / 0",
             "0 / 0",
-            "sqrt(0 - 4)",
             "ln(0)",
             "10 ^ 400",
-            "(0 - 8) ^ 0.5",
             "1e999",
+            "sqrt(1 / 0)",
+            "(1 / 0) * i",
         ] {
             assert_eq!(run_src(src), Err(EvalError::NotFinite), "{src}");
         }
@@ -527,7 +516,11 @@ mod tests {
                 },
             ),
         )];
-        let q = *evaluate(&regions).values[&id(1)].as_ref().unwrap();
+        let q = evaluate(&regions).values[&id(1)]
+            .as_ref()
+            .unwrap()
+            .as_real()
+            .unwrap();
         assert_eq!(q.dim, Dimension::LENGTH);
         assert!((q.si - 3.0).abs() < 1e-12);
     }

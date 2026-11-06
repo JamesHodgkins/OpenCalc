@@ -14,6 +14,7 @@ use opencalc_core::eval::{evaluate, EvalError, Output, RegionId, Warning};
 use opencalc_core::expr::{AssignKind, Expr};
 use opencalc_core::parser::parse;
 use opencalc_core::units::UnitError;
+use opencalc_core::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Target {
@@ -154,6 +155,7 @@ fn kind_of(e: &EvalError) -> &'static str {
         EvalError::Arity(..) => "arity",
         EvalError::Invalid(_) => "invalid",
         EvalError::Internal(_) => "internal",
+        EvalError::Value(_) => "value",
     }
 }
 
@@ -199,6 +201,36 @@ fn close(got: f64, want: f64, tol: f64) -> bool {
     }
 }
 
+/// Why `got` is not `want` within the relative tolerance, if it is not. Compares
+/// dimensions and, element by element, the real and imaginary parts in SI.
+fn differs(got: &Value, want: &Value, tol: f64) -> Option<String> {
+    if got.dim() != want.dim() {
+        return Some(format!(
+            "has dimension {:?}, expected {:?}",
+            got.dim(),
+            want.dim()
+        ));
+    }
+    let parts = |v: &Value| -> Vec<f64> {
+        match v {
+            Value::Scalar(s) => vec![s.z.re, s.z.im],
+            Value::Matrix(m) => {
+                let mut out = vec![m.rows() as f64, m.cols() as f64];
+                out.extend(m.elements().iter().flat_map(|z| [z.re, z.im]));
+                out
+            }
+        }
+    };
+    let (g, w) = (parts(got), parts(want));
+    if g.len() != w.len() {
+        return Some(format!("is {got:?}, expected {want:?} (different shape)"));
+    }
+    if g.iter().zip(&w).any(|(a, b)| !close(*a, *b, tol)) {
+        return Some(format!("is {got:?} (SI), expected {want:?}"));
+    }
+    None
+}
+
 /// Check every expectation of a case against one evaluation. Returns failures.
 fn check(case: &Case, regions: &[(RegionId, Expr)], out: &Output) -> Vec<String> {
     let mut failures = Vec::new();
@@ -231,25 +263,14 @@ fn check(case: &Case, regions: &[(RegionId, Expr)], out: &Output) -> Vec<String>
                         *line,
                         format!("{} should equal {expr} but failed: {e}", describe(target)),
                     ),
-                    Ok(got) if got.dim != want.dim => fail(
-                        *line,
-                        format!(
-                            "{} has dimension {:?}, expected {:?} (from '{expr}')",
-                            describe(target),
-                            got.dim,
-                            want.dim
-                        ),
-                    ),
-                    Ok(got) if !close(got.si, want.si, *tol) => fail(
-                        *line,
-                        format!(
-                            "{} = {} (SI), expected {} (SI) from '{expr}' within {tol}",
-                            describe(target),
-                            got.si,
-                            want.si
-                        ),
-                    ),
-                    Ok(_) => {}
+                    Ok(got) => {
+                        if let Some(problem) = differs(got, &want, *tol) {
+                            fail(
+                                *line,
+                                format!("{}: {problem} (expected '{expr}')", describe(target)),
+                            );
+                        }
+                    }
                 }
             }
             Expect::Error { target, kind, line } => {

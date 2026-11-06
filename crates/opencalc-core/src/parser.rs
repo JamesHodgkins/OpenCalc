@@ -359,7 +359,12 @@ mod tests {
             .map(|(i, s)| (RegionId(i as u64), parse(s)))
             .collect();
         let out = evaluate(&regions);
-        out.values[&RegionId(which as u64)].clone().unwrap().si
+        out.values[&RegionId(which as u64)]
+            .clone()
+            .unwrap()
+            .as_real()
+            .unwrap()
+            .si
     }
 
     #[test]
@@ -395,7 +400,7 @@ mod tests {
             .map(|(i, s)| (RegionId(i as u64), parse(s)))
             .collect();
         let out = evaluate(&regions);
-        let q = out.values[&RegionId(0)].clone().unwrap();
+        let q = out.values[&RegionId(0)].clone().unwrap().as_real().unwrap();
         assert!((q.in_unit("MPa").unwrap() - 1.0).abs() < 1e-9);
     }
 

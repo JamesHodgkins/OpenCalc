@@ -7,8 +7,11 @@ pub mod document;
 pub mod edit;
 pub mod eval;
 pub mod expr;
+pub mod functions;
+pub mod numeric;
 pub mod parser;
 pub mod units;
+pub mod value;
 pub mod worker;
 
 /// Version of the on-disk document format. Increment with every breaking change

@@ -61,9 +61,10 @@ whole of it.
   recalculation (TD-07) is not needed** at these sizes: recalculating the whole
   sheet is already cheaper than a frame. **A layout cache (TD-15) is not needed**
   either. Neither should be built until a measurement says otherwise.
-- The evaluator is real-number only. Phase C adds complex numbers, vectors and
-  matrices, which will slow it. Re-measure after each step; the budgets leave room
-  for a slowdown of two orders of magnitude.
+- Phase C2 made every scalar complex and added matrices. Re-measured
+  2026-11-06: 500 regions 0.41 ms (was 0.39), 2000 regions 1.81 ms (was 1.73),
+  edit to result 0.18 ms (was 0.15), about 5 to 15 percent slower and still far
+  inside the budgets. Re-measure after each further step of phase C.
 - Measured text sizes in document units change slightly with zoom (font rounding
   at small pixel sizes). "Fit" therefore needs two passes to be exact (see
   `perf_frame_time_with_200_visible_regions`). This is a small known imprecision

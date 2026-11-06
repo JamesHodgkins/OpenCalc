@@ -5,7 +5,7 @@ use opencalc_core::document::RegionKind;
 use opencalc_core::expr::{AssignKind, Expr};
 
 use crate::app::AppState;
-use crate::format::format_quantity;
+use crate::format::format_value;
 use crate::theme::type_size;
 
 pub fn show(ui: &mut Ui, state: &AppState) {
@@ -34,7 +34,7 @@ pub fn show(ui: &mut Ui, state: &AppState) {
         };
         any = true;
         let value = match state.output.values.get(&r.id) {
-            Some(Ok(q)) => format_quantity(*q),
+            Some(Ok(q)) => format_value(q),
             Some(Err(_)) => "error".to_owned(),
             None => "\u{2026}".to_owned(),
         };

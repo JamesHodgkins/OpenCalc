@@ -10,7 +10,7 @@ use opencalc_core::expr::Expr;
 use super::adapt::{kind_icon, vec};
 use super::view::{CanvasView, GRID};
 use super::Env;
-use crate::format::format_quantity;
+use crate::format::format_value;
 use crate::layout::{Layout, Typesetter};
 use crate::theme::{metrics, type_size, Theme};
 use opencalc_core::document::{MathRegion, Region, RegionKind};
@@ -139,7 +139,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 t.layout(expr, size),
                 Some(plain(
                     f,
-                    &format!("= {}", format_quantity(*q)),
+                    &format!("= {}", format_value(q)),
                     theme.text,
                     size,
                 )),
