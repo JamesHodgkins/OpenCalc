@@ -539,15 +539,66 @@ fn parts(src: &str) -> (f64, f64) {
     }
 }
 
-/// Equal within rounding. The absolute part matters for a determinant that is
-/// exactly zero in theory: elimination leaves noise of about 1e-9 there, because
-/// the intermediate products are around 1e5 in size.
+/// Equal within rounding, for the small exact inputs of the complex tests: a
+/// relative part, and a tiny absolute part for results that are zero in theory.
+/// (Determinants have their own derived bound, `rounding_bound`.)
 fn near(a: f64, b: f64) -> bool {
-    (a - b).abs() <= 1e-6 + 1e-9 * a.abs().max(b.abs())
+    (a - b).abs() <= 1e-12 + 1e-9 * a.abs().max(b.abs())
 }
 
 fn small() -> impl Strategy<Value = i32> {
     -20i32..=20
+}
+
+fn to_i128(items: &[i32]) -> Vec<i128> {
+    items.iter().map(|&x| i128::from(x)).collect()
+}
+
+/// Product of two n x n integer matrices, row-major.
+fn int_product(a: &[i128], b: &[i128], n: usize) -> Vec<i128> {
+    (0..n * n)
+        .map(|k| (0..n).map(|j| a[(k / n) * n + j] * b[j * n + k % n]).sum())
+        .collect()
+}
+
+/// Exact determinant of an integer matrix by fraction-free (Bareiss) elimination:
+/// every division is exact, so no rounding is involved.
+fn det_exact(entries: &[i128], n: usize) -> i128 {
+    let mut m = entries.to_vec();
+    let (mut sign, mut previous) = (1, 1);
+    for k in 0..n - 1 {
+        if m[k * n + k] == 0 {
+            let Some(row) = (k + 1..n).find(|&r| m[r * n + k] != 0) else {
+                return 0;
+            };
+            for c in 0..n {
+                m.swap(k * n + c, row * n + c);
+            }
+            sign = -sign;
+        }
+        for i in k + 1..n {
+            for j in k + 1..n {
+                m[i * n + j] =
+                    (m[i * n + j] * m[k * n + k] - m[i * n + k] * m[k * n + j]) / previous;
+            }
+        }
+        previous = m[k * n + k];
+    }
+    sign * m[(n - 1) * n + n - 1]
+}
+
+/// How far a floating-point elimination may legitimately stray from the exact
+/// determinant: n steps, each with a few roundings of relative size epsilon, on
+/// values no larger than Hadamard's bound (the product of the row lengths), which
+/// bounds the determinant and every intermediate minor.
+fn rounding_bound(entries: &[i128], n: usize) -> f64 {
+    let hadamard: f64 = (0..n)
+        .map(|r| {
+            let squares: f64 = (0..n).map(|c| (entries[r * n + c] as f64).powi(2)).sum();
+            squares.sqrt()
+        })
+        .product();
+    8.0 * n as f64 * f64::EPSILON * hadamard
 }
 
 fn matrix_source(rows: usize, cols: usize, items: &[i32]) -> String {
@@ -579,17 +630,31 @@ proptest! {
         prop_assert!(near(re, f64::from(a)) && near(im, f64::from(b)), "{re} {im}");
     }
 
-    /// Matrix identities: det(A B) = det A det B, transposing twice is the
-    /// identity, and det(A^T) = det A.
+    /// The engine's determinant agrees with an exact integer one, to within the
+    /// rounding error elimination can legitimately make, and the identities
+    /// det(A B) = det A det B, det(A^T) = det A and (A^T)^T = A hold.
     #[test]
     fn matrix_identities_hold(a in prop::collection::vec(small(), 9), b in prop::collection::vec(small(), 9)) {
         let (ma, mb) = (matrix_source(3, 3, &a), matrix_source(3, 3, &b));
-        let (lhs, _) = parts(&format!("det({ma} * {mb})"));
-        let (da, _) = parts(&format!("det({ma})"));
-        let (db, _) = parts(&format!("det({mb})"));
-        prop_assert!(near(lhs, da * db), "{lhs} vs {}", da * db);
-        let (dt, _) = parts(&format!("det(transpose({ma}))"));
-        prop_assert!(near(dt, da));
+        let (ia, ib) = (to_i128(&a), to_i128(&b));
+        let iab = int_product(&ia, &ib, 3);
+
+        let engine = |src: &str| parts(src).0;
+        let check = |got: f64, exact: i128, entries: &[i128], what: &str| {
+            let allowed = rounding_bound(entries, 3);
+            let error = (got - exact as f64).abs();
+            prop_assert!(error <= allowed, "{what}: engine {got}, exact {exact}, error {error} > {allowed}");
+            Ok(())
+        };
+        check(engine(&format!("det({ma})")), det_exact(&ia, 3), &ia, "det A")?;
+        check(engine(&format!("det({mb})")), det_exact(&ib, 3), &ib, "det B")?;
+        check(
+            engine(&format!("det({ma} * {mb})")),
+            det_exact(&ia, 3) * det_exact(&ib, 3),
+            &iab,
+            "det (A B)",
+        )?;
+        check(engine(&format!("det(transpose({ma}))")), det_exact(&ia, 3), &ia, "det A^T")?;
         prop_assert_eq!(value_of(&format!("transpose(transpose({ma}))")), value_of(&ma));
     }
 

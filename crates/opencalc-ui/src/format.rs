@@ -112,10 +112,27 @@ pub fn format_quantity(q: Quantity, system: UnitSystem) -> String {
     with_unit(format!("{:.*}", digits(q.dim), q.si / scale), &label)
 }
 
-/// A complex number as `a + bi`, with a sign that never doubles up.
-fn complex_text(z: Complex64, scale: f64, digits: usize) -> String {
-    let (re, im) = (z.re / scale, z.im / scale);
-    if z.im == 0.0 {
+/// A part smaller than this fraction of the largest part shown alongside it is
+/// displayed as zero. It is rounding noise, not a quantity: `exp(i*pi)` is
+/// `-1 + 1.2e-16i` in floating point and should read `-1`. Display only; the
+/// stored value is untouched. It is relative to the neighbours because an
+/// absolute limit means nothing for a quantity in arbitrary units, so a lone real
+/// number is never snapped.
+const ZERO_RELATIVE: f64 = 1e-12;
+
+fn snapped(x: f64, peak: f64) -> f64 {
+    if x.abs() < ZERO_RELATIVE * peak {
+        0.0
+    } else {
+        x
+    }
+}
+
+/// A complex number as `a + bi`, with a sign that never doubles up. `peak` is the
+/// largest magnitude it is shown alongside (itself, or its matrix).
+fn complex_text(z: Complex64, scale: f64, digits: usize, peak: f64) -> String {
+    let (re, im) = (snapped(z.re, peak) / scale, snapped(z.im, peak) / scale);
+    if im == 0.0 {
         return format!("{re:.digits$}");
     }
     let sign = if im < 0.0 { '-' } else { '+' };
@@ -130,8 +147,9 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
         Value::Scalar(s) => match s.as_real() {
             Some(q) => format_quantity(q, system),
             None => {
-                let (label, scale) = display_unit(system, s.dim, s.z.re.abs().max(s.z.im.abs()));
-                let text = complex_text(s.z, scale, digits(s.dim));
+                let peak = s.z.re.abs().max(s.z.im.abs());
+                let (label, scale) = display_unit(system, s.dim, peak);
+                let text = complex_text(s.z, scale, digits(s.dim), peak);
                 if label.is_empty() {
                     text
                 } else {
@@ -155,7 +173,7 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
                         rows.push(row.join(", "));
                         break 'rows;
                     }
-                    row.push(complex_text(m.at(r, c), scale, digits(m.dim)));
+                    row.push(complex_text(m.at(r, c), scale, digits(m.dim), peak));
                     shown += 1;
                 }
                 rows.push(row.join(", "));
@@ -246,6 +264,27 @@ mod tests {
         assert_eq!(shown("3 + 4 * i"), "3.000000 + 4.000000i");
         assert_eq!(shown("3 - 4 * i"), "3.000000 - 4.000000i");
         assert_eq!(shown("sqrt(0 - 4)"), "0.000000 + 2.000000i");
+    }
+
+    #[test]
+    fn rounding_noise_next_to_a_real_part_is_not_shown() {
+        // exp(i pi) is -1 + 1.22e-16 i in floating point.
+        assert_eq!(shown("exp(i * 3.141592653589793)"), "-1.000000");
+        // A genuinely small imaginary part survives.
+        assert_eq!(shown("1 + 0.001 * i"), "1.000000 + 0.001000i");
+        // Only noise relative to the neighbouring part is dropped.
+        assert_eq!(shown("1e-20 + i"), "0.000000 + 1.000000i");
+    }
+
+    #[test]
+    fn matrix_noise_is_judged_against_the_largest_element() {
+        assert_eq!(
+            shown("mat(1, 2, 1, 1e-15)"),
+            "1\u{00d7}2 [1.000000, 0.000000]"
+        );
+        // A lone small number is never snapped: it may be a real small quantity.
+        assert_eq!(shown("1e-15"), "0.000000");
+        assert_eq!(shown("2e-15 m"), "0.0000 mm");
     }
 
     #[test]
