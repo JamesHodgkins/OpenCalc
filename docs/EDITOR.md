@@ -1,6 +1,6 @@
 # Math editor design (Milestone 2.5)
 
-Status: **proposed, not built.** This note is for review before any editor code.
+Status: **approved** (hybrid editor, `lpha` Greek entry, underscore subscripts). Progress: **E1 done** (spans); E2 to E6 not started.
 
 ## 1. What exists today
 
@@ -66,12 +66,17 @@ file format because the buffer *is* the file format.
 
 ## 4. How it works
 
-### 4.1 Spans (core)
+### 4.1 Spans (core) - built
 
-`parse_with_spans(src) -> (Expr, Spans)`. `Spans` records `(start, end)` in
-characters for every node, keyed by the node's **path** (the same child numbering
-`Expr::at_path` and the error paths already use). Tokens already carry ranges, so this
-is bookkeeping in the parser, not new analysis. `parse` is unchanged.
+`parse_with_spans(src) -> (Expr, SpanNode)`. A `SpanNode` tree has the same shape as
+the `Expr` (its `kids` follow `Expr::children()`), so a node is found with the same
+path that `Expr::at_path` and the error paths use. Each node has an `outer` span
+(including any parentheses written around it) and an `inner` span (without them), in
+characters. The parser logs one entry per finished node, and the tree is rebuilt from
+that log only when spans are asked for, so `parse` costs and behaves as before (parse
+of 200 regions went from about 105 to 150 microseconds, from the extra log pushes). The
+operator between two children, the brackets of a call and so on are not separate
+nodes: they are the gaps between a node's `inner` and its kids' `outer` spans.
 
 This also turns an evaluation error path into a source range, which is what
 underlining needs.
