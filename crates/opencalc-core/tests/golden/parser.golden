@@ -106,6 +106,38 @@ if(a, if(b, 1, 2), 3)
   (if a (if b 1 2) 3)
 if(1, 2)
   (call if 1 2)
+0..5
+  (range 0 5)
+0..n
+  (range 0 n)
+0, 2..10
+  (range 0 2 10)
+i := 0..n
+  (:= i (range 0 n))
+i := 0, 0.5..10
+  (:= i (range 0 0.5 10))
+a + 1 .. b * 2
+  (range (+ a 1) (* b 2))
+x := (0..5) ^ 2
+  (:= x (^ (range 0 5) 2))
+sum(0..5)
+  (call sum (range 0 5))
+f(1, 2..3)
+  (call f 1 (range 2 3))
+1.5..2.5
+  (range 1.5 2.5)
+0 .. 5
+  (range 0 5)
+1..
+  (error 3..3 expression ends early)
+..5
+  (error 0..2 unexpected '..')
+0, 2
+  (error 4..4 a step needs '..' and an end value, as in 0, 2..10)
+0, 2 ..
+  (error 7..7 expression ends early)
+f(0, 2..10)
+  (call f 0 (range 2 10))
 
   (error 0..0 empty)
 1 +

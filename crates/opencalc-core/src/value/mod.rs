@@ -1,12 +1,15 @@
-//! Values the evaluator produces: a scalar (complex number with a dimension) or
-//! a matrix of them. A vector is a matrix with one column. Real numbers are
-//! scalars with a zero imaginary part, so there is one arithmetic, not two.
+//! Values the evaluator produces: a scalar (complex number with a dimension), a
+//! matrix of them, or a series (a list combined element by element, which is what
+//! a range gives). A vector is a matrix with one column. Real numbers are scalars
+//! with a zero imaginary part, so there is one arithmetic, not two.
 
 mod matrix;
 mod scalar;
+mod series;
 
 pub use matrix::{Matrix, MAX_ELEMENTS};
 pub use scalar::Scalar;
+pub use series::Series;
 
 use crate::numeric::Complex64;
 use crate::units::{Dimension, Quantity, UnitError};
@@ -37,6 +40,7 @@ pub enum ValueError {
 pub enum Value {
     Scalar(Scalar),
     Matrix(Matrix),
+    Series(Series),
 }
 
 impl From<Quantity> for Value {
@@ -50,6 +54,9 @@ impl From<Scalar> for Value {
         Value::Scalar(s)
     }
 }
+
+/// What to do with two scalars, element by element.
+type Pairwise<'a> = &'a dyn Fn(Scalar, Scalar) -> Result<Scalar, ValueError>;
 
 impl Value {
     pub fn dimensionless(v: f64) -> Value {
@@ -65,6 +72,7 @@ impl Value {
         match self {
             Value::Scalar(s) => s.is_finite(),
             Value::Matrix(m) => m.is_finite(),
+            Value::Series(r) => r.is_finite(),
         }
     }
 
@@ -72,6 +80,7 @@ impl Value {
         match self {
             Value::Scalar(s) => s.dim,
             Value::Matrix(m) => m.dim,
+            Value::Series(r) => r.dim,
         }
     }
 
@@ -79,7 +88,7 @@ impl Value {
     pub fn as_real(&self) -> Option<Quantity> {
         match self {
             Value::Scalar(s) => s.as_real(),
-            Value::Matrix(_) => None,
+            Value::Matrix(_) | Value::Series(_) => None,
         }
     }
 
@@ -87,6 +96,27 @@ impl Value {
         match self {
             Value::Scalar(s) => Value::Scalar(s.negated()),
             Value::Matrix(m) => Value::Matrix(m.map(|z| -z)),
+            Value::Series(r) => Value::Series(
+                Series::new(r.elements().iter().map(|z| -*z).collect(), r.dim)
+                    .expect("negation keeps the length"),
+            ),
+        }
+    }
+
+    /// If either side is a series, combine element by element (a scalar is used
+    /// against every element). `None` when neither is.
+    fn pairwise(&self, o: &Value, f: Pairwise) -> Option<Result<Value, ValueError>> {
+        let series = |r: Result<Series, ValueError>| r.map(Value::Series);
+        match (self, o) {
+            (Value::Series(a), Value::Series(b)) => Some(series(a.zip(b, f))),
+            (Value::Series(a), Value::Scalar(b)) => Some(series(a.map(|x| f(x, *b)))),
+            (Value::Scalar(a), Value::Series(b)) => Some(series(b.map(|x| f(*a, x)))),
+            (Value::Series(_), Value::Matrix(_)) | (Value::Matrix(_), Value::Series(_)) => {
+                Some(Err(ValueError::Shape(
+                    "a list of values cannot be combined with a matrix".into(),
+                )))
+            }
+            _ => None,
         }
     }
 
@@ -99,6 +129,9 @@ impl Value {
     }
 
     fn sum(&self, o: &Value, subtract: bool) -> Result<Value, ValueError> {
+        if let Some(r) = self.pairwise(o, &|a, b| a.sum(b, subtract)) {
+            return r;
+        }
         match (self, o) {
             (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(a.sum(*b, subtract)?)),
             (Value::Matrix(a), Value::Matrix(b)) => Ok(Value::Matrix(a.sum(b, subtract)?)),
@@ -109,16 +142,23 @@ impl Value {
     }
 
     pub fn mul(&self, o: &Value) -> Result<Value, ValueError> {
+        if let Some(r) = self.pairwise(o, &|a, b| a.times(b)) {
+            return r;
+        }
         match (self, o) {
             (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(a.times(*b)?)),
             (Value::Scalar(s), Value::Matrix(m)) | (Value::Matrix(m), Value::Scalar(s)) => {
                 Ok(Value::Matrix(m.scaled(*s)?))
             }
             (Value::Matrix(a), Value::Matrix(b)) => Ok(Value::Matrix(a.product(b)?)),
+            _ => unreachable!("series cases are handled by pairwise"),
         }
     }
 
     pub fn div(&self, o: &Value) -> Result<Value, ValueError> {
+        if let Some(r) = self.pairwise(o, &|a, b| a.over(b)) {
+            return r;
+        }
         match (self, o) {
             (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(a.over(*b)?)),
             (Value::Matrix(m), Value::Scalar(s)) => Ok(Value::Matrix(m.scaled(s.reciprocal()?)?)),
@@ -126,28 +166,45 @@ impl Value {
         }
     }
 
-    /// 1 if the comparison holds, 0 if not, as a dimensionless number.
+    /// 1 if the comparison holds, 0 if not, as a dimensionless number (one per
+    /// element for lists).
     pub fn compare(&self, o: &Value, how: Comparison) -> Result<Value, ValueError> {
+        let flag = |a: Scalar, b: Scalar| {
+            Ok(Scalar::new(
+                Complex64::new(f64::from(u8::from(a.compare(b, how)?)), 0.0),
+                Dimension::NONE,
+            ))
+        };
+        if let Some(r) = self.pairwise(o, &flag) {
+            return r;
+        }
         match (self, o) {
-            (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::dimensionless(f64::from(u8::from(
-                a.compare(*b, how)?,
-            )))),
+            (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(flag(*a, *b)?)),
             _ => Err(ValueError::Unsupported("comparing matrices".into())),
         }
     }
 
-    /// Element `indices` (zero-based) of a matrix or vector. One index addresses
-    /// a vector (a single column or a single row); two address a matrix.
+    /// Element `indices` (zero-based) of a matrix, vector or list. One index
+    /// addresses a vector or list; two address a matrix.
     pub fn element(&self, indices: &[usize]) -> Result<Value, ValueError> {
-        let Value::Matrix(m) = self else {
-            return Err(ValueError::Shape(
-                "only a matrix or vector can be indexed".into(),
-            ));
-        };
-        m.element(indices).map(Value::Scalar)
+        match (self, indices) {
+            (Value::Matrix(m), _) => m.element(indices).map(Value::Scalar),
+            (Value::Series(r), [i]) => r.at(*i).map(Value::Scalar).ok_or_else(|| {
+                ValueError::Shape(format!("index out of range for {} values", r.len()))
+            }),
+            (Value::Series(_), _) => {
+                Err(ValueError::Shape("a list of values takes one index".into()))
+            }
+            (Value::Scalar(_), _) => Err(ValueError::Shape(
+                "only a matrix or list can be indexed".into(),
+            )),
+        }
     }
 
     pub fn pow(&self, e: &Value) -> Result<Value, ValueError> {
+        if let Some(r) = self.pairwise(e, &|a, b| a.pow(b)) {
+            return r;
+        }
         match (self, e) {
             (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(a.pow(*b)?)),
             _ => Err(ValueError::Unsupported("a matrix power".into())),

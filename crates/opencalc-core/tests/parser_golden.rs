@@ -72,6 +72,10 @@ fn sexp(e: &Expr) -> String {
             let idx: Vec<String> = indices.iter().map(sexp).collect();
             format!("(index {} {})", sexp(base), idx.join(" "))
         }
+        Expr::Range { start, step, end } => match step {
+            Some(step) => format!("(range {} {} {})", sexp(start), sexp(step), sexp(end)),
+            None => format!("(range {} {})", sexp(start), sexp(end)),
+        },
         Expr::Conditional {
             cond,
             then,
@@ -146,6 +150,23 @@ const INPUTS: &[&str] = &[
     "if(x > 0, x, -x)",
     "if(a, if(b, 1, 2), 3)",
     "if(1, 2)",
+    // Ranges.
+    "0..5",
+    "0..n",
+    "0, 2..10",
+    "i := 0..n",
+    "i := 0, 0.5..10",
+    "a + 1 .. b * 2",
+    "x := (0..5) ^ 2",
+    "sum(0..5)",
+    "f(1, 2..3)",
+    "1.5..2.5",
+    "0 .. 5",
+    "1..",
+    "..5",
+    "0, 2",
+    "0, 2 ..",
+    "f(0, 2..10)",
     // Errors.
     "",
     "1 +",

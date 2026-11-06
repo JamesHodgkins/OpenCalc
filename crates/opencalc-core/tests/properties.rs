@@ -681,3 +681,85 @@ proptest! {
         prop_assert!(evaluate(&mixed).values[&RegionId(1)].is_err());
     }
 }
+
+// ------------------------------------------------------------------ lists
+
+fn evaluate_all(lines: &[&str]) -> Output {
+    let regions: Vec<_> = lines
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (RegionId(i as u64 + 1), parse(s)))
+        .collect();
+    evaluate(&regions)
+}
+
+fn list_elements(out: &Output, region: u64) -> Vec<(f64, f64)> {
+    match &out.values[&RegionId(region)] {
+        Ok(opencalc_core::value::Value::Series(r)) => {
+            r.elements().iter().map(|z| (z.re, z.im)).collect()
+        }
+        other => panic!("region {region} should be a list, got {other:?}"),
+    }
+}
+
+proptest! {
+    /// A range has the length arithmetic says, starts at its first value, and
+    /// never goes past its end.
+    #[test]
+    fn a_range_has_the_right_length_and_bounds(a in -50i32..50, step in 1i32..7, n in 0i32..40) {
+        let b = a + step * n;
+        let out = evaluate_all(&[&format!("r := {a}, {}..{b}", a + step)]);
+        let got = list_elements(&out, 1);
+        prop_assert_eq!(got.len(), (n + 1) as usize);
+        prop_assert_eq!(got[0].0, f64::from(a));
+        prop_assert_eq!(got[got.len() - 1].0, f64::from(b));
+        for pair in got.windows(2) {
+            prop_assert_eq!(pair[1].0 - pair[0].0, f64::from(step));
+        }
+        // And a descending range is the reverse.
+        let down = evaluate_all(&[&format!("r := {b}, {}..{a}", b - step)]);
+        let mut reversed = list_elements(&down, 1);
+        reversed.reverse();
+        prop_assert_eq!(reversed, got);
+    }
+
+    /// An expression over a range gives, element by element, exactly what the same
+    /// expression gives for that element alone.
+    #[test]
+    fn list_arithmetic_is_the_scalar_arithmetic_applied_to_each_element(
+        a in -20i32..20,
+        n in 0i32..12,
+        which in 0usize..8,
+    ) {
+        const TEMPLATES: [&str; 8] = [
+            "k ^ 2 + 3 * k",
+            "(k - 1) / (k + 100)",
+            "sqrt(k + 30)",
+            "k * k - k",
+            "abs(k - 3)",
+            "(k > 2) * k",
+            "sin(k) + cos(k)",
+            "2 ^ (k / 10) - k",
+        ];
+        let template = TEMPLATES[which];
+        let b = a + n;
+        let listed = evaluate_all(&[&format!("k := {a}..{b}"), &format!("y := {template}")]);
+        let got = list_elements(&listed, 2);
+        prop_assert_eq!(got.len(), (n + 1) as usize);
+        for (j, value) in got.iter().enumerate() {
+            let one = a + j as i32;
+            let single = evaluate_all(&[&format!("k := {one}"), &format!("y := {template}")]);
+            match &single.values[&RegionId(2)] {
+                Ok(opencalc_core::value::Value::Scalar(s)) => {
+                    prop_assert_eq!(*value, (s.z.re, s.z.im), "{} at k = {}", template, one);
+                }
+                other => prop_assert!(false, "{template} at k = {one}: {other:?}"),
+            }
+        }
+        // And the aggregates agree with summing those elements.
+        let total = evaluate_all(&[&format!("k := {a}..{b}"), &format!("t := sum({template})")]);
+        let want: f64 = got.iter().map(|g| g.0).sum();
+        let have = total.values[&RegionId(2)].clone().unwrap().as_real().unwrap().si;
+        prop_assert!((have - want).abs() <= 1e-9 * (1.0 + want.abs()), "{have} vs {want}");
+    }
+}

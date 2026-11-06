@@ -1,9 +1,11 @@
 //! Built-in functions. Arguments arrive already evaluated.
 
+mod stats;
+
 use crate::eval::EvalError;
 use crate::numeric::{self, Complex64};
 use crate::units::{Dimension, UnitError};
-use crate::value::{Matrix, Scalar, Value, ValueError};
+use crate::value::{Matrix, Scalar, Series, Value, ValueError};
 
 type Result<T> = std::result::Result<T, EvalError>;
 
@@ -126,6 +128,55 @@ pub const FUNCTIONS: &[FunctionDef] = &[
         matrix
     ),
     function!(
+        "sum",
+        "sum(x, ...)",
+        "Total of every element",
+        AtLeast(1),
+        stats::sum
+    ),
+    function!(
+        "mean",
+        "mean(x, ...)",
+        "Average of every element",
+        AtLeast(1),
+        stats::mean
+    ),
+    function!(
+        "stdev",
+        "stdev(x, ...)",
+        "Population standard deviation",
+        AtLeast(1),
+        stats::stdev
+    ),
+    function!(
+        "stdev_sample",
+        "stdev_sample(x, ...)",
+        "Sample standard deviation (divides by n - 1)",
+        AtLeast(1),
+        stats::stdev_sample
+    ),
+    function!(
+        "min",
+        "min(x, ...)",
+        "Smallest element",
+        AtLeast(1),
+        stats::min
+    ),
+    function!(
+        "max",
+        "max(x, ...)",
+        "Largest element",
+        AtLeast(1),
+        stats::max
+    ),
+    function!(
+        "length",
+        "length(x, ...)",
+        "Number of elements",
+        AtLeast(1),
+        stats::length
+    ),
+    function!(
         "transpose",
         "transpose(A)",
         "Transposed matrix",
@@ -181,7 +232,28 @@ pub fn call(name: &str, args: &[Value]) -> Result<Value> {
         }
         _ => {}
     }
+    if let [Value::Series(list)] = args {
+        if MAPS_OVER_LISTS.contains(&name) {
+            return over_list(f, list);
+        }
+    }
     (f.run)(args)
+}
+
+/// Functions of one number that apply to each element of a list.
+const MAPS_OVER_LISTS: &[&str] = &[
+    "sqrt", "abs", "re", "im", "conj", "arg", "sin", "cos", "tan", "ln", "exp",
+];
+
+fn over_list(f: &FunctionDef, list: &Series) -> Result<Value> {
+    let mut out = Vec::with_capacity(list.len());
+    for element in list.scalars() {
+        match (f.run)(&[Value::Scalar(element)])? {
+            Value::Scalar(s) => out.push(s),
+            _ => unreachable!("these functions return a number"),
+        }
+    }
+    Ok(Value::Series(Series::from_scalars(&out)?))
 }
 
 fn scalar_arg(name: &str, args: &[Value]) -> Result<Scalar> {
@@ -226,7 +298,7 @@ fn scalars(args: &[Value]) -> Result<Vec<Scalar>> {
     args.iter()
         .map(|a| match a {
             Value::Scalar(s) => Ok(*s),
-            Value::Matrix(_) => {
+            Value::Matrix(_) | Value::Series(_) => {
                 Err(ValueError::Shape("matrix elements must be scalars".into()).into())
             }
         })
@@ -235,6 +307,11 @@ fn scalars(args: &[Value]) -> Result<Vec<Scalar>> {
 
 /// `vec(a, b, c)`: a column vector.
 fn vector(args: &[Value]) -> Result<Value> {
+    // A list of values becomes a column vector.
+    if let [Value::Series(list)] = args {
+        let items: Vec<Scalar> = list.scalars().collect();
+        return Ok(Value::Matrix(Matrix::column(&items)?));
+    }
     Ok(Value::Matrix(Matrix::column(&scalars(args)?)?))
 }
 

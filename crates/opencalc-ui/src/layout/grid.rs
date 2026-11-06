@@ -87,6 +87,20 @@ impl Typesetter<'_> {
         out
     }
 
+    /// `a..b`, or `a, b..c` when there is a step.
+    pub(super) fn range(&self, start: &Expr, step: Option<&Expr>, end: &Expr, size: f32) -> Layout {
+        let mut parts = vec![self.layout(start, size)];
+        if let Some(step) = step {
+            parts.push(self.text(", ", size));
+            parts.push(self.layout(step, size));
+        }
+        parts.push(self.gap(size * 0.1));
+        parts.push(self.text("..", size));
+        parts.push(self.gap(size * 0.1));
+        parts.push(self.layout(end, size));
+        self.row(parts)
+    }
+
     /// `name(a, b, c)`.
     pub(super) fn call_like(&self, name: &str, args: &[&Expr], size: f32) -> Layout {
         let mut parts = vec![self.text(name, size), self.text("(", size)];

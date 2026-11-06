@@ -23,6 +23,7 @@ pub(super) enum Tok {
     Greater,
     LessEq,
     GreaterEq,
+    DotDot,
 }
 
 /// Tokens with the character range each came from.
@@ -38,9 +39,16 @@ pub(super) fn tokenize(src: &str) -> Result<Tokens, (String, usize, usize)> {
         let c = chars[i];
         match c {
             c if c.is_whitespace() => i += 1,
+            '.' if chars.get(i + 1) == Some(&'.') => {
+                toks.push(Tok::DotDot);
+                i += 2;
+            }
             '0'..='9' | '.' => {
                 let start = i;
-                while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
+                while i < chars.len()
+                    && (chars[i].is_ascii_digit()
+                        || (chars[i] == '.' && chars.get(i + 1) != Some(&'.')))
+                {
                     i += 1;
                 }
                 // Exponent: only when `e` is followed by a digit or a signed digit.
@@ -189,5 +197,6 @@ pub(super) fn describe(t: &Tok) -> String {
         Tok::Greater => "'>'".into(),
         Tok::LessEq => "'<='".into(),
         Tok::GreaterEq => "'>='".into(),
+        Tok::DotDot => "'..'".into(),
     }
 }

@@ -219,6 +219,13 @@ fn differs(got: &Value, want: &Value, tol: f64) -> Option<String> {
                 out.extend(m.elements().iter().flat_map(|z| [z.re, z.im]));
                 out
             }
+            // A different kind of value must not compare equal to a matrix of the
+            // same numbers, so the length is tagged with a marker no matrix has.
+            Value::Series(r) => {
+                let mut out = vec![-1.0, r.len() as f64];
+                out.extend(r.elements().iter().flat_map(|z| [z.re, z.im]));
+                out
+            }
         }
     };
     let (g, w) = (parts(got), parts(want));

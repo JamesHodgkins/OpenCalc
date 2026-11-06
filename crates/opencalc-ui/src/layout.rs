@@ -89,6 +89,7 @@ impl<'a> Typesetter<'a> {
             }
             Expr::Matrix { rows, cols, cells } => self.matrix(*rows, *cols, cells, size),
             Expr::Index { base, indices } => self.index(base, indices, size),
+            Expr::Range { start, step, end } => self.range(start, step.as_deref(), end, size),
             Expr::Conditional {
                 cond,
                 then,

@@ -1,0 +1,55 @@
+# source: original; ranges and element-wise lists, worked by hand
+k := 0..4
+squares := k ^ 2
+total := sum(squares)
+average := mean(k)
+spread := stdev(k)
+spread_s := stdev_sample(k)
+smallest := min(squares)
+largest := max(squares)
+count := length(k)
+third := squares[3]
+stepped := 0, 2..10
+stepped_total := sum(stepped)
+down := 10, 7.5..0
+down_total := sum(down)
+lengths := 0 m..3 m
+longest := max(lengths)
+scaled_total := sum(2 * lengths)
+root_total := sum(sqrt(k))
+dotted := dot(vec(k), vec(k))
+above := sum(k > 2)
+parabola := sum(k ^ 2 - 2 * k)
+shifted := sum(k + 10)
+negated := sum(-k)
+paired := sum(k * k)
+quotient := sum(squares / (k + 1))
+fine_steps := 0, 0.1..0.3
+fine_total := sum(fine_steps)
+single := 5..5
+backwards := 3..1
+=> k = 0, 1..4
+=> total = 30
+=> average = 2
+=> spread = 1.4142135623730951
+=> spread_s = 1.5811388300841898
+=> smallest = 0
+=> largest = 16
+=> count = 5
+=> third = 9
+=> stepped = 0, 2..10
+=> stepped_total = 30
+=> down_total = 25
+=> longest = 3 m
+=> scaled_total = 12 m
+=> root_total ~1e-12 = 6.146264369941973
+=> dotted = 30
+=> above = 2
+=> parabola = 10
+=> shifted = 60
+=> negated = 0 - 10
+=> paired = 30
+=> quotient ~1e-12 = 0.5 + 0.0 + 1.3333333333333333 + 2.25 + 3.2
+=> fine_total ~1e-12 = 0.6
+=> single = 5..5
+=> backwards = 3, 2..1

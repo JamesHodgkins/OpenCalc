@@ -1,0 +1,29 @@
+# source: original; each line is meant to fail in a particular, reportable way
+mismatched := (0..2) + (0..3)
+zero_step := 0, 0..5
+wrong_way := 0, -1..5
+too_many := 0..1000000000
+mixed_units := 0 m..5 s
+complex_range := (1 + 2 * i)..3
+matrix_end := 0..[1, 2]
+list_in_matrix := [1; 2] + (0..1)
+index_range := (0..3)[4]
+two_indices := (0..3)[0, 0]
+list_power := (0..3) ^ (0..2)
+bad_mean := mean(0 m, 1 s)
+sample_of_one := stdev_sample(5)
+complex_max := max(1, i)
+!> mismatched : value
+!> zero_step : value
+!> wrong_way : value
+!> too_many : value
+!> mixed_units : mismatch
+!> complex_range : value
+!> matrix_end : value
+!> list_in_matrix : value
+!> index_range : value
+!> two_indices : value
+!> list_power : value
+!> bad_mean : mismatch
+!> sample_of_one : invalid
+!> complex_max : value

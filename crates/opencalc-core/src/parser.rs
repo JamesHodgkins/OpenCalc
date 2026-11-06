@@ -90,13 +90,13 @@ impl Parser {
         if self.toks.is_empty() {
             return Err("empty".into());
         }
-        let lhs = self.expr(0)?;
+        let lhs = self.range_expr(true)?;
         let result = match self.peek() {
             Some(Tok::Define) => {
                 // Checked first, while the position is still on the `:=`.
                 let target = target_name(&lhs)?;
                 self.pos += 1;
-                let value = self.expr(0)?;
+                let value = self.range_expr(true)?;
                 Expr::Assign {
                     kind: AssignKind::Define,
                     target,
@@ -121,7 +121,7 @@ impl Parser {
                         value: Box::new(lhs),
                     }
                 } else {
-                    let value = self.expr(0)?;
+                    let value = self.range_expr(true)?;
                     Expr::Assign {
                         kind: AssignKind::Evaluate,
                         target: target.unwrap_or_default(),
@@ -177,7 +177,7 @@ impl Parser {
                 self.indexed(e)
             }
             Some(Tok::LParen) => {
-                let e = self.expr(0)?;
+                let e = self.range_expr(true)?;
                 if self.eat(&Tok::RParen) {
                     self.indexed(e)
                 } else {
@@ -203,6 +203,29 @@ impl Parser {
                 Err("expression ends early".into())
             }
         }
+    }
+
+    /// An expression, or a range `a..b` / `a, b..c`. The step form takes a comma,
+    /// so it is only allowed where a comma cannot separate anything else.
+    fn range_expr(&mut self, allow_step: bool) -> Result<Expr, String> {
+        let first = self.expr(0)?;
+        let mut step = None;
+        if allow_step && self.peek() == Some(&Tok::Comma) {
+            self.pos += 1;
+            step = Some(self.expr(0)?);
+            if self.peek() != Some(&Tok::DotDot) {
+                return Err("a step needs '..' and an end value, as in 0, 2..10".into());
+            }
+        }
+        if !self.eat(&Tok::DotDot) {
+            return Ok(first);
+        }
+        let end = self.expr(0)?;
+        Ok(Expr::Range {
+            start: Box::new(first),
+            step: step.map(Box::new),
+            end: Box::new(end),
+        })
     }
 
     /// Any number of `[i]` or `[i, j]` after a value.
@@ -261,7 +284,9 @@ impl Parser {
             return Ok(args);
         }
         loop {
-            args.push(self.expr(0)?);
+            // A step needs a comma, which here separates arguments, so only the
+            // plain `a..b` form is allowed inside a call.
+            args.push(self.range_expr(false)?);
             if self.eat(&Tok::Comma) {
                 continue;
             }
@@ -437,7 +462,6 @@ mod tests {
             "1 2 3 ,",
             "^",
             "((((",
-            "1..2",
         ] {
             assert!(
                 matches!(parse(src), Expr::Error(_)),

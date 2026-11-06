@@ -4,7 +4,7 @@
 use super::{Cx, EvalError};
 use crate::expr::{BinaryOp, Expr, UnaryOp, ORIGIN};
 use crate::functions;
-use crate::value::{Comparison, Matrix, Value, ValueError};
+use crate::value::{Comparison, Matrix, Series, Value, ValueError};
 
 /// An evaluation error and where in the expression it happened. The path is
 /// built from the inside out as the error propagates, so it is stored reversed.
@@ -80,6 +80,7 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
         Expr::Call { name, args } => apply(name, args, cx),
         Expr::Matrix { rows, cols, cells } => literal(*rows, *cols, cells, cx),
         Expr::Index { base, indices } => index(base, indices, cx),
+        Expr::Range { start, step, end } => range(start, step.as_deref(), end, cx),
         Expr::Conditional {
             cond,
             then,
@@ -97,7 +98,7 @@ fn literal(rows: usize, cols: usize, cells: &[Expr], cx: &Cx) -> Evaluated {
     for (i, cell) in cells.iter().enumerate() {
         match child(cell, i, cx)? {
             Value::Scalar(s) => items.push(s),
-            Value::Matrix(_) => {
+            Value::Matrix(_) | Value::Series(_) => {
                 return Err(Located::here(ValueError::Shape(
                     "a matrix cell must be a single number".into(),
                 ))
@@ -106,6 +107,26 @@ fn literal(rows: usize, cols: usize, cells: &[Expr], cx: &Cx) -> Evaluated {
         }
     }
     Ok(Value::Matrix(Matrix::from_scalars(rows, cols, &items)?))
+}
+
+/// `a..b` or `a, b..c`: a list of values.
+#[inline(never)]
+fn range(start: &Expr, step: Option<&Expr>, end: &Expr, cx: &Cx) -> Evaluated {
+    let scalar = |value: Value, index: usize| match value {
+        Value::Scalar(s) => Ok(s),
+        _ => Err(Located::here(ValueError::Shape(
+            "the parts of a range must be single numbers".into(),
+        ))
+        .under(index)),
+    };
+    let a = scalar(child(start, 0, cx)?, 0)?;
+    let next = match step {
+        Some(e) => Some(scalar(child(e, 1, cx)?, 1)?),
+        None => None,
+    };
+    let end_at = if step.is_some() { 2 } else { 1 };
+    let b = scalar(child(end, end_at, cx)?, end_at)?;
+    Ok(Value::Series(Series::range(a, next, b)?))
 }
 
 /// Where indexing starts: the worksheet's `ORIGIN` variable, 0 if it has none.

@@ -181,6 +181,28 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
             let size = format!("{}\u{00d7}{}", m.rows(), m.cols());
             with_unit(format!("{size} [{}]", rows.join("; ")), &label)
         }
+        Value::Series(r) => {
+            let peak = r
+                .elements()
+                .iter()
+                .fold(0.0_f64, |p, z| p.max(z.re.abs()).max(z.im.abs()));
+            let (label, scale) = display_unit(system, r.dim, peak);
+            let mut items: Vec<String> = r
+                .elements()
+                .iter()
+                .take(SHOWN)
+                .map(|z| complex_text(*z, scale, digits(r.dim), peak))
+                .collect();
+            if r.len() > SHOWN {
+                items.push("\u{2026}".to_owned());
+            }
+            let count = if r.len() == 1 {
+                "1 value".to_owned()
+            } else {
+                format!("{} values", r.len())
+            };
+            with_unit(format!("{count} [{}]", items.join(", ")), &label)
+        }
     }
 }
 
@@ -274,6 +296,22 @@ mod tests {
         assert_eq!(shown("1 + 0.001 * i"), "1.000000 + 0.001000i");
         // Only noise relative to the neighbouring part is dropped.
         assert_eq!(shown("1e-20 + i"), "0.000000 + 1.000000i");
+    }
+
+    #[test]
+    fn a_list_shows_its_count_and_first_values() {
+        assert_eq!(
+            shown("0..3"),
+            "4 values [0.000000, 1.000000, 2.000000, 3.000000]"
+        );
+        assert_eq!(shown("5..5"), "1 value [5.000000]");
+        assert_eq!(
+            shown("0 m, 1 m..2 m"),
+            "3 values [0.0000, 1.0000, 2.0000] m"
+        );
+        let long = shown("0..99");
+        assert!(long.starts_with("100 values [0.000000, 1.000000") && long.contains('\u{2026}'));
+        assert!(long.len() < 300, "{long}");
     }
 
     #[test]
