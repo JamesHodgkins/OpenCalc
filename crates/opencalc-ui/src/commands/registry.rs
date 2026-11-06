@@ -38,7 +38,7 @@ impl Registry {
     /// are always available; unimplemented ones never are.
     pub fn allows(&self, command: CommandId) -> bool {
         match command {
-            CommandId::SelectSheet(_) | CommandId::CloseSheet(_) => true,
+            CommandId::SelectSheet(_) | CommandId::CloseSheet(_) | CommandId::ZoomTo(_) => true,
             other => self.enabled.contains(&other),
         }
     }

@@ -61,14 +61,14 @@ impl Harness {
         }
         while Instant::now() < end {
             self.frame();
-            if self.app.state.status_text().contains("up to date") {
+            if self.app.state.calc_label() == "Calculated" {
                 return;
             }
             std::thread::sleep(Duration::from_millis(5));
         }
         panic!(
             "worker result never arrived: {}",
-            self.app.state.status_text()
+            self.app.state.calc_label()
         );
     }
 
@@ -458,7 +458,7 @@ fn moving_a_region_does_not_recalculate() {
         "a move is not an evaluation change"
     );
     assert!(
-        h.app.state.status_text().contains("up to date"),
+        h.app.state.calc_label() == "Calculated",
         "no recalculation was started"
     );
     let mut results_after: Vec<_> = h

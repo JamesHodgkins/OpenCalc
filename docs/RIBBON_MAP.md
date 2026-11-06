@@ -82,7 +82,7 @@ ribbon tab and stays.
 - Tests: every command still appears exactly once; every ribbon item names a real
   command; the tab list and panel titles are as above; nothing implemented is
   unreachable from the ribbon.
-- Status bar (U4) is a separate step.
+- Status bar (U4): built; page, calculation indicator and a zoom slider.
 
 ## 5. Decisions needed
 

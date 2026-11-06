@@ -101,12 +101,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
 
         ViewZoomIn => zoom_by(state, 1.25),
         ViewZoomOut => zoom_by(state, 1.0 / 1.25),
-        ViewZoom100 => {
-            let (centre, origin) = (state.viewport.center(), state.viewport.min);
-            if let Some(i) = state.active {
-                state.sheets[i].view.set_zoom_about(centre, origin, 1.0);
-            }
-        }
+        ViewZoom100 => zoom_to(state, 1.0),
+        ZoomTo(percent) => zoom_to(state, f32::from(percent) / 100.0),
         ViewZoomFit => {
             let size = state.viewport.size();
             if let Some(i) = state.active {
@@ -213,6 +209,14 @@ fn insert(state: &mut AppState, fx: &mut Vec<Effect>, kind: RegionKind) {
 }
 
 /// Zoom the active sheet about the middle of the canvas.
+/// Set the zoom of the active worksheet (clamped by the view), about the centre.
+fn zoom_to(state: &mut AppState, zoom: f32) {
+    let (centre, origin) = (state.viewport.center(), state.viewport.min);
+    if let Some(i) = state.active {
+        state.sheets[i].view.set_zoom_about(centre, origin, zoom);
+    }
+}
+
 fn zoom_by(state: &mut AppState, factor: f32) {
     let (centre, origin) = (state.viewport.center(), state.viewport.min);
     if let Some(i) = state.active {
@@ -308,6 +312,17 @@ mod tests {
             vec![Effect::ApplyTheme]
         );
         assert_eq!(s.palette, PaletteKey::Neutral);
+    }
+
+    #[test]
+    fn zoom_to_sets_the_percentage_and_stays_within_the_limits() {
+        let mut s = state();
+        run(&mut s, CommandId::ZoomTo(150));
+        assert_eq!(s.zoom_percent(), 150.0);
+        run(&mut s, CommandId::ZoomTo(5));
+        assert_eq!(s.zoom_percent(), 25.0);
+        run(&mut s, CommandId::ZoomTo(900));
+        assert_eq!(s.zoom_percent(), 400.0);
     }
 
     #[test]

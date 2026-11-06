@@ -130,13 +130,16 @@ impl AppState {
         })
     }
 
-    pub fn status_text(&self) -> String {
+    /// The calculation indicator on the status bar.
+    pub fn calc_label(&self) -> &'static str {
         if !self.calc.worker_ok {
-            "worker stopped".to_owned()
-        } else if self.calc.applied == self.calc.revision {
-            format!("OpenCalc {} \u{b7} up to date", opencalc_core::version())
+            "Calculation stopped"
+        } else if self.calc.applied != self.calc.revision {
+            "Calculating\u{2026}"
+        } else if self.live_recalc {
+            "Calculated"
         } else {
-            "calculating\u{2026}".to_owned()
+            "Manual"
         }
     }
 
@@ -157,16 +160,19 @@ mod tests {
         assert_eq!(s.sheets[0].title(), "Untitled");
         assert!(s.sheets[0].doc.regions().is_empty());
         assert_eq!(s.calc.revision, s.calc.applied);
-        assert!(s.status_text().contains("up to date"));
+        assert_eq!(s.calc_label(), "Calculated");
     }
 
     #[test]
-    fn status_text_reports_calculating_and_a_stopped_worker() {
+    fn the_calculation_indicator_follows_the_worker_and_the_mode() {
         let mut s = AppState::new(PaletteKey::Neutral);
-        s.calc.revision = 5;
-        assert!(s.status_text().contains("calculating"));
+        assert_eq!(s.calc_label(), "Calculated");
+        s.live_recalc = false;
+        assert_eq!(s.calc_label(), "Manual");
+        s.calc.revision = 3;
+        assert!(s.calc_label().starts_with("Calculating"));
         s.calc.worker_ok = false;
-        assert_eq!(s.status_text(), "worker stopped");
+        assert_eq!(s.calc_label(), "Calculation stopped");
     }
 
     #[test]

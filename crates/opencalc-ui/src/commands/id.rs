@@ -21,6 +21,7 @@ macro_rules! commands {
             InsertSymbol(char),
             SelectSheet(usize),
             CloseSheet(usize),
+            ZoomTo(u16),
         }
 
         impl CommandId {
@@ -37,6 +38,7 @@ macro_rules! commands {
                     CommandId::InsertSymbol(_) => "insert.symbol",
                     CommandId::SelectSheet(_) => "tab.select",
                     CommandId::CloseSheet(_) => "tab.close",
+                    CommandId::ZoomTo(_) => "view.zoom_to",
                 }
             }
 
@@ -47,6 +49,7 @@ macro_rules! commands {
                     CommandId::InsertSymbol(c) => symbol_name(c),
                     CommandId::SelectSheet(_) => "Select worksheet",
                     CommandId::CloseSheet(_) => "Close worksheet",
+                    CommandId::ZoomTo(_) => "Zoom",
                 }
             }
 
@@ -56,6 +59,7 @@ macro_rules! commands {
                     CommandId::InsertSymbol(c) => c,
                     CommandId::SelectSheet(_) => icons::HOME,
                     CommandId::CloseSheet(_) => icons::CLOSE,
+                    CommandId::ZoomTo(_) => icons::ZOOM_100,
                 }
             }
         }
@@ -186,7 +190,8 @@ impl CommandId {
             | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
             | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewProperties | ViewResetLayout
             | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs
-            | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) => true,
+            | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_)
+            | ZoomTo(_) => true,
             FileOpen | FileSave | ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind
             | EditReplace | RegionLock | RegionTag | InsertGreek | InsertSymbol(_) | FormatBold
             | FormatItalic | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
