@@ -203,6 +203,25 @@ fn main() {
         None,
     );
 
+    // Matrix and complex work: 100 regions that each build, multiply and take the
+    // determinant of 3x3 matrices, plus complex arithmetic.
+    let heavy: Vec<(RegionId, Expr)> = (0..100)
+        .map(|i| {
+            let src = format!(
+                "h{i} := det(mat(3, 3, 1, 2, {i}, 4, 5, 6, 7, 8, 10) * transpose(mat(3, 3, 2, 0, 1, 1, 3, 1, 0, 1, 4))) + abs(sqrt(0 - {i}) * (1 + 2 * i))"
+            );
+            (RegionId(i as u64 + 1), parse(&src))
+        })
+        .collect();
+    assert!(evaluate(&heavy).values.values().all(|r| r.is_ok()));
+    add(
+        "evaluate 100 regions (3x3 matrices, det, complex)",
+        sample(runs, || {
+            std::hint::black_box(evaluate(&heavy));
+        }),
+        Some(ms(50)),
+    );
+
     // Edit to updated result, in pieces and end to end (SPEC: under 16 ms for 200).
     let doc = worksheet_document(200);
     add(
