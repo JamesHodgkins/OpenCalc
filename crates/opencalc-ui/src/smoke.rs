@@ -378,15 +378,16 @@ fn clicking_selects_and_dragging_moves_a_region() {
         "the dragged region is selected"
     );
     let moved = h.region_pos(F);
-    // Snapped to the 20-unit grid, and moved about (100, 60) from where it began.
-    assert_eq!(moved.x % 20.0, 0.0);
-    assert_eq!(moved.y % 20.0, 0.0);
+    // Snapped to the grid, and moved about (100, 60) from where it began.
+    let grid = crate::canvas::view::GRID;
+    assert_eq!(moved.x % grid, 0.0);
+    assert_eq!(moved.y % grid, 0.0);
     assert!(
-        (moved.x - start.x - 100.0).abs() <= 20.0,
+        (moved.x - start.x - 100.0).abs() <= grid,
         "x: {moved:?} from {start:?}"
     );
     assert!(
-        (moved.y - start.y - 60.0).abs() <= 20.0,
+        (moved.y - start.y - 60.0).abs() <= grid,
         "y: {moved:?} from {start:?}"
     );
 }

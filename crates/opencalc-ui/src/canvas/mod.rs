@@ -12,6 +12,7 @@ mod overlay;
 mod page;
 mod paint;
 mod plot;
+mod result;
 pub mod view;
 
 use eframe::egui::{self, FontId, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};

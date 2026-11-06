@@ -6,9 +6,9 @@ use eframe::egui::{
     Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, Ui, Vec2,
 };
 use opencalc_core::expr::Expr;
-use opencalc_core::value::Value;
 
 use super::adapt::{kind_icon, vec};
+use super::result::{self, Beside};
 use super::view::{CanvasView, GRID};
 use super::Env;
 use crate::format::format_value;
@@ -22,20 +22,21 @@ const TEXT_SIZE: f32 = 14.0;
 /// Padding around region content, in document units.
 const PAD: f32 = 6.0;
 /// Gap between an expression and its result, in document units.
-const RESULT_GAP: f32 = 20.0;
+const RESULT_GAP: f32 = 6.0;
 
-/// Minor lines at the snap grid, a stronger line every fifth. When zoomed out
+/// Minor lines at the snap grid (an eighth of an inch), a stronger line every
+/// eighth (an inch). When zoomed out
 /// far enough that lines would crowd, the spacing steps up by five.
 pub fn grid(painter: &Painter, rect: Rect, view: &CanvasView, origin: Pos2, theme: &Theme) {
     let mut step = GRID * view.zoom;
-    let mut major_every = 5;
+    let mut major_every = 8;
     while step < 8.0 {
         step *= 5.0;
         major_every *= 5;
     }
     let base = origin + view.offset;
-    let minor = Stroke::new(1.0_f32, theme.surface);
-    let major = Stroke::new(1.0_f32, theme.raised);
+    let minor = Stroke::new(1.0_f32, theme.raised);
+    let major = Stroke::new(1.0_f32, theme.border);
 
     let first = ((rect.min.x - base.x) / step).floor() as i64;
     let last = ((rect.max.x - base.x) / step).ceil() as i64;
@@ -127,42 +128,38 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
     let result = env.output.values.get(&r.id);
     let (lay, res) = ui.ctx().fonts(|f| {
         let t = Typesetter::new(f, theme.text);
-        match (expr, result) {
-            _ if blank => (plain(f, "math", theme.text_disabled, size), None),
-            (Expr::Error(m), _) => (
-                plain(f, source, theme.text, size),
-                Some(plain(
-                    f,
-                    &format!("{} {m}", crate::icons::WARNING),
-                    theme.error,
-                    size,
-                )),
-            ),
-            (_, None) => (
-                t.layout(expr, size),
-                Some(plain(f, "\u{2026}", theme.text_weak, size)),
-            ),
-            // A function definition has no value to show next to it.
-            (_, Some(Ok(Value::Function { .. }))) => (t.layout(expr, size), None),
-            (_, Some(Ok(q))) => (
-                t.layout(expr, size),
-                Some(plain(
-                    f,
-                    &format!("= {}", format_value(q, env.units)),
-                    theme.text,
-                    size,
-                )),
-            ),
-            (_, Some(Err(e))) => (
-                t.layout(expr, size),
-                Some(plain(
-                    f,
-                    &format!("{} {e}", crate::icons::WARNING),
-                    theme.error,
-                    size,
-                )),
-            ),
+        let warn = |message: String| {
+            plain(
+                f,
+                &format!("{} {message}", crate::icons::WARNING),
+                theme.error,
+                size,
+            )
+        };
+        if blank {
+            return (plain(f, "math", theme.text_disabled, size), None);
         }
+        if let Expr::Error(e) = expr {
+            return (
+                plain(f, source, theme.text, size),
+                Some(warn(e.to_string())),
+            );
+        }
+        // A definition or bare expression shows only what was typed; an
+        // evaluation region (`x =`) also shows its answer. Errors always show.
+        let typed = t.layout(result::typeset_part(expr), size);
+        let after = match result::beside(expr, result) {
+            Beside::Nothing => None,
+            Beside::Pending => Some(plain(f, "= \u{2026}", theme.text_weak, size)),
+            Beside::Value(v) => Some(plain(
+                f,
+                &format!("= {}", format_value(v, env.units)),
+                theme.text,
+                size,
+            )),
+            Beside::Failed(e) => Some(warn(e.to_string())),
+        };
+        (typed, after)
     });
     let pad = PAD * zoom;
     let gap = if res.is_some() {

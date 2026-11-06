@@ -7,8 +7,9 @@ use eframe::egui::{Pos2, Rect, Vec2};
 
 pub const MIN_ZOOM: f32 = 0.25;
 pub const MAX_ZOOM: f32 = 4.0;
-/// Snap grid spacing in document units.
-pub const GRID: f32 = 20.0;
+/// Snap grid spacing in document units: an eighth of an inch, so every eighth
+/// line is a whole inch.
+pub const GRID: f32 = 12.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CanvasView {

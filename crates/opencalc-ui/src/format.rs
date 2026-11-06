@@ -97,11 +97,27 @@ pub fn axis_unit(system: UnitSystem, dim: Dimension, peak: f64) -> (String, f64)
     display_unit(system, dim, peak)
 }
 
-fn digits(dim: Dimension) -> usize {
-    if dim.is_dimensionless() {
-        6
+/// A number to three decimal places with trailing zeros dropped (`10`, `0.333`,
+/// `-1.5`), as Mathcad shows results by default. Numbers too large or too small to
+/// read plainly use scientific notation (`1.5e-7`, `2.5e12`).
+pub fn number_text(x: f64) -> String {
+    if x == 0.0 {
+        return "0".to_owned();
+    }
+    let magnitude = x.abs();
+    if !(1e-3..1e9).contains(&magnitude) {
+        let text = format!("{x:.3e}");
+        let (mantissa, exponent) = text.split_once('e').unwrap_or((&text, "0"));
+        return format!("{}e{exponent}", trim_zeros(mantissa));
+    }
+    trim_zeros(&format!("{x:.3}"))
+}
+
+fn trim_zeros(text: &str) -> String {
+    if text.contains('.') {
+        text.trim_end_matches('0').trim_end_matches('.').to_owned()
     } else {
-        4
+        text.to_owned()
     }
 }
 
@@ -115,7 +131,7 @@ fn with_unit(text: String, label: &str) -> String {
 
 pub fn format_quantity(q: Quantity, system: UnitSystem) -> String {
     let (label, scale) = display_unit(system, q.dim, q.si.abs());
-    with_unit(format!("{:.*}", digits(q.dim), q.si / scale), &label)
+    with_unit(number_text(q.si / scale), &label)
 }
 
 /// A part smaller than this fraction of the largest part shown alongside it is
@@ -136,13 +152,13 @@ fn snapped(x: f64, peak: f64) -> f64 {
 
 /// A complex number as `a + bi`, with a sign that never doubles up. `peak` is the
 /// largest magnitude it is shown alongside (itself, or its matrix).
-fn complex_text(z: Complex64, scale: f64, digits: usize, peak: f64) -> String {
+fn complex_text(z: Complex64, scale: f64, peak: f64) -> String {
     let (re, im) = (snapped(z.re, peak) / scale, snapped(z.im, peak) / scale);
     if im == 0.0 {
-        return format!("{re:.digits$}");
+        return number_text(re);
     }
     let sign = if im < 0.0 { '-' } else { '+' };
-    format!("{re:.digits$} {sign} {:.digits$}i", im.abs())
+    format!("{} {sign} {}i", number_text(re), number_text(im.abs()))
 }
 
 /// Show any value. A complex scalar is `(3 + 4i) m`; a matrix lists its rows
@@ -157,7 +173,7 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
             None => {
                 let peak = s.z.re.abs().max(s.z.im.abs());
                 let (label, scale) = display_unit(system, s.dim, peak);
-                let text = complex_text(s.z, scale, digits(s.dim), peak);
+                let text = complex_text(s.z, scale, peak);
                 if label.is_empty() {
                     text
                 } else {
@@ -181,7 +197,7 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
                         rows.push(row.join(", "));
                         break 'rows;
                     }
-                    row.push(complex_text(m.at(r, c), scale, digits(m.dim), peak));
+                    row.push(complex_text(m.at(r, c), scale, peak));
                     shown += 1;
                 }
                 rows.push(row.join(", "));
@@ -200,7 +216,7 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
                 .elements()
                 .iter()
                 .take(SHOWN_IN_LIST)
-                .map(|z| complex_text(*z, scale, digits(r.dim), peak))
+                .map(|z| complex_text(*z, scale, peak))
                 .collect();
             if r.len() > SHOWN_IN_LIST {
                 items.push("\u{2026}".to_owned());
@@ -262,20 +278,20 @@ mod tests {
     #[test]
     fn uscs_shows_feet_inches_and_psi() {
         let u = UnitSystem::Uscs;
-        assert_eq!(shown_in(u, 1.0, "m"), "3.2808 ft");
-        assert_eq!(shown_in(u, 5.0, "mm"), "0.1969 in");
-        assert_eq!(shown_in(u, 1.0, "MPa"), "145.0377 psi");
-        assert_eq!(shown_in(u, 100.0, "MPa"), "14.5038 ksi");
-        assert_eq!(shown_in(u, 10.0, "kN"), "2.2481 kip");
-        assert_eq!(shown_in(u, 1.0, "kg"), "2.2046 lb");
+        assert_eq!(shown_in(u, 1.0, "m"), "3.281 ft");
+        assert_eq!(shown_in(u, 5.0, "mm"), "0.197 in");
+        assert_eq!(shown_in(u, 1.0, "MPa"), "145.038 psi");
+        assert_eq!(shown_in(u, 100.0, "MPa"), "14.504 ksi");
+        assert_eq!(shown_in(u, 10.0, "kN"), "2.248 kip");
+        assert_eq!(shown_in(u, 1.0, "kg"), "2.205 lb");
     }
 
     #[test]
     fn cgs_shows_centimetres_grams_and_dynes() {
         let c = UnitSystem::Cgs;
-        assert_eq!(shown_in(c, 2.0, "m"), "200.0000 cm");
-        assert_eq!(shown_in(c, 1.0, "N"), "100000.0000 dyn");
-        assert_eq!(shown_in(c, 2.0, "kg"), "2000.0000 g");
+        assert_eq!(shown_in(c, 2.0, "m"), "200 cm");
+        assert_eq!(shown_in(c, 1.0, "N"), "100000 dyn");
+        assert_eq!(shown_in(c, 2.0, "kg"), "2000 g");
     }
 
     #[test]
@@ -286,25 +302,25 @@ mod tests {
             .pow(Quantity::dimensionless(3.0))
             .unwrap();
         for system in UnitSystem::ALL {
-            assert_eq!(format_quantity(volume, system), "8.0000 m^3");
+            assert_eq!(format_quantity(volume, system), "8 m^3");
         }
     }
 
     #[test]
     fn complex_numbers_show_both_parts() {
-        assert_eq!(shown("3 + 4 * i"), "3.000000 + 4.000000i");
-        assert_eq!(shown("3 - 4 * i"), "3.000000 - 4.000000i");
-        assert_eq!(shown("sqrt(0 - 4)"), "0.000000 + 2.000000i");
+        assert_eq!(shown("3 + 4 * i"), "3 + 4i");
+        assert_eq!(shown("3 - 4 * i"), "3 - 4i");
+        assert_eq!(shown("sqrt(0 - 4)"), "0 + 2i");
     }
 
     #[test]
     fn rounding_noise_next_to_a_real_part_is_not_shown() {
         // exp(i pi) is -1 + 1.22e-16 i in floating point.
-        assert_eq!(shown("exp(i * 3.141592653589793)"), "-1.000000");
+        assert_eq!(shown("exp(i * 3.141592653589793)"), "-1");
         // A genuinely small imaginary part survives.
-        assert_eq!(shown("1 + 0.001 * i"), "1.000000 + 0.001000i");
+        assert_eq!(shown("1 + 0.001 * i"), "1 + 0.001i");
         // Only noise relative to the neighbouring part is dropped.
-        assert_eq!(shown("1e-20 + i"), "0.000000 + 1.000000i");
+        assert_eq!(shown("1e-20 + i"), "0 + 1i");
     }
 
     #[test]
@@ -314,43 +330,32 @@ mod tests {
 
     #[test]
     fn a_list_shows_its_count_and_first_values() {
-        assert_eq!(
-            shown("0..3"),
-            "4 values [0.000000, 1.000000, 2.000000, 3.000000]"
-        );
-        assert_eq!(shown("5..5"), "1 value [5.000000]");
-        assert_eq!(
-            shown("0 m, 1 m..2 m"),
-            "3 values [0.0000, 1.0000, 2.0000] m"
-        );
+        assert_eq!(shown("0..3"), "4 values [0, 1, 2, 3]");
+        assert_eq!(shown("5..5"), "1 value [5]");
+        assert_eq!(shown("0 m, 1 m..2 m"), "3 values [0, 1, 2] m");
         let long = shown("0..99");
-        assert!(long.starts_with("100 values [0.000000, 1.000000") && long.contains('\u{2026}'));
+        assert!(long.starts_with("100 values [0, 1") && long.contains('\u{2026}'));
         assert!(long.len() < 120, "{long}");
     }
 
     #[test]
     fn matrix_noise_is_judged_against_the_largest_element() {
-        assert_eq!(
-            shown("mat(1, 2, 1, 1e-15)"),
-            "1\u{00d7}2 [1.000000, 0.000000]"
-        );
+        assert_eq!(shown("mat(1, 2, 1, 1e-15)"), "1\u{00d7}2 [1, 0]");
         // A lone small number is never snapped: it may be a real small quantity.
-        assert_eq!(shown("1e-15"), "0.000000");
-        assert_eq!(shown("2e-15 m"), "0.0000 mm");
+        // ...and so it shows as it is, in scientific notation, not as a false zero.
+        assert_eq!(shown("1e-15"), "1e-15");
+        assert_eq!(shown("2e-15 m"), "2e-12 mm");
     }
 
     #[test]
     fn complex_quantities_share_one_unit() {
-        assert_eq!(shown("(3 + 4 * i) * 1 kN"), "(3.0000 + 4.0000i) kN");
+        assert_eq!(shown("(3 + 4 * i) * 1 kN"), "(3 + 4i) kN");
     }
 
     #[test]
     fn matrices_list_their_rows() {
-        assert_eq!(
-            shown("mat(2, 2, 1, 2, 3, 4)"),
-            "2\u{00d7}2 [1.000000, 2.000000; 3.000000, 4.000000]"
-        );
-        assert_eq!(shown("vec(1 kN, 2 kN)"), "2\u{00d7}1 [1.0000; 2.0000] kN");
+        assert_eq!(shown("mat(2, 2, 1, 2, 3, 4)"), "2\u{00d7}2 [1, 2; 3, 4]");
+        assert_eq!(shown("vec(1 kN, 2 kN)"), "2\u{00d7}1 [1; 2] kN");
     }
 
     #[test]
@@ -361,24 +366,56 @@ mod tests {
     }
 
     #[test]
+    fn numbers_have_three_decimals_without_trailing_zeros() {
+        for (x, want) in [
+            (10.0, "10"),
+            (0.5, "0.5"),
+            (1.0 / 3.0, "0.333"),
+            (2.0 / 3.0, "0.667"),
+            (-1.5, "-1.5"),
+            (0.9999, "1"),
+            (1234.5678, "1234.568"),
+            (0.0, "0"),
+            (-0.0, "0"),
+            (999_999_999.0, "999999999"),
+        ] {
+            assert_eq!(number_text(x), want, "{x}");
+        }
+    }
+
+    #[test]
+    fn very_large_and_very_small_numbers_use_scientific_notation() {
+        for (x, want) in [
+            (1.5e-7, "1.5e-7"),
+            (2.5e12, "2.5e12"),
+            (1e9, "1e9"),
+            (0.0009, "9e-4"),
+            (-3.14159e-5, "-3.142e-5"),
+            (0.001, "0.001"),
+        ] {
+            assert_eq!(number_text(x), want, "{x}");
+        }
+    }
+
+    #[test]
     fn small_values_keep_their_unit() {
-        assert_eq!(show(5.0, "N"), "5.0000 N");
-        assert_eq!(show(100.0, "Pa"), "100.0000 Pa");
-        assert_eq!(show(0.5, "kg"), "500.0000 g");
+        assert_eq!(show(5.0, "N"), "5 N");
+        assert_eq!(show(100.0, "Pa"), "100 Pa");
+        assert_eq!(show(0.5, "kg"), "500 g");
     }
 
     #[test]
     fn large_values_step_up_a_unit() {
-        assert_eq!(show(10.0, "kN"), "10.0000 kN");
-        assert_eq!(show(2.5e6, "Pa"), "2.5000 MPa");
-        assert_eq!(show(3.0, "km"), "3.0000 km");
+        assert_eq!(show(10.0, "kN"), "10 kN");
+        assert_eq!(show(2.5e6, "Pa"), "2.5 MPa");
+        assert_eq!(show(3.0, "km"), "3 km");
     }
 
     #[test]
     fn lengths_pick_metres_or_millimetres_sensibly() {
-        assert_eq!(show(2.0, "m"), "2.0000 m");
-        assert_eq!(show(0.1, "m"), "100.0000 mm");
-        assert_eq!(show(100.0, "mm"), "100.0000 mm");
+        assert_eq!(show(2.0, "m"), "2 m");
+        assert_eq!(show(0.1, "m"), "100 mm");
+        assert_eq!(show(100.0, "mm"), "100 mm");
     }
 
     #[test]
@@ -392,20 +429,20 @@ mod tests {
             stress.si, 1e6,
             "the point of this test: it is not exactly 1e6"
         );
-        assert_eq!(format_quantity(stress, UnitSystem::Si), "1.0000 MPa");
+        assert_eq!(format_quantity(stress, UnitSystem::Si), "1 MPa");
         // But a genuinely smaller value still steps down.
-        assert_eq!(show(999.0, "kPa"), "999.0000 kPa");
+        assert_eq!(show(999.0, "kPa"), "999 kPa");
     }
 
     #[test]
     fn negative_values_use_their_magnitude_to_choose() {
-        assert_eq!(show(-10.0, "kN"), "-10.0000 kN");
-        assert_eq!(show(-5.0, "N"), "-5.0000 N");
+        assert_eq!(show(-10.0, "kN"), "-10 kN");
+        assert_eq!(show(-5.0, "N"), "-5 N");
     }
 
     #[test]
     fn zero_uses_the_smallest_unit() {
-        assert_eq!(show(0.0, "kN"), "0.0000 N");
+        assert_eq!(show(0.0, "kN"), "0 N");
     }
 
     #[test]
@@ -414,22 +451,19 @@ mod tests {
             .unwrap()
             .pow(Quantity::dimensionless(2.0))
             .unwrap();
-        assert_eq!(
-            format_quantity(small, UnitSystem::Si),
-            "100.0000 mm\u{00b2}"
-        );
+        assert_eq!(format_quantity(small, UnitSystem::Si), "100 mm\u{00b2}");
         let big = Quantity::from_unit(3.0, "m")
             .unwrap()
             .pow(Quantity::dimensionless(2.0))
             .unwrap();
-        assert_eq!(format_quantity(big, UnitSystem::Si), "9.0000 m\u{00b2}");
+        assert_eq!(format_quantity(big, UnitSystem::Si), "9 m\u{00b2}");
     }
 
     #[test]
     fn dimensionless_has_no_unit() {
         assert_eq!(
             format_quantity(Quantity::dimensionless(1.5), UnitSystem::Si),
-            "1.500000"
+            "1.5"
         );
     }
 
@@ -440,6 +474,6 @@ mod tests {
             .unwrap()
             .over(Quantity::from_unit(2.0, "m").unwrap())
             .unwrap();
-        assert_eq!(format_quantity(q, UnitSystem::Si), "3000.0000 kg*s^-2");
+        assert_eq!(format_quantity(q, UnitSystem::Si), "3000 kg*s^-2");
     }
 }

@@ -40,13 +40,13 @@ impl OpenSheet {
             Point::new(40.0, 20.0),
         );
         for (src, x, y) in [
-            ("\u{03c3} := F / A", 40.0, 220.0),
-            ("F := 10 kN", 40.0, 80.0),
-            ("b := 100 mm", 40.0, 120.0),
-            ("A := b^2", 400.0, 120.0),
-            ("s := sqrt(A)", 400.0, 160.0),
-            ("\u{03c3} =", 400.0, 220.0),
-            ("w := 50 mm, 60 mm..150 mm", 40.0, 160.0),
+            ("\u{03c3} := F / A", 60.0, 204.0),
+            ("F := 10 kN", 60.0, 84.0),
+            ("b := 100 mm", 60.0, 120.0),
+            ("A := b^2", 60.0, 156.0),
+            ("s := sqrt(A)", 360.0, 156.0),
+            ("\u{03c3} =", 360.0, 204.0),
+            ("w := 50 mm, 60 mm..150 mm", 60.0, 276.0),
         ] {
             s.add(RegionKind::math(src), Point::new(x, y));
         }
@@ -56,7 +56,7 @@ impl OpenSheet {
             .with_x("w")
             .with_series(0, "F / w ^ 2")
             .with_labels("width", "stress");
-        s.add(RegionKind::Plot(spec), Point::new(40.0, 300.0));
+        s.add(RegionKind::Plot(spec), Point::new(60.0, 336.0));
         // New regions go below the worked example, not on top of it.
         s.canvas.insert_at = Pos2::new(40.0, 520.0);
         s.history = History::default();

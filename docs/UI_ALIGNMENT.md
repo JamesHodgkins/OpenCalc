@@ -110,7 +110,7 @@ values next to definitions", off by default.
 | P1 | **Paper pages** (section 8): page setup in the document, white pages on a grey desk, paper palette for page content, page numbers. **Done** (page setup has no dialog yet: that is P2) |
 | U1 | Remove default docks and the Names pane; blank Untitled worksheet at startup (Home tab stays); grid off by default; add the Functions window. Properties opens only for a selected plot. **Done**: the Names pane is gone; the Functions window is optional (View tab); a small floating Plot window replaces the plot fields in the side pane; the Properties pane is optional and closed by default and is kept only for error details until U3 puts errors on the regions |
 | U2 | Ribbon rebuilt to the tabs above (commands unchanged, rearranged and renamed) |
-| U3 | Results only on `=` regions (if B is agreed); three-decimal default; errors on the region |
+| U3 | Results only on `=` regions (if B is agreed); three-decimal default; errors on the region. **Done** except removing the optional Properties pane, which still carries the detailed error text: results appear only on `=` regions (a bare expression shows nothing; errors show everywhere); numbers show three decimals without trailing zeros and use scientific notation outside 0.001 to 1e9 |
 | U4 | Status bar to Mathcad's items, with a zoom slider |
 | P2 | Page View and Draft View toggle, zoom slider and fit-to-width; page setup dialog on the Document tab |
 | later | Click-and-type region creation, `:` to `:=`, in-plot placeholders (with the editor); print and PDF export from the same page layout (Milestone 3) |

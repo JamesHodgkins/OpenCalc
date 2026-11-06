@@ -5,7 +5,7 @@
 //! at `k * (height + GAP)`, so there is a gap between pages that regions may cross.
 //! Pure geometry is separate from painting so it is tested without a window.
 
-use eframe::egui::{epaint::Shadow, Color32, Painter, Pos2, Rect, Stroke, Vec2};
+use eframe::egui::{epaint::Shadow, Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
 use opencalc_core::document::{PageSetup, Region};
 
 use super::adapt::{rect_of, Sizes};
@@ -73,22 +73,9 @@ pub fn fit_width(setup: &PageSetup, viewport: Vec2) -> CanvasView {
     }
 }
 
-/// Short lines in the four corners of the margin box, like the crop marks of a
-/// print layout. Each is a pair of end points, in document space.
-pub fn margin_marks(page: Rect, margin: f32) -> Vec<(Pos2, Pos2)> {
-    let inner = page.shrink(margin);
-    let tick = (margin * 0.5).clamp(4.0, 16.0);
-    let mut marks = Vec::with_capacity(8);
-    for (corner, dx, dy) in [
-        (inner.left_top(), 1.0, 1.0),
-        (inner.right_top(), -1.0, 1.0),
-        (inner.left_bottom(), 1.0, -1.0),
-        (inner.right_bottom(), -1.0, -1.0),
-    ] {
-        marks.push((corner, corner + Vec2::new(dx * tick, 0.0)));
-        marks.push((corner, corner + Vec2::new(0.0, dy * tick)));
-    }
-    marks
+/// The text area of a page: the page inset by the margin on every side.
+pub fn margin_box(page: Rect, margin: f32) -> Rect {
+    page.shrink(margin.min(page.width().min(page.height()) / 2.0))
 }
 
 /// Draw the pages that are visible in `viewport`. Returns the screen rectangle of
@@ -116,13 +103,17 @@ pub fn paint(
         };
         painter.add(shadow.as_shape(screen, 0.0));
         painter.rect_filled(screen, 0.0, paper.base);
-        let stroke = Stroke::new(1.0_f32, paper.raised);
-        for (a, b) in margin_marks(page_rect(setup, k), setup.margin()) {
-            painter.line_segment(
-                [view.doc_to_screen(a, origin), view.doc_to_screen(b, origin)],
-                stroke,
-            );
-        }
+        // The margin box, dashed, so the text area is plain to see.
+        let inner = view.rect_to_screen(margin_box(page_rect(setup, k), setup.margin()), origin);
+        let corners = [
+            inner.left_top(),
+            inner.right_top(),
+            inner.right_bottom(),
+            inner.left_bottom(),
+            inner.left_top(),
+        ];
+        let stroke = Stroke::new(1.0_f32, paper.border);
+        painter.extend(Shape::dashed_line(&corners, stroke, 5.0, 4.0));
         drawn.push(screen);
     }
     drawn
@@ -215,15 +206,13 @@ mod tests {
     }
 
     #[test]
-    fn margin_marks_sit_on_the_margin_box() {
+    fn the_margin_box_is_the_page_inset_on_every_side() {
         let page = page_rect(&a4(), 0);
-        let margin = 75.0;
-        let marks = margin_marks(page, margin);
-        assert_eq!(marks.len(), 8);
-        let inner = page.shrink(margin);
-        for (corner, other) in marks {
-            assert!(inner.expand(0.01).contains(corner), "{corner:?}");
-            assert!(page.contains(other));
-        }
+        let inner = margin_box(page, 75.0);
+        assert_eq!(inner.min, page.min + Vec2::splat(75.0));
+        assert_eq!(inner.max, page.max - Vec2::splat(75.0));
+        // A margin too big for the page leaves a point, never an inverted box.
+        let squeezed = margin_box(page, 1e6);
+        assert!(squeezed.width() >= 0.0 && squeezed.height() >= 0.0);
     }
 }
