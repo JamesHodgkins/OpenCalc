@@ -116,6 +116,10 @@ impl App {
         panels::options::show(ctx, &self.state, &mut cmds);
         panels::page_setup::show(ctx, &self.state, &mut cmds);
 
+        // Seen by the canvas next frame: egui reports IME output only while a text
+        // box has focus.
+        self.state.text_box_focus = ctx.output(|o| o.ime.is_some());
+
         let mut pending = std::mem::take(&mut self.queue);
         pending.extend(cmds);
         for command in pending {
@@ -134,6 +138,7 @@ impl App {
             units: state.sheets[sheet].doc.unit_system(),
             show_grid: state.show_grid,
             snap: state.snap,
+            text_box_focus: state.text_box_focus,
             draft: state.draft,
         };
         let open = &mut state.sheets[sheet];

@@ -214,14 +214,16 @@ impl CommandId {
             | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs
             | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_)
             | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
-            | DocPageSetupClose | ViewPageView | ViewDraftView => true,
+            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
+                true
+            }
             FileOpen | FileSave | ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind
-            | EditReplace | RegionLock | RegionTag | InsertGreek | InsertSymbol(_) | FormatBold
-            | FormatItalic | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
-            | FormatEngineering | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate
-            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
-            | UnitsDisplayReset | UnitsDefine | UnitsManage | CalcCheck | WarnNext | WarnPrev
-            | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
+            | EditReplace | RegionLock | RegionTag | FormatBold | FormatItalic
+            | FormatDecimalsMore | FormatDecimalsLess | FormatScientific | FormatEngineering
+            | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate | UnitsDisplayM | UnitsDisplayMm
+            | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn | UnitsDisplayReset | UnitsDefine
+            | UnitsManage | CalcCheck | WarnNext | WarnPrev | InsertMatrix | InsertRange
+            | HelpShortcuts | HelpGuide => false,
         }
     }
 

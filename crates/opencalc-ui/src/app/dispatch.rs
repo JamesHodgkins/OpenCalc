@@ -141,6 +141,13 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         PageLandscape(landscape) => set_page(state, true, |p| p.landscape = landscape),
         // A drag over the margin box is one undo step (the run merges).
         PageMarginMm(mm) => set_page(state, false, |p| p.margin_mm = f32::from(mm)),
+        InsertSymbol(symbol) => {
+            if let Some(i) = state.active {
+                fx.extend(insert_symbol(state, i, symbol));
+            }
+        }
+        // The large button on the Symbols panel opens its flyout (the ribbon does that).
+        InsertGreek => {}
         HelpAbout => state.about_open = true,
         HelpAboutClose => state.about_open = false,
 
@@ -233,6 +240,22 @@ fn set_page(state: &mut AppState, own_step: bool, change: impl FnOnce(&mut PageS
     }
 }
 
+/// Put `symbol` into the math region being edited, at the caret (replacing the
+/// selection), as an ordinary edit of its source. The editor picks it up.
+fn insert_symbol(state: &mut AppState, sheet: usize, symbol: char) -> Vec<Effect> {
+    let canvas = &state.sheets[sheet].canvas;
+    let (Some(id), Some(field)) = (canvas.editing, canvas.field.as_ref()) else {
+        return Vec::new();
+    };
+    let mut after = field.clone();
+    after.insert(&symbol.to_string());
+    let edit = Edit::SetMathSource {
+        id,
+        source: after.text(),
+    };
+    apply_canvas(state, sheet, vec![CanvasCmd::Edit(edit)])
+}
+
 fn insert(state: &mut AppState, fx: &mut Vec<Effect>, kind: RegionKind) {
     with_eval_check(state, fx, |s| {
         s.insert(kind);
@@ -285,7 +308,6 @@ mod tests {
         let mut s = state();
         assert!(dispatch(&mut s, CommandId::SelectSheet(0)).is_some());
         assert!(dispatch(&mut s, CommandId::CloseSheet(5)).is_some());
-        assert!(dispatch(&mut s, CommandId::InsertSymbol('x')).is_none());
     }
 
     #[test]

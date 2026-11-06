@@ -39,6 +39,8 @@ pub struct Env<'a> {
     pub units: UnitSystem,
     pub show_grid: bool,
     pub snap: bool,
+    /// A text box elsewhere in the window (the Functions search) holds the keyboard.
+    pub text_box_focus: bool,
     /// Draft View: one continuous sheet, no page edges or margin box.
     pub draft: bool,
 }

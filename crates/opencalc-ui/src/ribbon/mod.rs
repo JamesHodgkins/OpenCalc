@@ -5,6 +5,7 @@
 //! nothing is defined twice. The ribbon never runs commands itself: it reports
 //! the clicked ID and the caller handles it.
 
+mod flyout;
 mod show;
 pub mod widgets;
 

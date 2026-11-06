@@ -49,6 +49,8 @@ pub struct AppState {
     pub about_open: bool,
     /// The Page setup window.
     pub page_setup_open: bool,
+    /// A text box (not the math editor) held the keyboard last frame.
+    pub text_box_focus: bool,
     /// Draft View (one continuous sheet) instead of Page View.
     pub draft: bool,
     /// The Options window (settings such as the theme).
@@ -80,6 +82,7 @@ impl AppState {
             viewport: Rect::from_min_size(Pos2::ZERO, eframe::egui::vec2(800.0, 600.0)),
             about_open: false,
             page_setup_open: false,
+            text_box_focus: false,
             draft: false,
             options_open: false,
         }
@@ -105,6 +108,7 @@ impl AppState {
             has_selection: sheet.is_some_and(|s| !s.canvas.selection.is_empty()),
             can_undo: sheet.is_some_and(OpenSheet::can_undo),
             can_redo: sheet.is_some_and(OpenSheet::can_redo),
+            editing_math: sheet.is_some_and(|s| s.canvas.field.is_some()),
         }
     }
 

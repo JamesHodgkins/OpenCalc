@@ -1062,3 +1062,114 @@ fn many_keystrokes_in_one_frame_all_arrive() {
     assert_eq!(h.source_of(id), "sigma_y");
     assert!(h.sheet().canvas.editing.is_none());
 }
+
+#[test]
+fn clicking_the_ribbon_does_not_end_editing_and_typing_carries_on() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    let count = h.sheet().doc.regions().len();
+    h.type_text("ab");
+    // A ribbon tab, then the empty part of the ribbon: neither is the canvas.
+    for at in [Pos2::new(108.0, 45.0), Pos2::new(1100.0, 80.0)] {
+        h.frame_with(vec![Event::PointerMoved(at)]);
+        h.frame_with(vec![press(at)]);
+        h.frame_with(vec![release(at)]);
+        h.frame();
+        h.frame();
+        assert_eq!(h.sheet().canvas.editing, Some(id), "a click at {at:?}");
+    }
+    h.type_text("cd");
+    assert_eq!(h.source_of(id), "abcd");
+    assert_eq!(h.sheet().doc.regions().len(), count, "no region was added");
+}
+
+#[test]
+fn a_press_on_the_canvas_away_from_the_region_ends_editing() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("ab");
+    let away = Pos2::new(1000.0, 650.0);
+    h.frame_with(vec![Event::PointerMoved(away)]);
+    h.frame_with(vec![press(away)]);
+    h.frame_with(vec![release(away)]);
+    h.frame();
+    assert!(h.sheet().canvas.editing.is_none());
+    assert_eq!(h.source_of(id), "ab");
+}
+
+#[test]
+fn a_greek_letter_from_the_ribbon_goes_in_at_the_caret_while_editing() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x := ");
+    h.command(CommandId::InsertSymbol('\u{3c3}'));
+    assert_eq!(h.source_of(id), "x := \u{3c3}");
+    h.type_text(" + 1");
+    assert_eq!(
+        h.source_of(id),
+        "x := \u{3c3} + 1",
+        "typing carries on after the letter"
+    );
+    // In the middle: the letter goes at the caret and replaces a selection.
+    h.press_key(Key::Home, Modifiers::NONE);
+    h.command(CommandId::InsertSymbol('\u{3b1}'));
+    assert_eq!(h.source_of(id), "\u{3b1}x := \u{3c3} + 1");
+    // One undo step for the typing before, and the letter edits are undoable.
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    h.key(Key::Z, Modifiers::COMMAND);
+    assert!(!h.source_of(id).starts_with('\u{3b1}'));
+}
+
+#[test]
+fn symbols_are_not_offered_when_nothing_is_being_edited() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("a");
+    // The first Escape closes the autocomplete list, the second ends the edit.
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    assert!(h.sheet().canvas.field.is_none());
+    h.app.queue.push(CommandId::InsertSymbol('\u{3c3}'));
+    h.frame();
+    assert_eq!(
+        h.source_of(id),
+        "a",
+        "the command is disabled when no region is open"
+    );
+}
+
+#[test]
+fn clicking_a_flyout_that_floats_over_the_canvas_does_not_end_editing() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x := ");
+    // The Greek flyout (Math tab, Symbols panel) hangs below the ribbon, over the page.
+    h.app.ribbon_state.open_panel = Some((0, 4));
+    h.frame();
+    h.frame();
+    let flyout = h
+        .ctx
+        .memory(|m| m.area_rect(egui::Id::new(("ribbon-flyout", (0usize, 4usize)))))
+        .expect("the flyout is open");
+    assert!(
+        flyout.max.y > 100.0,
+        "it reaches into the canvas area: {flyout:?}"
+    );
+    let at = flyout.center();
+    h.frame_with(vec![Event::PointerMoved(at)]);
+    h.frame_with(vec![press(at)]);
+    h.frame_with(vec![release(at)]);
+    h.frame();
+    assert_eq!(
+        h.sheet().canvas.editing,
+        Some(id),
+        "still editing after the click"
+    );
+}

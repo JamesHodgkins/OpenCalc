@@ -163,13 +163,28 @@ pub(super) fn math(
         ui.input(|i| i.pointer.interact_pos())
             .is_some_and(|pos| p.contains(pos))
     });
-    if resp.lost_focus() {
-        if on_popup {
-            resp.request_focus();
-        } else {
-            finished = true;
-        }
+    // Clicking the ribbon or a window does not end editing: the editor takes the
+    // keyboard back unless another text box (the Functions search) holds it. A
+    // press on the canvas outside the region, and Enter or Escape, end it.
+    // (A press this frame is left alone: the widget pressed may be a text box.)
+    if !resp.has_focus() && !env.text_box_focus && !ui.input(|i| i.pointer.any_pressed()) {
+        resp.request_focus();
     }
+    // (The pointer is read first: asking egui which layer is under it while inside
+    // `ui.input` would lock the context twice.)
+    let press = ui.input(|i| {
+        i.pointer
+            .primary_pressed()
+            .then(|| i.pointer.interact_pos())
+            .flatten()
+    });
+    let pressed_elsewhere = press.is_some_and(|p| {
+        ui.clip_rect().contains(p)
+            && ui.ctx().layer_id_at(p) == Some(ui.layer_id())
+            && !rect.contains(p)
+            && !on_popup
+    });
+    finished |= pressed_elsewhere;
 
     let text = field.text();
     if text != source {

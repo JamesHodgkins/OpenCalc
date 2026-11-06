@@ -14,11 +14,15 @@ pub struct CommandContext {
     pub has_selection: bool,
     pub can_undo: bool,
     pub can_redo: bool,
+    /// A math region is open for editing (symbols can be inserted into it).
+    pub editing_math: bool,
 }
 
 pub struct Registry {
     enabled: HashSet<CommandId>,
     active: HashSet<CommandId>,
+    /// Whether a symbol can be inserted: a math region is being edited.
+    symbols: bool,
 }
 
 impl Registry {
@@ -31,6 +35,7 @@ impl Registry {
                 .filter(|c| c.is_implemented() && available(*c, ctx))
                 .collect(),
             active: active.iter().copied().collect(),
+            symbols: ctx.editing_math,
         }
     }
 
@@ -44,6 +49,7 @@ impl Registry {
             | CommandId::PagePaper(_)
             | CommandId::PageLandscape(_)
             | CommandId::PageMarginMm(_) => true,
+            CommandId::InsertSymbol(_) => self.symbols,
             other => self.enabled.contains(&other),
         }
     }
@@ -77,6 +83,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
         && (ctx.has_selection || command != RegionDelete)
         && (ctx.can_undo || command != EditUndo)
         && (ctx.can_redo || command != EditRedo)
+        && (ctx.editing_math || command != InsertGreek)
 }
 
 impl CommandSource for Registry {
@@ -103,6 +110,7 @@ mod tests {
             has_selection,
             can_undo,
             can_redo,
+            editing_math: has_sheet,
         }
     }
 
@@ -112,7 +120,19 @@ mod tests {
         for c in CommandId::ALL {
             assert_eq!(r.allows(*c), c.is_implemented(), "{}", c.name());
         }
+        assert!(r.allows(CommandId::InsertSymbol('x')));
+    }
+
+    #[test]
+    fn symbols_can_only_be_inserted_while_a_math_region_is_being_edited() {
+        let mut c = ctx(true, false, false, false);
+        c.editing_math = false;
+        let r = Registry::new(&c, &[]);
         assert!(!r.allows(CommandId::InsertSymbol('x')));
+        assert!(!r.allows(CommandId::InsertGreek));
+        c.editing_math = true;
+        let r = Registry::new(&c, &[]);
+        assert!(r.allows(CommandId::InsertSymbol('x')) && r.allows(CommandId::InsertGreek));
     }
 
     #[test]

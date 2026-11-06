@@ -1,8 +1,8 @@
 //! Laying out and drawing the ribbon.
 
 use eframe::egui::{
-    self, popup::popup_below_widget, Align2, CornerRadius, FontId, Id, Order, PopupCloseBehavior,
-    Rect, Sense, Ui, Vec2,
+    self, popup::popup_below_widget, Align2, CornerRadius, FontId, Id, PopupCloseBehavior, Rect,
+    Sense, Ui, Vec2,
 };
 
 use super::widgets::{self as w, Look};
@@ -11,29 +11,29 @@ use crate::commands::CommandId;
 use crate::theme::{metrics, type_size, Theme};
 
 /// Everything a draw call needs, so helpers take one argument.
-struct Cx<'a> {
-    theme: &'a Theme,
+pub(super) struct Cx<'a> {
+    pub(super) theme: &'a Theme,
     source: &'a dyn CommandSource,
-    state: &'a mut RibbonState,
+    pub(super) state: &'a mut RibbonState,
     out: &'a mut RibbonOutput,
 }
 
 impl Cx<'_> {
-    fn look(&self, command: CommandId) -> Look {
+    pub(super) fn look(&self, command: CommandId) -> Look {
         Look {
             enabled: self.source.is_enabled(command),
             active: self.source.is_active(command),
         }
     }
 
-    fn tip(&self, item: &Item) -> String {
+    pub(super) fn tip(&self, item: &Item) -> String {
         match self.source.shortcut_text(item.command) {
             Some(s) => format!("{} ({s})", item.label),
             None => item.label.to_owned(),
         }
     }
 
-    fn press(&mut self, item: &Item, look: Look) {
+    pub(super) fn press(&mut self, item: &Item, look: Look) {
         if look.enabled {
             self.out.clicked = Some(item.command);
         }
@@ -122,6 +122,15 @@ fn panel_ui(ui: &mut Ui, cx: &mut Cx, panel: &Panel, key: (usize, usize)) {
                 });
             }
         });
+        // The big Greek button opens the panel's flyout instead of running a command.
+        if cx
+            .out
+            .clicked
+            .take_if(|c| *c == CommandId::InsertGreek)
+            .is_some()
+        {
+            cx.state.open_panel = (cx.state.open_panel != Some(key)).then_some(key);
+        }
         title_row(ui, cx, panel, key, body.response.rect.width());
     });
 }
@@ -156,54 +165,9 @@ fn title_row(ui: &mut Ui, cx: &mut Cx, panel: &Panel, key: (usize, usize), width
             cx.state.open_panel = if look.active { None } else { Some(key) };
         }
         if look.active {
-            flyout(ui, cx, panel, key, &arrow);
+            super::flyout::flyout(ui, cx, panel, key, &arrow);
         }
     });
-}
-
-/// The expanded panel: an icon-only grid in a foreground area under the panel.
-fn flyout(ui: &mut Ui, cx: &mut Cx, panel: &Panel, key: (usize, usize), arrow: &egui::Response) {
-    let ctx = ui.ctx().clone();
-    let pos = arrow.rect.left_bottom() + Vec2::new(-80.0, 4.0);
-    let frame = egui::Frame::popup(&ctx.style())
-        .fill(cx.theme.surface)
-        .corner_radius(CornerRadius::same(metrics::RADIUS))
-        .inner_margin(4.0);
-    let area = egui::Area::new(Id::new(("ribbon-flyout", key)))
-        .order(Order::Foreground)
-        .fixed_pos(pos)
-        .show(&ctx, |ui| {
-            frame.show(ui, |ui| {
-                ui.spacing_mut().item_spacing = Vec2::splat(2.0);
-                ui.set_max_width(26.0 * 8.0 + 14.0);
-                ui.horizontal_wrapped(|ui| {
-                    for item in &panel.extra {
-                        let look = cx.look(item.command);
-                        let (rect, resp) = ui.allocate_exact_size(Vec2::splat(26.0), look.sense());
-                        w::paint_state(ui, rect, &resp, cx.theme, look);
-                        w::paint_small(ui, rect, cx.theme, look, Some(item.icon), None);
-                        if resp.on_hover_text(cx.tip(item)).clicked() {
-                            cx.press(item, look);
-                            cx.state.open_panel = None;
-                        }
-                    }
-                });
-                ui.label(
-                    egui::RichText::new(panel.title)
-                        .size(type_size::RIBBON_TITLE)
-                        .color(cx.theme.text_weak),
-                );
-            });
-        });
-    let outside = ctx.input(|i| {
-        i.pointer.any_pressed()
-            && i.pointer
-                .interact_pos()
-                .is_some_and(|p| !area.response.rect.contains(p) && !arrow.rect.contains(p))
-    });
-    if outside || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
-        cx.state.open_panel = None;
-    }
 }
 
 fn column_ui(ui: &mut Ui, cx: &mut Cx, col: &Column, id: ((usize, usize), usize)) {
