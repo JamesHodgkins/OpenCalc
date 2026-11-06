@@ -1,0 +1,8 @@
+# source: original; a name defined twice warns, and the last definition wins
+@ordered
+x := 1
+x := 2
+y := x + 10
+=> y = 12
+=> x = 2
+!> warn : redefinition x

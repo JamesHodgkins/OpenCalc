@@ -463,3 +463,71 @@ fn conversions_place_regions_where_the_document_says() {
     let back = sheet.view.screen_to_doc(screen, h.app.state.viewport.min);
     assert!((back - pos(r.pos)).length() < 1e-3);
 }
+
+/// SPEC 5.6: pan and zoom at 60 fps with 200 visible regions. This measures the
+/// work the UI does every frame (typesetting, painting into shapes, input) with
+/// all 200 regions on screen. It excludes tessellation and the GPU, which egui
+/// does outside `ctx.run`, so it is a lower bound on a real frame.
+///
+/// Ignored by default because timing means nothing in a debug build. Run:
+///   cargo test --release -p opencalc-ui perf -- --ignored --nocapture
+#[test]
+#[ignore = "performance: run in release with --ignored --nocapture"]
+fn perf_frame_time_with_200_visible_regions() {
+    let mut h = Harness::new();
+    let mut sheet = OpenSheet::new("perf");
+    for i in 0..200 {
+        // 8 columns by 25 rows: wide enough to be realistic, compact enough that
+        // "fit" (minimum zoom 25%) can show all 200 in the open canvas.
+        let (col, row) = (i % 8, i / 8);
+        let at = Point::new(col as f32 * 330.0, row as f32 * 60.0);
+        sheet.add(RegionKind::math(&format!("v{i} := {} m * 2", i + 1)), at);
+    }
+    h.app.state.sheets.push(sheet);
+    h.command(CommandId::SelectSheet(1));
+    h.settle();
+    // Fit twice: text measured at 100% differs a little from text measured at the
+    // fitted zoom (font rounding at small sizes), so the second fit uses the
+    // sizes the sheet really has when drawn small.
+    for _ in 0..2 {
+        h.command(CommandId::ViewZoomFit);
+        h.settle();
+    }
+
+    // All 200 must really be on screen, or the number below means less.
+    let sheet = h.sheet();
+    let viewport = h.app.state.viewport;
+    let on_screen = sheet
+        .doc
+        .regions()
+        .iter()
+        .filter(|r| {
+            let rect = sheet
+                .view
+                .rect_to_screen(rect_of(r, &sheet.canvas.sizes), viewport.min);
+            viewport.contains_rect(rect)
+        })
+        .count();
+    assert_eq!(
+        on_screen, 200,
+        "zoom {}: not every region is visible",
+        sheet.view.zoom
+    );
+
+    let mut times: Vec<Duration> = (0..80)
+        .map(|_| {
+            let start = Instant::now();
+            h.frame();
+            start.elapsed()
+        })
+        .collect();
+    times.sort();
+    let (min, median, max) = (times[0], times[times.len() / 2], times[times.len() - 1]);
+    println!(
+        "\nframe with 200 visible regions at {:.0}% zoom: median {:.2} ms, best {:.2} ms, worst {:.2} ms (budget 16.7 ms)\n",
+        h.sheet().view.zoom * 100.0,
+        median.as_secs_f64() * 1e3,
+        min.as_secs_f64() * 1e3,
+        max.as_secs_f64() * 1e3
+    );
+}

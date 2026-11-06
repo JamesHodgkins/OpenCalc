@@ -12,3 +12,8 @@ thiserror.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
+proptest.workspace = true
+
+[[bench]]
+name = "recalc"
+harness = false

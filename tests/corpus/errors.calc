@@ -1,0 +1,29 @@
+# source: original; each line is meant to fail in a particular, reportable way
+bad_sum := 1 m + 1 kg
+dependent := bad_sum * 2
+nope := missing + 1
+cyc_a := cyc_b + 1
+cyc_b := cyc_a + 1
+div := 1 / 0
+huge := (1 m)^100 * (1 m)^100
+neg := sqrt(0 - 4)
+trig := sin(1 m)
+unk := foo(1)
+arity := sqrt(1, 2)
+5 furlong
+broken := 1 +
+fine := 1 m + 2 m
+!> bad_sum : mismatch
+!> dependent : mismatch
+!> nope : undefined
+!> cyc_a : cycle
+!> cyc_b : cycle
+!> div : notfinite
+!> huge : overflow
+!> neg : notfinite
+!> trig : not-dimensionless
+!> unk : unknown-function
+!> arity : arity
+!> #12 : undefined
+!> #13 : invalid
+=> fine = 3 m

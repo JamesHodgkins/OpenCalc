@@ -14,9 +14,13 @@ function Step($name, [scriptblock]$run) {
 Step "cargo fmt --all --check" { cargo fmt --all --check }
 Step "cargo clippy (warnings are errors)" { cargo clippy --workspace --all-targets -- -D warnings }
 Step "cargo test" { cargo test --workspace }
+# A coarse tripwire, not a benchmark: the budgets have roughly 500x headroom, so this
+# only fails on a real regression such as an accidental quadratic loop (docs/PERFORMANCE.md).
+Step "performance budgets (core)" { cargo bench -p opencalc-core --bench recalc -- --quick --check }
 
 # File-size rule: about 400 production lines per file (lines before #[cfg(test)],
-# or before a file-level #![cfg(test)] for files that are entirely tests).
+# or before a file-level #![cfg(test)] for files that are entirely tests). Files under
+# a tests/ or benches/ directory are test code and are not counted.
 # Files that already exceed it are listed in scripts/line_limit_exceptions.txt with
 # their current size. They may shrink but never grow: a ratchet, so the debt
 # cannot get worse while it waits for its refactor (see docs/TECH_DEBT.md).
@@ -30,6 +34,7 @@ Get-Content "scripts/line_limit_exceptions.txt" | Where-Object { $_ -and -not $_
 $bad = @()
 Get-ChildItem crates -Recurse -Filter *.rs | ForEach-Object {
     $rel = (Resolve-Path -Relative $_.FullName).TrimStart(".\").Replace("\", "/")
+    if ($rel -match '/(tests|benches)/') { return }
     $lines = Get-Content $_.FullName
     $test = ($lines | Select-String -Pattern '^#!?\[cfg\(test\)\]' | Select-Object -First 1).LineNumber
     $prod = if ($test) { $test - 1 } else { $lines.Count }

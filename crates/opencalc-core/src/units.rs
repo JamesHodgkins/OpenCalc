@@ -103,32 +103,42 @@ pub struct UnitDef {
     pub to_si_scale: f64,
 }
 
-/// Look up a built-in unit by symbol. Offset scales (degC, degF) come later.
+/// The built-in units: symbol, dimension, and the factor that turns a value in
+/// the unit into SI. One table, so a unit cannot be added in one place and
+/// missed in another. Offset scales (degC, degF) come later (see TECH_DEBT).
+const BUILTIN: &[(&str, Dimension, f64)] = &[
+    ("m", Dimension::LENGTH, 1.0),
+    ("mm", Dimension::LENGTH, 1e-3),
+    ("cm", Dimension::LENGTH, 1e-2),
+    ("km", Dimension::LENGTH, 1e3),
+    ("in", Dimension::LENGTH, 0.0254),
+    ("ft", Dimension::LENGTH, 0.3048),
+    ("kg", Dimension::MASS, 1.0),
+    ("g", Dimension::MASS, 1e-3),
+    ("lb", Dimension::MASS, 0.453_592_37),
+    ("s", Dimension::TIME, 1.0),
+    ("N", Dimension::FORCE, 1.0),
+    ("kN", Dimension::FORCE, 1e3),
+    ("Pa", Dimension::PRESSURE, 1.0),
+    ("kPa", Dimension::PRESSURE, 1e3),
+    ("MPa", Dimension::PRESSURE, 1e6),
+];
+
+/// Look up a built-in unit by symbol.
 pub fn builtin_unit(symbol: &str) -> Option<UnitDef> {
-    let (force, pressure) = (Dimension::FORCE, Dimension::PRESSURE);
-    let (dimension, scale) = match symbol {
-        "m" => (Dimension::LENGTH, 1.0),
-        "mm" => (Dimension::LENGTH, 1e-3),
-        "cm" => (Dimension::LENGTH, 1e-2),
-        "km" => (Dimension::LENGTH, 1e3),
-        "in" => (Dimension::LENGTH, 0.0254),
-        "ft" => (Dimension::LENGTH, 0.3048),
-        "kg" => (Dimension::MASS, 1.0),
-        "g" => (Dimension::MASS, 1e-3),
-        "lb" => (Dimension::MASS, 0.453_592_37),
-        "s" => (Dimension::TIME, 1.0),
-        "N" => (force, 1.0),
-        "kN" => (force, 1e3),
-        "Pa" => (pressure, 1.0),
-        "kPa" => (pressure, 1e3),
-        "MPa" => (pressure, 1e6),
-        _ => return None,
-    };
-    Some(UnitDef {
-        symbol: symbol.to_owned(),
-        dimension,
-        to_si_scale: scale,
-    })
+    BUILTIN
+        .iter()
+        .find(|(s, _, _)| *s == symbol)
+        .map(|(s, dimension, scale)| UnitDef {
+            symbol: (*s).to_owned(),
+            dimension: *dimension,
+            to_si_scale: *scale,
+        })
+}
+
+/// Every built-in unit symbol, for tests and for listing units in the UI.
+pub fn builtin_symbols() -> impl Iterator<Item = &'static str> {
+    BUILTIN.iter().map(|(s, _, _)| *s)
 }
 
 /// Errors from quantity arithmetic.
@@ -342,6 +352,41 @@ mod tests {
             .checked_times(Dimension::LENGTH)
             .and_then(|d| d.checked_over(Dimension::TIME.checked_powi(2)?));
         assert_eq!(force_from_base, Some(Dimension::FORCE));
+    }
+
+    #[test]
+    fn the_unit_table_has_unique_symbols_and_sane_scales() {
+        let symbols: Vec<&str> = builtin_symbols().collect();
+        let mut sorted = symbols.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), symbols.len(), "duplicate unit symbol");
+        for s in symbols {
+            let u = builtin_unit(s).expect(s);
+            assert!(u.to_si_scale.is_finite() && u.to_si_scale > 0.0, "{s}");
+            assert!(!u.dimension.is_dimensionless(), "{s} has no dimension");
+        }
+        assert!(builtin_unit("furlong").is_none());
+    }
+
+    /// Relationships that are definitions or exact by convention, stated
+    /// independently of the table's own numbers.
+    #[test]
+    fn unit_scales_agree_with_their_exact_definitions() {
+        let si = |v: f64, u: &str| Quantity::from_unit(v, u).unwrap().si;
+        assert_eq!(si(1.0, "in"), 0.0254, "the international inch");
+        assert!(
+            (si(1.0, "ft") - 12.0 * si(1.0, "in")).abs() < 1e-15,
+            "12 in = 1 ft"
+        );
+        assert_eq!(si(1.0, "lb"), 0.453_592_37, "the avoirdupois pound");
+        assert_eq!(si(1.0, "kN"), 1000.0 * si(1.0, "N"));
+        assert_eq!(si(1.0, "MPa"), 1000.0 * si(1.0, "kPa"));
+        assert_eq!(si(1.0, "kPa"), 1000.0 * si(1.0, "Pa"));
+        assert_eq!(si(1000.0, "mm"), si(1.0, "m"));
+        assert_eq!(si(100.0, "cm"), si(1.0, "m"));
+        assert_eq!(si(1.0, "km"), 1000.0 * si(1.0, "m"));
+        assert_eq!(si(1000.0, "g"), si(1.0, "kg"));
     }
 
     #[test]

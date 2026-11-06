@@ -1,0 +1,20 @@
+# source: elementary mechanics: W = m g, KE = m v^2 / 2, x = v0 t + a t^2 / 2,
+#   hydrostatic pressure = rho g h; standard gravity is 9.80665 m/s^2 by definition
+# hand check: W = 2 * 9.80665 = 19.6133 N; KE = 2 * 9 / 2 = 9 J;
+#   x = 10 * 5 + 2 * 25 / 2 = 75 m; p = 1000 * 9.80665 * 10 = 98 066.5 Pa
+g_std := 9.80665 m / s^2
+mass := 2 kg
+weight := mass * g_std
+speed := 3 m / s
+ke := mass * speed^2 / 2
+v0 := 10 m / s
+acc := 2 m / s^2
+time := 5 s
+dist := v0 * time + acc * time^2 / 2
+rho := 1000 kg / m^3
+depth := 10 m
+press := rho * g_std * depth
+=> weight = 19.6133 N
+=> ke = 9 kg * m^2 / s^2
+=> dist = 75 m
+=> press = 98066.5 Pa

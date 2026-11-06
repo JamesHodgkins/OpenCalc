@@ -1,0 +1,20 @@
+# source: exact definitions: 1 in = 0.0254 m, 1 ft = 12 in, 1 lb = 0.45359237 kg
+#   (international yard and pound agreement), and SI prefixes
+inches := 12 in
+foot := 1 ft
+pounds := 10 lb
+load := 2.5 kN
+pressure := 750 kPa
+distance := 3 km
+grams := 250 g
+centimetres := 100 cm
+combined := 1 ft + 6 in
+=> inches = 0.3048 m
+=> foot = 0.3048 m
+=> pounds = 4.5359237 kg
+=> load = 2500 N
+=> pressure = 750000 Pa
+=> distance = 3000 m
+=> grams = 0.25 kg
+=> centimetres = 1 m
+=> combined = 0.4572 m

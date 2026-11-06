@@ -1,0 +1,10 @@
+# source: standard thin-walled cylinder results: hoop = p r / t, axial = p r / (2 t)
+# hand check: p r / t = 2e6 Pa * 0.5 m / 0.01 m = 1e8 Pa; the axial stress is half of it
+p := 2 MPa
+r := 500 mm
+t := 10 mm
+hoop := p * r / t
+axial := p * r / (2 * t)
+=> hoop = 100 MPa
+=> axial = 50 MPa
+=> hoop = 100000000 Pa

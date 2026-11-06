@@ -1,0 +1,15 @@
+# source: standard beam formula, simply supported beam with a central point load:
+#   delta = P L^3 / (48 E I),  I = b h^3 / 12  for a rectangular section
+# hand check: I = 0.2 * 0.4^3 / 12 = 0.0128 / 12 = 0.0010666667 m^4
+#   48 E I = 48 * 2e11 * 1.0666667e-3 = 1.024e10 Pa m^4
+#   P L^3 = 5000 * 64 = 320 000 N m^3,  delta = 320 000 / 1.024e10 = 3.125e-5 m
+P := 5 kN
+L := 4 m
+E := 200000 MPa
+b := 0.2 m
+h := 0.4 m
+I := b * h^3 / 12
+delta := P * L^3 / (48 * E * I)
+=> I = 0.001066666666666667 m^4
+=> delta = 3.125e-5 m
+=> delta = 0.03125 mm

@@ -1,0 +1,11 @@
+# source: original; names are used before they are defined, as a calculation note
+#   often reads (results first, inputs last)
+# hand check: a = 5, b = 6, c = 12, total = 23
+total := a + b + c
+c := b * 2
+b := a + 1
+a := 5
+=> a = 5
+=> b = 6
+=> c = 12
+=> total = 23

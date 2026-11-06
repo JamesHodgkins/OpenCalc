@@ -1,0 +1,10 @@
+# source: elementary geometry: the 3-4-5 right triangle, area = base * height / 2
+# hand check: sqrt(9 + 16) = 5; area = 3 * 4 / 2 = 6; sqrt(2) * 3 = 4.242640687119285
+leg_a := 3 m
+leg_b := 4 m
+hyp := sqrt(leg_a^2 + leg_b^2)
+area := leg_a * leg_b / 2
+diag := sqrt(2) * leg_a
+=> hyp = 5 m
+=> area = 6 m^2
+=> diag = 4.242640687119285 m

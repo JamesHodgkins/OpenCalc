@@ -1,0 +1,7 @@
+# source: elementary: mass = density * volume; 7850 kg/m^3 is the usual figure for steel
+# hand check: V = 0.5 * 0.2 * 0.1 = 0.01 m^3; mass = 7850 * 0.01 = 78.5 kg
+rho := 7850 kg / m^3
+vol := 0.5 m * 0.2 m * 0.1 m
+mass := rho * vol
+=> vol = 0.01 m^3
+=> mass = 78.5 kg

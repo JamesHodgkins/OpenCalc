@@ -16,7 +16,7 @@ context is in `ARCHITECTURE.md`.
 | TD-08 | `Quantity` is a real `f64`. No `Value` enum: no vectors, matrices, complex, text, booleans. | Blocks ranges, vectors, `sqrt(-4) = 2i`. | Phase C, before M2 vectors | M |
 | TD-09 | Units are a hard-coded `match` (`builtin_unit`). No `UnitRegistry`, custom units, per-worksheet unit system, or temperature offsets. The SI/USCS/CGS selector is now shown disabled in the status bar and unhandled in the ribbon (was clickable and did nothing). | Core feature (SPEC 2.3) missing; misleading control. | Phase C; disable the control now (owner decision 4) | M |
 | TD-10 | Errors carry no source position (`Expr::Error(String)`, `EvalError`). | SPEC "error tracing" cannot highlight the failing sub-expression. | With spans in phase C | M |
-| TD-07 | Evaluator recomputes the whole sheet on every edit; no dirty propagation; no benchmark for the 200-region / 500-region targets (SPEC 5.6). | Unknown until measured. | Add benchmark in phase C; build incremental recalculation if over budget | M |
+| TD-07 | The evaluator recomputes the whole sheet on every edit; there is no dirty propagation. **Measured (docs/PERFORMANCE.md): 500 regions in 0.39 ms against a 200 ms budget, so this is not needed.** | None at current scale. | Revisit only if a measurement after phase C or Milestone 2 approaches a budget | M |
 | TD-20 | No cancellation (`AtomicBool`) for long computations. | Needed once integrals or root-finding exist. | When those land | S |
 | TD-19 | `MAX_SYMBOLS = 128` per region. | Rejects a legitimately very long equation. | Revisit if frames shrink or the structured editor changes input shape; keep the stack-margin tests | S |
 | TD-23 | Region IDs restart at 1 on every worksheet. | Cross-sheet references and global definitions (`≡`) need a worksheet-qualified ID. | With global definitions | S |
@@ -34,10 +34,11 @@ context is in `ARCHITECTURE.md`.
 
 | ID | Debt | Impact | Pay by | Size |
 |---|---|---|---|---|
-| TD-15 | Typesetting is redone every frame for visible regions; only the *sizes* are cached. | Fine at 10 regions; unknown at 200 (target 60 fps). | Measure in phase C; cache layouts if over budget | M |
+| TD-15 | Typesetting is redone every frame for visible regions; only the *sizes* are cached. **Measured: 0.76 ms for a frame with 200 visible regions against 16.7 ms, excluding tessellation and the GPU.** | None at current scale. Tessellation and GPU time are not yet measured. | Revisit if a real-window frame is slow | M |
+| TD-27 | Measured region sizes (document units) vary slightly with zoom, because of font rounding at small pixel sizes. "Fit" computed from sizes measured at another zoom undershoots, so it needs two passes to be exact (found by the performance test). | A small, visible imprecision in Fit. | When a layout cache is built, key it by zoom bucket | S |
 | TD-26 | No continuous integration and no `cargo deny` / `cargo audit`. `scripts/check.ps1` is run by hand. | The gate only works if someone remembers to run it. Only Windows is exercised. | With the first Linux/macOS work (M3) | S |
 | TD-18 | Placeholder controls that look real: the "12 pt" font-size slot. | Misleading until Format is built. | When Format tab is implemented | S |
-| TD-22 | No property tests for unit algebra or golden tests for the parser (SPEC Milestone 2 asks for both). Smoke tests are single-threaded and cannot reproduce timing races. | Algebra bugs are found by luck. | M2 | M |
+| TD-22 | Property tests for unit algebra and a corpus of hand-checked worksheets are done (R-19). Still missing: golden tests for the parser (SPEC Milestone 2) and a unit-algebra property over custom units (needs the phase C registry). Smoke tests cannot reproduce timing races. | Parser output is checked indirectly, through evaluation. | M2 | S |
 | TD-24 | Only Inter Regular is bundled (no bold or italic), so the Format tab's Bold and Italic cannot be implemented yet. Lucide icons are private-use codepoints and rely on font order. | Blocks rich text. | When Format tab is built | S |
 
 ## Paid in the 2026-11-06 review
@@ -62,3 +63,5 @@ context is in `ARCHITECTURE.md`.
 | R-16 | TD-04: command IDs were strings in three lists; unknown IDs ignored; 49 of 70 ribbon items had no handler and nothing tracked it. | One `CommandId` table (a macro generates the enum, name, label and icon together). Key bindings are one table that gives both the behaviour and the tooltip text. `is_implemented` is an exhaustive match, and a test checks `dispatch` agrees with it. |
 | R-17 | TD-05: `App` was a god object; `shell.rs` mutated it in 4 places; two files over the size limit. | `AppState` (data) + `dispatch` (the only mutator) + `panels/` (read-only, push commands). The size exceptions list is empty. |
 | R-18 | TD-17: bar heights and similar were inline numbers. | `theme::metrics` holds the bar heights; the frame code uses them. |
+| R-19 | TD-22 (part): no property tests and no corpus. | 22 property tests (unit algebra over the whole exponent range, no input can panic or yield a non-finite number, layout order never changes a result, plus a differential test against an independent reference interpreter) and 13 hand-checked textbook worksheets with a self-testing harness. Each audit bug was reintroduced to confirm the tests catch it. |
+| R-20 | No performance baseline; the SPEC 5.6 targets were unmeasured. | `benches/recalc.rs`, a UI frame-time test, and `docs/PERFORMANCE.md`. A coarse tripwire in the gate. |

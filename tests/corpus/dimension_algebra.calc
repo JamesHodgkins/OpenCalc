@@ -1,0 +1,13 @@
+# source: original; dimensions of derived quantities
+# hand check: moment = 6 kN * 2 m = 12 kN m = 12 000 N m; stiffness = 6 kN / 2 m = 3000 N/m;
+#   area = 4 m^2; volume = 8 m^3
+span := 2 m
+force := 6 kN
+moment := force * span
+stiffness := force / span
+area := span * span
+volume := area * span
+=> moment = 12000 N * m
+=> stiffness = 3000 N / m
+=> area = 4 m^2
+=> volume = 8 m^3

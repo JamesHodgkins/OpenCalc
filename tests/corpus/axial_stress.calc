@@ -1,0 +1,11 @@
+# source: standard strength-of-materials result, stress = force / area
+# hand check: A = (0.1 m)^2 = 0.01 m^2, so sigma = 10 000 N / 0.01 m^2 = 1 000 000 Pa
+# written out of dependency order on purpose
+sigma := F / A
+F := 10 kN
+b := 100 mm
+A := b^2
+=> A = 0.01 m^2
+=> F = 10000 N
+=> sigma = 1000000 Pa
+=> sigma = 1 MPa
