@@ -10,9 +10,10 @@ description = "OpenCalc document model, parser, evaluator and units. No UI code.
 serde.workspace = true
 thiserror.workspace = true
 num-complex.workspace = true
+serde_json.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
 proptest.workspace = true
 
 [[bench]]

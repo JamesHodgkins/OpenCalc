@@ -3,3 +3,5 @@
 *.ttf binary
 *.png binary
 *.ron binary
+# Fixtures are binary; never convert line endings.
+*.ocx binary

@@ -272,6 +272,24 @@ fn main() {
         Some(ms(16)),
     );
 
+    // Saving and loading a file (docs/PERSISTENCE.md: under 20 ms for 500 regions).
+    let doc = worksheet_document(500);
+    let bytes = opencalc_core::persist::save_bytes(&doc).expect("save");
+    add(
+        "save 500 regions to bytes",
+        sample(runs, || {
+            std::hint::black_box(opencalc_core::persist::save_bytes(&doc).expect("save"));
+        }),
+        Some(ms(20)),
+    );
+    add(
+        "load 500 regions from bytes",
+        sample(runs, || {
+            std::hint::black_box(opencalc_core::persist::load_bytes(&bytes).expect("load"));
+        }),
+        Some(ms(20)),
+    );
+
     println!("\nOpenCalc core performance (release build; {runs} runs each)\n");
     println!(
         "{:<58} {:>11} {:>11} {:>11}   budget",

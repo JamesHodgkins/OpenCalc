@@ -10,6 +10,7 @@ pub mod expr;
 pub mod functions;
 pub mod numeric;
 pub mod parser;
+pub mod persist;
 pub mod registry;
 pub mod units;
 pub mod value;
