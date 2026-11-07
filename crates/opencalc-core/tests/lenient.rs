@@ -202,3 +202,19 @@ proptest! {
         prop_assert!(!matches!(expr, Expr::Error(_)));
     }
 }
+
+#[test]
+fn a_greek_name_being_entered_is_one_piece() {
+    for src in [r"\alpha", r"\", r"\sig", r"x+\alpha", r"2\beta"] {
+        checked(src);
+    }
+    assert_eq!(
+        checked(r"\alpha"),
+        Expr::Garbage {
+            head: None,
+            text: r"\alpha".into()
+        }
+    );
+    // The strict parse still refuses it.
+    assert!(matches!(parse(r"\alpha"), Expr::Error(_)));
+}

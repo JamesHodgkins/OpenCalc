@@ -171,6 +171,16 @@ pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usiz
                 toks.push(Tok::Semicolon);
                 i += 1;
             }
+            // A Greek name being entered, `\alpha`, is one piece, not a stray
+            // backslash followed by a name.
+            '\\' if lenient => {
+                let start = i;
+                i += 1;
+                while i < chars.len() && chars[i].is_ascii_alphabetic() {
+                    i += 1;
+                }
+                toks.push(Tok::Bad(chars[start..i].iter().collect()));
+            }
             other if lenient => {
                 toks.push(Tok::Bad(other.to_string()));
                 i += 1;
