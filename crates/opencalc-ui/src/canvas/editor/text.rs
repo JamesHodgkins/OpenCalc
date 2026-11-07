@@ -150,10 +150,16 @@ impl Field {
         let after = self.chars.get(self.caret).copied();
         let hand_typed_define = before(1) == Some('=') && before(2) == Some(':');
         match s {
-            " " if !self.has_selection() && self.expand_greek(greek) => {}
+            // Spaces are not typed into math: the display does the spacing. A space
+            // after a backslash name is the Greek-letter terminator.
+            " " => {
+                if !self.has_selection() {
+                    self.expand_greek(greek);
+                }
+            }
             ":" if after != Some('=') => self.insert(":="),
             "=" if !self.has_selection() && hand_typed_define => {}
-            _ => self.insert(s),
+            _ => self.insert(&s.replace(' ', "")),
         }
     }
 
@@ -276,14 +282,17 @@ mod tests {
         // Case matters, and an unknown name keeps its text and gets the space.
         let mut g = Field::new("\\delta");
         g.typed(" ", greek);
-        assert_eq!(g.text(), "\\delta ");
+        assert_eq!(g.text(), r"\delta", "an unknown name stays as typed");
         let mut h = Field::new("\\Delta");
         h.typed(" ", greek);
         assert_eq!(h.text(), "\u{394}");
         // A name with no backslash is left alone.
         let mut k = Field::new("alpha");
         k.typed(" ", greek);
-        assert_eq!(k.text(), "alpha ");
+        assert_eq!(k.text(), "alpha", "spaces are never typed into math");
+        let mut m = Field::new("");
+        m.typed("a b  c", greek);
+        assert_eq!(m.text(), "abc", "spaces inside typed text are dropped");
     }
 
     #[test]
@@ -296,7 +305,7 @@ mod tests {
         f.typed(" ", greek);
         f.typed("1", greek);
         f.typed("=", greek);
-        assert_eq!(f.text(), "x := 1=", "other equals signs are kept");
+        assert_eq!(f.text(), "x :=1=", "other equals signs are kept");
         // Typing : in front of an = does not double it either.
         let mut g = Field::new("x =");
         g.set_caret(2, false);

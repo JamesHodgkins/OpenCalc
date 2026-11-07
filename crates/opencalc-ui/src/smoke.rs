@@ -545,7 +545,7 @@ fn typing_into_a_region_is_one_undo_step_and_recalculates_live() {
     h.settle();
     h.command(CommandId::InsertMath); // opens the new region for editing with focus
     h.frame();
-    for ch in ["q", " ", ":", "=", " ", "7"] {
+    for ch in ["q", ":", "=", "7"] {
         h.frame_with(vec![Event::Text(ch.to_owned())]);
     }
     let id = *h
@@ -558,7 +558,7 @@ fn typing_into_a_region_is_one_undo_step_and_recalculates_live() {
         RegionKind::Math(m) => m.source().to_owned(),
         _ => panic!("math region"),
     };
-    assert_eq!(source(&h), "q := 7");
+    assert_eq!(source(&h), "q:=7");
     h.settle();
     assert!(
         h.app.state.output.values[&id].is_ok(),
@@ -819,11 +819,11 @@ fn shift_arrows_select_and_typing_replaces_the_selection() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("x + yy");
+    h.type_text("x+yy");
     h.press_key(Key::ArrowLeft, SHIFT);
     h.press_key(Key::ArrowLeft, SHIFT);
     h.type_text("z");
-    assert_eq!(h.source_of(id), "x + z");
+    assert_eq!(h.source_of(id), "x+z");
     h.press_key(Key::A, Modifiers::COMMAND);
     h.type_text("q");
     assert_eq!(h.source_of(id), "q");
@@ -834,10 +834,10 @@ fn copy_puts_the_source_text_of_the_selection_on_the_clipboard_and_cut_removes_i
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("a / b");
+    h.type_text("a/b");
     h.press_key(Key::Home, SHIFT);
     h.frame_with(vec![Event::Copy]);
-    assert_eq!(h.copied.as_deref(), Some("a / b"));
+    assert_eq!(h.copied.as_deref(), Some("a/b"));
     h.frame_with(vec![Event::Cut]);
     assert_eq!(h.source_of(id), "");
     h.frame_with(vec![Event::Paste("1\n+ 2".to_owned())]);
@@ -863,13 +863,13 @@ fn arrows_skip_characters_that_draw_nothing_and_up_down_move_between_fraction_li
     );
     // In a fraction, Up goes to the numerator and Down back to the denominator.
     h.press_key(Key::A, Modifiers::COMMAND);
-    h.type_text("a / b");
-    assert_eq!(h.source_of(id), "a / b");
+    h.type_text("a/b");
+    assert_eq!(h.source_of(id), "a/b");
     h.press_key(Key::End, Modifiers::NONE);
     h.press_key(Key::ArrowUp, Modifiers::NONE);
     assert!(h.caret() <= 1, "caret in the numerator: {}", h.caret());
     h.press_key(Key::ArrowDown, Modifiers::NONE);
-    assert!(h.caret() >= 4, "caret in the denominator: {}", h.caret());
+    assert!(h.caret() >= 2, "caret in the denominator: {}", h.caret());
 }
 
 #[test]
@@ -877,7 +877,7 @@ fn clicking_in_the_region_places_the_caret_and_a_double_click_selects_a_node() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("alpha + beta");
+    h.type_text("alpha+beta");
     h.frame();
     let sheet = h.sheet();
     let r = sheet.doc.region(id).expect("region");
@@ -903,7 +903,7 @@ fn clicking_in_the_region_places_the_caret_and_a_double_click_selects_a_node() {
     assert!(h.caret() >= 10, "a click near the right: {}", h.caret());
     assert_eq!(
         h.source_of(id),
-        "alpha + beta",
+        "alpha+beta",
         "clicking never changes the text"
     );
 }
@@ -913,12 +913,12 @@ fn enter_and_escape_end_editing_and_the_whole_burst_is_one_undo_step() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("m := 3");
+    h.type_text("m:=3");
     h.press_key(Key::Escape, Modifiers::NONE);
     h.frame();
     assert!(h.sheet().canvas.editing.is_none());
     assert!(h.sheet().canvas.field.is_none());
-    assert_eq!(h.source_of(id), "m := 3");
+    assert_eq!(h.source_of(id), "m:=3");
     h.key(Key::Z, Modifiers::COMMAND);
     assert_eq!(h.source_of(id), "");
 }
@@ -928,10 +928,10 @@ fn half_typed_input_never_breaks_a_frame_and_a_huge_paste_is_capped() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    for text in ["(", "1 +", " $", " * [1, 2; 3", " f(", "\u{20ac}"] {
+    for text in ["(", "1+", "$", "*[1,2;3", "f(", "\u{20ac}"] {
         h.type_text(text);
     }
-    assert_eq!(h.source_of(id), "(1 + $ * [1, 2; 3 f(\u{20ac}");
+    assert_eq!(h.source_of(id), "(1+$*[1,2;3f(\u{20ac}");
     h.frame_with(vec![Event::Paste("9".repeat(20_000))]);
     assert!(h.source_of(id).chars().count() <= 8192);
     h.settle();
@@ -942,14 +942,14 @@ fn the_functions_window_inserts_into_the_region_being_edited() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("x := ");
+    h.type_text("x:=");
     h.sheet().doc.region(id).expect("region");
     // An edit from outside the editor (as the Functions window makes) is picked up.
-    let source = "x := sqrt(".to_owned();
+    let source = "x:=sqrt(".to_owned();
     h.app.state.sheets[0].edit(Edit::SetMathSource { id, source });
     h.frame();
     h.type_text("4)");
-    assert_eq!(h.source_of(id), "x := sqrt(4)");
+    assert_eq!(h.source_of(id), "x:=sqrt(4)");
 }
 
 #[test]
@@ -960,8 +960,8 @@ fn backslash_names_become_greek_letters_and_a_colon_makes_a_define() {
     h.type_text(r"\sigma");
     h.type_text(" ");
     h.type_text(":");
-    h.type_text("= 5");
-    assert_eq!(h.source_of(id), "\u{3c3}:= 5");
+    h.type_text("=5");
+    assert_eq!(h.source_of(id), "\u{3c3}:=5");
     h.press_key(Key::A, Modifiers::COMMAND);
     h.type_text(r"\beta");
     h.press_key(Key::Tab, Modifiers::NONE);
@@ -1008,7 +1008,7 @@ fn autocomplete_offers_names_defined_in_the_worksheet_and_arrows_choose() {
     let mut h = Harness::new();
     h.settle();
     let first = h.new_math();
-    h.type_text("stress_y := 250");
+    h.type_text("stress_y:=250");
     h.press_key(Key::Enter, Modifiers::NONE);
     h.settle();
     let second = h.new_math();
@@ -1023,13 +1023,13 @@ fn a_subscript_name_edits_like_any_other_text() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("F_x + F_y");
+    h.type_text("F_x+F_y");
     h.press_key(Key::Home, Modifiers::NONE);
     h.press_key(Key::ArrowRight, Modifiers::NONE);
     h.press_key(Key::ArrowRight, Modifiers::NONE);
     h.press_key(Key::ArrowRight, Modifiers::NONE);
     assert!(h.caret() >= 3, "{}", h.caret());
-    assert_eq!(h.source_of(id), "F_x + F_y");
+    assert_eq!(h.source_of(id), "F_x+F_y");
     h.settle();
 }
 
@@ -1104,19 +1104,19 @@ fn a_greek_letter_from_the_ribbon_goes_in_at_the_caret_while_editing() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("x := ");
+    h.type_text("x:=");
     h.command(CommandId::InsertSymbol('\u{3c3}'));
-    assert_eq!(h.source_of(id), "x := \u{3c3}");
-    h.type_text(" + 1");
+    assert_eq!(h.source_of(id), "x:=\u{3c3}");
+    h.type_text("+1");
     assert_eq!(
         h.source_of(id),
-        "x := \u{3c3} + 1",
+        "x:=\u{3c3}+1",
         "typing carries on after the letter"
     );
     // In the middle: the letter goes at the caret and replaces a selection.
     h.press_key(Key::Home, Modifiers::NONE);
     h.command(CommandId::InsertSymbol('\u{3b1}'));
-    assert_eq!(h.source_of(id), "\u{3b1}x := \u{3c3} + 1");
+    assert_eq!(h.source_of(id), "\u{3b1}x:=\u{3c3}+1");
     // One undo step for the typing before, and the letter edits are undoable.
     h.press_key(Key::Escape, Modifiers::NONE);
     h.frame();
@@ -1149,7 +1149,7 @@ fn clicking_a_flyout_that_floats_over_the_canvas_does_not_end_editing() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("x := ");
+    h.type_text("x:=");
     // The Greek flyout (Math tab, Symbols panel) hangs below the ribbon, over the page.
     h.app.ribbon_state.open_panel = Some((0, 4));
     h.frame();
@@ -1179,7 +1179,7 @@ fn up_and_down_remember_the_column_they_started_from() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("a / b");
+    h.type_text("a/b");
     h.press_key(Key::End, Modifiers::NONE);
     h.press_key(Key::ArrowUp, Modifiers::NONE);
     let goal = h.sheet().canvas.field.as_ref().expect("editing").goal_x;
@@ -1196,11 +1196,7 @@ fn up_and_down_remember_the_column_they_started_from() {
         None,
         "a horizontal move forgets it"
     );
-    assert_eq!(
-        h.source_of(id),
-        "a / b",
-        "navigation never edits the source"
-    );
+    assert_eq!(h.source_of(id), "a/b", "navigation never edits the source");
 }
 
 #[test]
@@ -1208,7 +1204,7 @@ fn moving_the_caret_makes_no_edit_and_undo_while_editing_keeps_it_in_range() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("x + 12345");
+    h.type_text("x+12345");
     let before = h.source_of(id);
     h.press_key(Key::Home, Modifiers::NONE);
     h.press_key(Key::ArrowRight, SHIFT);
@@ -1290,7 +1286,7 @@ fn deleting_the_region_being_edited_closes_the_editor() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("x + 1");
+    h.type_text("x+1");
     h.command(CommandId::RegionDelete);
     h.frame();
     assert!(h.sheet().doc.region(id).is_none());
@@ -1354,7 +1350,7 @@ fn zooming_while_editing_keeps_the_caret_and_clicks_consistent() {
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("a / b");
+    h.type_text("a/b");
     let caret = h.caret();
     for c in [
         CommandId::ViewZoomIn,
@@ -1364,10 +1360,10 @@ fn zooming_while_editing_keeps_the_caret_and_clicks_consistent() {
         h.command(c);
         h.frame();
         assert_eq!(h.caret(), caret, "zoom never moves the caret in the source");
-        assert_eq!(h.source_of(id), "a / b");
+        assert_eq!(h.source_of(id), "a/b");
     }
     h.type_text("c");
-    assert_eq!(h.source_of(id), "a / bc");
+    assert_eq!(h.source_of(id), "a/bc");
 }
 
 #[test]
@@ -1375,7 +1371,7 @@ fn enter_readies_the_next_input_below_and_typing_starts_it() {
     let mut h = Harness::new();
     h.settle();
     let first = h.new_math();
-    h.type_text("a := 1");
+    h.type_text("a:=1");
     h.key(Key::Enter, Modifiers::NONE);
     assert!(h.sheet().canvas.editing.is_none());
     assert!(
@@ -1391,7 +1387,7 @@ fn enter_readies_the_next_input_below_and_typing_starts_it() {
     let id = *h.sheet().canvas.selection.first().expect("selected");
     assert_ne!(id, first);
     assert_eq!(h.source_of(id), "b");
-    assert_eq!(h.source_of(first), "a := 1", "the first input is untouched");
+    assert_eq!(h.source_of(first), "a:=1", "the first input is untouched");
 }
 
 #[test]
@@ -1399,7 +1395,7 @@ fn ctrl_space_grows_the_selection_through_the_expression_and_typing_replaces_it(
     let mut h = Harness::new();
     h.settle();
     let id = h.new_math();
-    h.type_text("1 + a / b");
+    h.type_text("1+a/b");
     h.press_key(Key::ArrowLeft, Modifiers::NONE);
     h.press_key(Key::Space, Modifiers::COMMAND);
     let sel = |h: &Harness| {
@@ -1410,13 +1406,13 @@ fn ctrl_space_grows_the_selection_through_the_expression_and_typing_replaces_it(
             .expect("editing")
             .selection()
     };
-    assert_eq!(sel(&h), (8, 9), "the denominator");
+    assert_eq!(sel(&h), (4, 5), "the denominator");
     h.press_key(Key::Space, Modifiers::COMMAND);
-    assert_eq!(sel(&h), (4, 9), "the whole fraction");
+    assert_eq!(sel(&h), (2, 5), "the whole fraction");
     h.press_key(Key::Space, Modifiers::COMMAND);
-    assert_eq!(sel(&h), (0, 9), "the whole sum");
+    assert_eq!(sel(&h), (0, 5), "the whole sum");
     h.press_key(Key::Space, Modifiers::COMMAND);
-    assert_eq!(sel(&h), (0, 9), "nothing larger");
+    assert_eq!(sel(&h), (0, 5), "nothing larger");
     h.press_key(Key::Backspace, Modifiers::NONE);
     assert_eq!(h.source_of(id), "");
 }

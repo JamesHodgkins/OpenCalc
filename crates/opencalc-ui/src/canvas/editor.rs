@@ -7,11 +7,12 @@
 //! goes, and draws.
 
 mod complete;
+mod popup;
 mod text;
 
 use eframe::egui::{
-    self, Align2, Event, EventFilter, FontId, Id, Key, Modifiers, Order, Pos2, Rect, RichText,
-    Sense, Stroke, Ui, Vec2,
+    self, Align2, Event, EventFilter, FontId, Id, Key, Modifiers, Pos2, Rect, Sense, Stroke, Ui,
+    Vec2,
 };
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::edit::Edit;
@@ -160,6 +161,12 @@ pub(super) fn math(
         for event in events {
             let (start, list) = complete::for_field(field, &defined);
             match event {
+                Event::Text(s) if s == " " => {
+                    // Space finishes a Greek name, else grows the selection.
+                    if field.has_selection() || !field.expand_greek(greek_by_name) {
+                        grow(field, &lay);
+                    }
+                }
                 Event::Text(s) => field.typed(&s, greek_by_name),
                 Event::Paste(s) => field.insert(&s),
                 Event::Copy => copy(ui, field),
@@ -256,7 +263,7 @@ pub(super) fn math(
         return;
     }
     let at = text_origin + Vec2::new(caret.min.x, caret.max.y + 4.0);
-    let (rect, clicked) = popup(ui, popup_id, at, &list, field.pick, env);
+    let (rect, clicked) = popup::show(ui, popup_id, at, &list, field.pick, env);
     ui.data_mut(|d| d.insert_temp(popup_id, rect));
     if let Some(i) = clicked {
         accept(field, start, &list[i]);
@@ -306,11 +313,7 @@ fn key_down(
         Key::Backspace => field.backspace(),
         Key::Delete => field.delete(),
         Key::A if mods.command => field.select_all(),
-        Key::Space if mods.command => {
-            let (a, b) = field.selection();
-            let (s, e) = lay.grow(a, b);
-            field.select(s, e);
-        }
+        Key::Space if mods.command => grow(field, lay),
         Key::Home => field.set_caret(0, shift),
         Key::End => field.set_caret(len, shift),
         Key::ArrowLeft | Key::ArrowRight => {
@@ -342,6 +345,13 @@ fn key_down(
     false
 }
 
+/// Space: select the next larger piece of the expression around the selection.
+fn grow(field: &mut Field, lay: &SourceLayout) {
+    let (a, b) = field.selection();
+    let (s, e) = lay.grow(a, b);
+    field.select(s, e);
+}
+
 /// One character left or right, skipping characters that draw nothing (the caret
 /// would not appear to move).
 fn step(lay: &SourceLayout, from: usize, dir: i64, len: usize) -> usize {
@@ -358,37 +368,4 @@ fn step(lay: &SourceLayout, from: usize, dir: i64, len: usize) -> usize {
             return o;
         }
     }
-}
-
-/// Draw the list at `at`. Returns its rectangle and the entry clicked, if any.
-fn popup(
-    ui: &Ui,
-    id: Id,
-    at: Pos2,
-    list: &[Candidate],
-    pick: usize,
-    env: &Env,
-) -> (Rect, Option<usize>) {
-    let mut clicked = None;
-    let area = egui::Area::new(id)
-        .order(Order::Foreground)
-        .fixed_pos(at)
-        .show(ui.ctx(), |ui| {
-            egui::Frame::popup(ui.style())
-                .fill(env.theme.surface)
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 1.0;
-                    for (i, c) in list.iter().enumerate() {
-                        ui.horizontal(|ui| {
-                            let selected = i == pick.min(list.len() - 1);
-                            let label = RichText::new(&c.label).monospace();
-                            if ui.selectable_label(selected, label).clicked() {
-                                clicked = Some(i);
-                            }
-                            ui.label(RichText::new(&c.detail).small().color(env.theme.text_weak));
-                        });
-                    }
-                });
-        });
-    (area.response.rect, clicked)
 }
