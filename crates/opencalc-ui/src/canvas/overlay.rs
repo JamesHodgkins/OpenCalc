@@ -11,7 +11,7 @@ use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::edit::Edit;
 
 use super::adapt::rect_of;
-use super::{editor, CanvasCmd, CanvasUi, CanvasView, Env};
+use super::{editor, CanvasCmd, CanvasUi, CanvasView, Drag, Env};
 
 /// The in-place editor for the region being edited.
 pub(super) fn edit_overlay(
@@ -231,4 +231,20 @@ pub(super) fn next_input_below(st: &mut CanvasUi, region: &Region) {
     st.insert_at = super::view::snap(Pos2::new(r.min.x, r.max.y + 12.0), super::view::GRID);
     st.selection.clear();
     st.armed = true;
+}
+
+/// The rubber band of a marquee selection being dragged.
+pub(super) fn marquee(
+    painter: &eframe::egui::Painter,
+    view: &CanvasView,
+    origin: Pos2,
+    st: &CanvasUi,
+    theme: &crate::theme::Theme,
+) {
+    if let Some(Drag::Marquee { start, current, .. }) = &st.drag {
+        let m = view.rect_to_screen(Rect::from_two_pos(*start, *current), origin);
+        painter.rect_filled(m, 0.0, theme.accent.gamma_multiply(0.18));
+        let line = Stroke::new(1.0_f32, theme.accent);
+        painter.rect_stroke(m, 0.0, line, eframe::egui::StrokeKind::Inside);
+    }
 }

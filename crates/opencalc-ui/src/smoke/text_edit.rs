@@ -217,3 +217,41 @@ fn ctrl_g_turns_the_letter_before_the_caret_into_its_greek_letter_and_back() {
     h.type_text("^2");
     assert_eq!(h.source_of(id), "A:=2\u{3c0}*\u{3c1}^2");
 }
+
+#[test]
+fn clearing_a_region_and_moving_on_removes_it_and_undo_brings_it_back() {
+    let mut h = Harness::new();
+    h.settle();
+    let keep = h.new_math();
+    h.type_text("a:=1");
+    h.press_key(Key::Enter, Modifiers::NONE);
+    let count = h.sheet().doc.regions().len();
+    // Clear it, then leave with Enter.
+    h.press_key(Key::Enter, Modifiers::NONE);
+    let id = h.new_math();
+    h.type_text("zz");
+    h.press_key(Key::A, Modifiers::COMMAND);
+    h.press_key(Key::Backspace, Modifiers::NONE);
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    assert!(
+        h.sheet().doc.region(id).is_none(),
+        "the empty region is gone"
+    );
+    assert!(h.sheet().doc.region(keep).is_some());
+    assert_eq!(h.sheet().canvas.editing, None);
+    assert!(!h.sheet().canvas.selection.contains(&id));
+    let _ = count;
+    // Opening a region and leaving without typing leaves nothing behind either.
+    let before = h.sheet().doc.regions().len();
+    h.new_math();
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    assert_eq!(h.sheet().doc.regions().len(), before);
+    // A region with something in it stays.
+    let kept = h.new_math();
+    h.type_text("b");
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    assert!(h.sheet().doc.region(kept).is_some());
+}

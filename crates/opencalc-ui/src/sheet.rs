@@ -239,6 +239,10 @@ impl OpenSheet {
         if editable {
             self.canvas.editing = Some(id);
             self.canvas.focus_edit = true;
+        } else {
+            // Whatever was being edited is finished.
+            self.canvas.editing = None;
+            self.canvas.field = None;
         }
         id
     }

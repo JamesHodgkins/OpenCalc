@@ -258,10 +258,16 @@ fn inserting_each_region_type_adds_and_selects_it() {
         (CommandId::InsertTable, "Table"),
         (CommandId::InsertPicture, "Picture"),
     ];
-    for (n, (command, label)) in commands.iter().enumerate() {
+    // A math or text region left empty is removed when editing moves on, so only
+    // the other kinds stay behind.
+    let mut kept = 0;
+    for (command, label) in commands.iter() {
         h.command(*command);
         let sheet = h.sheet();
-        assert_eq!(sheet.doc.regions().len(), before + n + 1, "{command:?}");
+        assert_eq!(sheet.doc.regions().len(), before + kept + 1, "{command:?}");
+        if !matches!(*label, "Math" | "Text") {
+            kept += 1;
+        }
         let newest = sheet.doc.regions().last().expect("a region");
         assert_eq!(newest.kind.label(), *label);
         assert_eq!(sheet.canvas.selection, vec![newest.id], "{command:?}");

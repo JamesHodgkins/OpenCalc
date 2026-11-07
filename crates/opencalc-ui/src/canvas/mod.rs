@@ -6,6 +6,7 @@
 //! iterated (rule R3). Selection, editing, drag and measured sizes are UI state
 //! and live in [`CanvasUi`], not in the document.
 
+mod abandon;
 pub mod adapt;
 mod editor;
 mod errors;
@@ -79,6 +80,8 @@ enum Drag {
 pub struct CanvasUi {
     pub selection: Vec<RegionId>,
     pub editing: Option<RegionId>,
+    /// What was being edited at the end of the last frame.
+    last_editing: Option<RegionId>,
     /// Ask the in-place editor to take keyboard focus on its next frame.
     pub focus_edit: bool,
     /// The editor opens with the caret at the start rather than the end (the
@@ -103,6 +106,7 @@ impl Default for CanvasUi {
         CanvasUi {
             selection: Vec::new(),
             editing: None,
+            last_editing: None,
             focus_edit: false,
             enter_at_start: false,
             field: None,
@@ -236,16 +240,8 @@ pub fn show(
     };
     pointer(ui, &resp, &scene, st, &mut cmds);
 
-    if let Some(Drag::Marquee { start, current, .. }) = &st.drag {
-        let m = view.rect_to_screen(Rect::from_two_pos(*start, *current), origin);
-        painter.rect_filled(m, 0.0, theme.accent.gamma_multiply(0.18));
-        painter.rect_stroke(
-            m,
-            0.0,
-            Stroke::new(1.0_f32, theme.accent),
-            StrokeKind::Inside,
-        );
-    }
+    abandon::remove_if_empty(st, regions, &mut cmds);
+    overlay::marquee(&painter, view, origin, st, theme);
     painter.text(
         rect.min + Vec2::new(10.0, 8.0),
         egui::Align2::LEFT_TOP,
