@@ -40,7 +40,17 @@ fn main() -> eframe::Result {
                 .map_or(theme::PaletteKey::Neutral, |k| {
                     theme::PaletteKey::from_key(&k)
                 });
-            Ok(Box::new(app::App::new(cc.egui_ctx.clone(), palette)))
+            let mut app = app::App::new(cc.egui_ctx.clone(), palette);
+            app.state.recent = cc
+                .storage
+                .and_then(|s| s.get_string("recent"))
+                .map(|list| list.lines().map(std::path::PathBuf::from).collect())
+                .unwrap_or_default();
+            // `opencalc FILE...` opens those files.
+            for arg in std::env::args_os().skip(1) {
+                app.open_path(std::path::Path::new(&arg));
+            }
+            Ok(Box::new(app))
         }),
     )
 }

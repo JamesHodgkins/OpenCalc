@@ -20,6 +20,21 @@ use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
+mod files;
+
+/// File dialogs that are never answered: a test must not open a real one.
+struct NoFiles;
+
+impl crate::app::Files for NoFiles {
+    fn pick_open(&mut self) -> Option<std::path::PathBuf> {
+        None
+    }
+
+    fn pick_save(&mut self, _: &str, _: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
+        None
+    }
+}
+
 struct Harness {
     ctx: egui::Context,
     app: App,
@@ -31,7 +46,11 @@ struct Harness {
 impl Harness {
     fn new() -> Harness {
         let ctx = egui::Context::default();
-        let app = App::with_state(ctx.clone(), AppState::with_sample(PaletteKey::Neutral));
+        let app = App::with_files(
+            ctx.clone(),
+            AppState::with_sample(PaletteKey::Neutral),
+            Box::new(NoFiles),
+        );
         Harness {
             ctx,
             app,

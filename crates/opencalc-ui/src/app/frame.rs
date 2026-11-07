@@ -15,6 +15,7 @@ impl App {
     pub fn frame(&mut self, ctx: &egui::Context) {
         self.poll_worker();
         self.queue_shortcuts(ctx);
+        self.window_events(ctx);
         let theme = self.state.theme;
         let registry = self.registry();
         let mut cmds: Vec<CommandId> = Vec::new();
@@ -104,6 +105,7 @@ impl App {
         panels::about::show(ctx, &self.state, &mut cmds);
         panels::options::show(ctx, &self.state, &mut cmds);
         panels::page_setup::show(ctx, &self.state, &mut cmds);
+        panels::dialogs::show(ctx, &self.state, &mut cmds);
 
         // Seen by the canvas next frame: egui reports IME output only while a text
         // box has focus.
@@ -142,6 +144,26 @@ impl App {
         state.page = out.page;
         let effects = super::dispatch::apply_canvas(state, sheet, out.cmds);
         self.run_effects(ctx, effects);
+    }
+
+    /// Files dropped on the window, a request to close it, and the window title.
+    fn window_events(&mut self, ctx: &egui::Context) {
+        let (dropped, close) =
+            ctx.input(|i| (i.raw.dropped_files.clone(), i.viewport().close_requested()));
+        for file in dropped {
+            if let Some(path) = file.path {
+                self.open_path(&path);
+            }
+        }
+        if close && !self.allow_close && self.state.sheets.iter().any(|s| s.dirty()) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.queue.push(CommandId::AppQuit);
+        }
+        let title = crate::panels::title::window_title(&self.state);
+        if title != self.window_title {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
+            self.window_title = title;
+        }
     }
 
     /// Consume the key bindings that apply right now and queue their commands.

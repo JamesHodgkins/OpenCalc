@@ -25,10 +25,32 @@ fn content(ui: &mut Ui, state: &AppState, out: &mut Commands) {
     );
     ui.add_space(16.0);
     ui.horizontal(|ui| {
-        for command in [CommandId::FileNew, CommandId::FileExample] {
+        for command in [
+            CommandId::FileNew,
+            CommandId::FileOpen,
+            CommandId::FileExample,
+        ] {
             if ui.button(command.label()).clicked() {
                 out.push(command);
             }
         }
     });
+    if !state.recent.is_empty() {
+        ui.add_space(20.0);
+        ui.label(RichText::new("Recent").size(16.0).color(theme.text));
+        for (n, path) in state.recent.iter().enumerate().take(u8::MAX as usize) {
+            let name = path.file_name().map_or_else(
+                || path.to_string_lossy().into_owned(),
+                |f| f.to_string_lossy().into_owned(),
+            );
+            let folder = path.parent().map(|p| p.display().to_string());
+            let response = ui.link(name).on_hover_text(path.display().to_string());
+            if let Some(folder) = folder {
+                ui.label(RichText::new(folder).small().color(theme.text_weak));
+            }
+            if response.clicked() {
+                out.push(CommandId::OpenRecent(n as u8));
+            }
+        }
+    }
 }

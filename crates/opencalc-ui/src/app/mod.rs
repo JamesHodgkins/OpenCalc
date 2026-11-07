@@ -6,6 +6,8 @@
 //! - This module: owns the worker thread and the ribbon, and carries out effects.
 
 pub(crate) mod dispatch;
+mod files;
+pub(crate) mod filing;
 mod frame;
 mod state;
 
@@ -17,6 +19,7 @@ use crate::ribbon::defs::opencalc_ribbon;
 use crate::ribbon::{Ribbon, RibbonState};
 use crate::theme::{self, PaletteKey};
 use dispatch::{dispatch, Effect};
+pub use files::{Files, NativeFiles};
 pub use state::AppState;
 
 pub struct App {
@@ -26,6 +29,12 @@ pub struct App {
     pub(crate) ribbon_state: RibbonState,
     /// Commands raised outside a frame (tests, startup), handled in the next one.
     pub queue: Vec<CommandId>,
+    /// How the app asks for file paths.
+    files: Box<dyn Files>,
+    /// Set once quitting has been decided, so closing the window is let through.
+    pub(crate) allow_close: bool,
+    /// The window title last sent, to send it only when it changes.
+    window_title: String,
 }
 
 impl App {
@@ -34,6 +43,10 @@ impl App {
     }
 
     pub fn with_state(ctx: egui::Context, state: AppState) -> App {
+        App::with_files(ctx, state, Box::new(NativeFiles))
+    }
+
+    pub fn with_files(ctx: egui::Context, state: AppState, files: Box<dyn Files>) -> App {
         crate::fonts::install(&ctx);
         theme::apply(&ctx, &state.theme);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
@@ -43,6 +56,9 @@ impl App {
             ribbon: opencalc_ribbon(),
             ribbon_state: RibbonState::default(),
             queue: Vec::new(),
+            files,
+            allow_close: false,
+            window_title: String::new(),
         };
         app.recalculate();
         app
@@ -91,7 +107,13 @@ impl App {
             match effect {
                 Effect::Recalculate => self.recalculate(),
                 Effect::ApplyTheme => theme::apply(ctx, &self.state.theme),
-                Effect::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                Effect::Quit => {
+                    self.allow_close = true;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                Effect::ChooseOpen => self.choose_open(),
+                Effect::Open(path) => self.open_path(&path),
+                Effect::Save { sheet, then, ask } => self.save_sheet(sheet, then, ask),
                 Effect::ResetDockWidths => {
                     self.state.dock_basis = ctx.screen_rect().width().max(crate::MIN_WIDTH);
                 }
@@ -103,6 +125,13 @@ impl App {
 impl eframe::App for App {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string("palette", self.state.palette.key().to_owned());
+        let recent: Vec<String> = self
+            .state
+            .recent
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        storage.set_string("recent", recent.join("\n"));
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {

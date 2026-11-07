@@ -55,6 +55,8 @@ pub enum Edit {
     SetPageSetup(PageSetup),
     /// Replace the worksheet's own unit definitions.
     SetCustomUnits(Vec<UnitDef>),
+    /// Rename the worksheet.
+    SetTitle(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -152,6 +154,10 @@ impl Worksheet {
             Edit::SetPageSetup(page) => Ok(Edit::SetPageSetup(std::mem::replace(
                 &mut self.page,
                 page.sanitised(),
+            ))),
+            Edit::SetTitle(title) => Ok(Edit::SetTitle(std::mem::replace(
+                &mut self.title,
+                title.clone(),
             ))),
             Edit::SetUnitSystem(system) => Ok(Edit::SetUnitSystem(std::mem::replace(
                 &mut self.unit_system,
@@ -281,6 +287,18 @@ mod tests {
         assert_eq!(w.page().margin_mm, 60.0);
         w.apply(applied.inverse).unwrap();
         assert_eq!(w.page().margin_mm, 20.0);
+    }
+
+    #[test]
+    fn renaming_is_an_edit_with_an_inverse_and_does_not_touch_evaluation() {
+        let mut w = Worksheet::new("old");
+        let e0 = w.eval_revision();
+        let applied = w.apply(Edit::SetTitle("new".into())).unwrap();
+        assert!(applied.changed);
+        assert_eq!(w.title(), "new");
+        assert_eq!(applied.inverse, Edit::SetTitle("old".into()));
+        assert_eq!(w.eval_revision(), e0);
+        assert!(!w.apply(Edit::SetTitle("new".into())).unwrap().changed);
     }
 
     #[test]

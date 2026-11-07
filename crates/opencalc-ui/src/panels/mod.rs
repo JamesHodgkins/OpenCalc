@@ -2,6 +2,7 @@
 //! and pushes the commands the user raised; none changes state itself (rule R4).
 
 pub mod about;
+pub mod dialogs;
 pub mod doc_tabs;
 pub mod functions;
 pub mod home;

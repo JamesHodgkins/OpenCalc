@@ -12,8 +12,20 @@ use crate::ribbon::widgets::{self as w, Look};
 use crate::ribbon::CommandSource;
 use crate::theme::{metrics, type_size};
 
-pub(crate) const MENU: [CommandId; 4] = [
+/// The text for the window's title bar and the centred title: modified sheets
+/// are marked with a dot.
+pub fn window_title(state: &crate::app::AppState) -> String {
+    match state.active_sheet() {
+        Some(sheet) => format!("{} \u{2013} OpenCalc", super::doc_tabs::label(sheet)),
+        None => "OpenCalc".to_owned(),
+    }
+}
+
+pub(crate) const MENU: [CommandId; 7] = [
     CommandId::FileNew,
+    CommandId::FileOpen,
+    CommandId::FileSave,
+    CommandId::FileSaveAs,
     CommandId::AppOptions,
     CommandId::HelpAbout,
     CommandId::AppQuit,
@@ -28,10 +40,7 @@ pub(crate) const QUICK_ACCESS: [CommandId; 5] = [
 
 pub fn show(ui: &mut Ui, cx: &PanelCx, out: &mut Commands) {
     let theme = cx.state.theme;
-    let title = match cx.state.active_sheet() {
-        Some(sheet) => format!("{} \u{2013} OpenCalc", sheet.title()),
-        None => "OpenCalc".to_owned(),
-    };
+    let title = window_title(cx.state);
     // Centred worksheet title, painted first so controls sit on top.
     ui.painter().text(
         ui.max_rect().center(),
@@ -69,10 +78,15 @@ pub fn show(ui: &mut Ui, cx: &PanelCx, out: &mut Commands) {
         popup_below_widget(ui, menu, &anchor, PopupCloseBehavior::CloseOnClick, |ui| {
             ui.set_min_width(160.0);
             for command in MENU {
-                let item = egui::Button::new(command.label())
+                let enabled = cx.registry.is_enabled(command);
+                let label = match cx.registry.shortcut_text(command) {
+                    Some(keys) => format!("{}    {keys}", command.label()),
+                    None => command.label().to_owned(),
+                };
+                let item = egui::Button::new(label)
                     .frame(false)
                     .min_size(Vec2::new(150.0, 22.0));
-                if ui.add(item).clicked() {
+                if ui.add_enabled(enabled, item).clicked() {
                     out.push(command);
                 }
             }

@@ -26,6 +26,8 @@ macro_rules! commands {
             PagePaper(PaperSize),
             PageLandscape(bool),
             PageMarginMm(u8),
+            /// Open the n-th recently used file.
+            OpenRecent(u8),
         }
 
         impl CommandId {
@@ -46,6 +48,7 @@ macro_rules! commands {
                     CommandId::PagePaper(_) => "page.paper",
                     CommandId::PageLandscape(_) => "page.orientation",
                     CommandId::PageMarginMm(_) => "page.margin",
+                    CommandId::OpenRecent(_) => "file.open_recent",
                 }
             }
 
@@ -61,6 +64,7 @@ macro_rules! commands {
                     CommandId::PageLandscape(true) => "Landscape",
                     CommandId::PageLandscape(false) => "Portrait",
                     CommandId::PageMarginMm(_) => "Margin",
+                    CommandId::OpenRecent(_) => "Open recent file",
                 }
             }
 
@@ -74,6 +78,7 @@ macro_rules! commands {
                     CommandId::PagePaper(_)
                     | CommandId::PageLandscape(_)
                     | CommandId::PageMarginMm(_) => icons::FIT,
+                    CommandId::OpenRecent(_) => icons::FOLDER_OPEN,
                 }
             }
         }
@@ -85,6 +90,12 @@ commands! {
     FileNew: "file.new", "New worksheet", icons::FILE_NEW;
     FileOpen: "file.open", "Open", icons::FOLDER_OPEN;
     FileSave: "file.save", "Save", icons::SAVE;
+    FileSaveAs: "file.save_as", "Save As", icons::SAVE;
+    // Answers to the dialogs that ask about unsaved changes or report a problem.
+    DialogSave: "dialog.save", "Save", icons::SAVE;
+    DialogDiscard: "dialog.discard", "Don't save", icons::DELETE;
+    DialogCancel: "dialog.cancel", "Cancel", icons::CLOSE;
+    DialogOk: "dialog.ok", "OK", icons::CLOSE;
     FileClose: "file.close", "Close worksheet", icons::CLOSE;
     FileExample: "file.example", "Open example", icons::BOOK;
     AppQuit: "app.quit", "Quit", icons::CLOSE;
@@ -206,23 +217,22 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            FileNew | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
-            | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
-            | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
-            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
-            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
-            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
-            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
-            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
-                true
-            }
-            FileOpen | FileSave | ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind
-            | EditReplace | RegionLock | RegionTag | FormatBold | FormatItalic
-            | FormatDecimalsMore | FormatDecimalsLess | FormatScientific | FormatEngineering
-            | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate | UnitsDisplayM | UnitsDisplayMm
-            | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn | UnitsDisplayReset | UnitsDefine
-            | UnitsManage | CalcCheck | WarnNext | WarnPrev | InsertMatrix | InsertRange
-            | HelpShortcuts | HelpGuide => false,
+            FileNew | FileOpen | FileSave | FileSaveAs | DialogSave | DialogDiscard
+            | DialogCancel | DialogOk | OpenRecent(_) | FileClose | FileExample | AppQuit
+            | TabHome | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText
+            | InsertArea | InsertPlot | InsertTable | InsertPicture | CalcAll | ViewZoomIn
+            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
+            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral
+            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
+            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
+            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
+            | InsertGreek | InsertSymbol(_) => true,
+            ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind | EditReplace | RegionLock
+            | RegionTag | FormatBold | FormatItalic | FormatDecimalsMore | FormatDecimalsLess
+            | FormatScientific | FormatEngineering | ArrangeAlignH | ArrangeAlignV
+            | ArrangeSeparate | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
+            | UnitsDisplayKn | UnitsDisplayReset | UnitsDefine | UnitsManage | CalcCheck
+            | WarnNext | WarnPrev | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
         }
     }
 
@@ -294,7 +304,7 @@ mod tests {
     fn some_commands_are_implemented_and_some_deliberately_are_not() {
         assert!(CommandId::EditUndo.is_implemented());
         assert!(CommandId::SelectSheet(3).is_implemented());
-        assert!(!CommandId::FileSave.is_implemented());
+        assert!(!CommandId::ClipboardPaste.is_implemented());
         let implemented = CommandId::ALL.iter().filter(|c| c.is_implemented()).count();
         assert!(implemented > 20 && implemented < CommandId::ALL.len());
     }

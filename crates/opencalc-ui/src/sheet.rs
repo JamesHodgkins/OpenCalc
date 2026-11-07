@@ -4,6 +4,8 @@
 //! view and the undo history live here, beside the document and not in it
 //! (rule R2).
 
+use std::path::{Path, PathBuf};
+
 use eframe::egui::{Pos2, Rect};
 use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind, Worksheet};
 use opencalc_core::edit::{Edit, History};
@@ -17,15 +19,25 @@ pub struct OpenSheet {
     pub history: History,
     pub view: CanvasView,
     pub canvas: CanvasUi,
+    /// The file this worksheet was opened from or last saved to.
+    pub path: Option<PathBuf>,
+    /// The document revision that is on disk. The worksheet is modified when its
+    /// revision differs. Undoing back to the saved state still counts as modified,
+    /// the safe way to be wrong (docs/PERSISTENCE.md).
+    saved_revision: u64,
 }
 
 impl OpenSheet {
     pub fn new(title: &str) -> OpenSheet {
-        let doc = Worksheet::new(title);
+        OpenSheet::from_doc(Worksheet::new(title))
+    }
+
+    fn from_doc(doc: Worksheet) -> OpenSheet {
         // The first input goes at the top left of the page margin, rounded in to
         // the snap grid so it sits inside the margin, not across its edge.
         let margin = doc.page().margin();
         let corner = (margin / GRID).ceil() * GRID;
+        let doc_revision = doc.revision();
         let mut canvas = CanvasUi::default();
         canvas.insert_at = Pos2::new(corner, corner);
         OpenSheet {
@@ -33,7 +45,41 @@ impl OpenSheet {
             history: History::default(),
             view: CanvasView::default(),
             canvas,
+            path: None,
+            saved_revision: doc_revision,
         }
+    }
+
+    /// A worksheet read from `path`, unmodified, with a clean history.
+    pub fn loaded(doc: Worksheet, path: PathBuf) -> OpenSheet {
+        let mut s = OpenSheet::from_doc(doc);
+        s.path = Some(path);
+        // New regions go below what is already there, not on top of it.
+        if let Some(bottom) = s.bounds().map(|b| b.max.y) {
+            s.canvas.insert_at = snap(Pos2::new(s.canvas.insert_at.x, bottom + 12.0), GRID);
+        }
+        s
+    }
+
+    /// Whether the worksheet has changes that are not on disk.
+    pub fn dirty(&self) -> bool {
+        self.doc.revision() != self.saved_revision
+    }
+
+    /// Record that the document as it is now is on disk at `path`.
+    pub fn mark_saved(&mut self, path: &Path) {
+        self.saved_revision = self.doc.revision();
+        self.path = Some(path.to_owned());
+    }
+
+    /// Treat the document as unmodified (changes thrown away on purpose).
+    pub fn mark_clean(&mut self) {
+        self.saved_revision = self.doc.revision();
+    }
+
+    /// Nothing typed, nothing saved: a blank sheet that opening a file may replace.
+    pub fn is_pristine(&self) -> bool {
+        self.path.is_none() && !self.dirty() && self.doc.regions().is_empty()
     }
 
     /// A small worksheet in deliberately non-dependency order, spread over the
@@ -67,6 +113,7 @@ impl OpenSheet {
         // New regions go below the worked example, not on top of it.
         s.canvas.insert_at = Pos2::new(40.0, 520.0);
         s.history = History::default();
+        s.mark_clean();
         s
     }
 

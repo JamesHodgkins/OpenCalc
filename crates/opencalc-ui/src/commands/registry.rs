@@ -48,7 +48,8 @@ impl Registry {
             | CommandId::ZoomTo(_)
             | CommandId::PagePaper(_)
             | CommandId::PageLandscape(_)
-            | CommandId::PageMarginMm(_) => true,
+            | CommandId::PageMarginMm(_)
+            | CommandId::OpenRecent(_) => true,
             CommandId::InsertSymbol(_) => self.symbols,
             other => self.enabled.contains(&other),
         }
@@ -61,6 +62,8 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
     let needs_sheet = matches!(
         command,
         FileClose
+            | FileSave
+            | FileSaveAs
             | CalcAll
             | InsertMath
             | InsertText

@@ -8,15 +8,17 @@ use opencalc_core::document::RegionKind;
 use opencalc_core::edit::Edit;
 use opencalc_core::registry::UnitSystem;
 
+use super::filing::{dispatch_file, Then};
 use super::state::AppState;
 use crate::canvas::CanvasCmd;
 use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
 use crate::theme::{PaletteKey, Theme};
 use opencalc_core::document::PageSetup;
+use std::path::PathBuf;
 
 /// Something a command needs done that state alone cannot do.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
     /// Send the active sheet to the evaluation worker.
     Recalculate,
@@ -25,12 +27,25 @@ pub enum Effect {
     Quit,
     /// Size the dock panels from the current window width.
     ResetDockWidths,
+    /// Ask which file to open, then open it.
+    ChooseOpen,
+    Open(PathBuf),
+    /// Save worksheet `sheet`. With no path yet, or `ask`, the user is asked where.
+    /// Once saved, `then` carries on with what was waiting (closing, quitting).
+    Save {
+        sheet: usize,
+        then: Option<Then>,
+        ask: bool,
+    },
 }
 
 /// Run a command. `None` means it is not implemented, which the registry already
 /// reflects by keeping it disabled.
 pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>> {
     use CommandId::*;
+    if let Some(fx) = dispatch_file(state, command) {
+        return Some(fx);
+    }
     let mut fx = Vec::new();
     match command {
         FileNew => {
@@ -43,18 +58,6 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             add_sheet(state, OpenSheet::sample());
             fx.push(Effect::Recalculate);
         }
-        FileClose => {
-            if let Some(i) = state.active {
-                close_sheet(state, i);
-                fx.push(Effect::Recalculate);
-            }
-        }
-        CloseSheet(i) => {
-            if i < state.sheets.len() {
-                close_sheet(state, i);
-                fx.push(Effect::Recalculate);
-            }
-        }
         SelectSheet(i) => {
             if i < state.sheets.len() {
                 state.active = Some(i);
@@ -66,7 +69,6 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             state.active = None;
             fx.push(Effect::Recalculate);
         }
-        AppQuit => fx.push(Effect::Quit),
 
         InsertMath => insert(state, &mut fx, RegionKind::math("")),
         InsertText => insert(
@@ -180,13 +182,13 @@ pub fn apply_canvas(state: &mut AppState, sheet: usize, cmds: Vec<CanvasCmd>) ->
     }
 }
 
-fn add_sheet(state: &mut AppState, sheet: OpenSheet) {
+pub(super) fn add_sheet(state: &mut AppState, sheet: OpenSheet) {
     state.sheets.push(sheet);
     state.active = Some(state.sheets.len() - 1);
     state.output = Default::default();
 }
 
-fn close_sheet(state: &mut AppState, i: usize) {
+pub(super) fn close_sheet(state: &mut AppState, i: usize) {
     state.sheets.remove(i);
     state.active = match state.active {
         _ if state.sheets.is_empty() => None,

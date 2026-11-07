@@ -44,6 +44,7 @@ const fn bind_free(command: CommandId, mods: Modifiers, key: Key) -> Binding {
 pub const BINDINGS: &[Binding] = &[
     bind(CommandId::FileNew, CTRL, Key::N),
     bind(CommandId::FileOpen, CTRL, Key::O),
+    bind(CommandId::FileSaveAs, CTRL_SHIFT, Key::S),
     bind(CommandId::FileSave, CTRL, Key::S),
     bind(CommandId::FileClose, CTRL, Key::W),
     bind_free(CommandId::EditRedo, CTRL_SHIFT, Key::Z),

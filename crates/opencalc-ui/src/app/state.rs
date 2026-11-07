@@ -1,10 +1,13 @@
 //! Application state: plain data, no egui context, no worker thread. Panels read
 //! it (rule R4); only `dispatch` changes it, in response to a command.
 
+use std::path::PathBuf;
+
 use eframe::egui::{Pos2, Rect};
 use opencalc_core::eval::Output;
 use opencalc_core::registry::UnitSystem;
 
+use super::filing::Dialog;
 use crate::commands::{CommandContext, CommandId};
 use crate::sheet::OpenSheet;
 use crate::theme::{PaletteKey, Theme};
@@ -54,6 +57,10 @@ pub struct AppState {
     pub draft: bool,
     /// The Options window (settings such as the theme).
     pub options_open: bool,
+    /// The question or message in front of everything, if any.
+    pub dialog: Option<Dialog>,
+    /// Recently opened or saved files, newest first.
+    pub recent: Vec<PathBuf>,
 }
 
 impl AppState {
@@ -83,6 +90,8 @@ impl AppState {
             text_box_focus: false,
             draft: false,
             options_open: false,
+            dialog: None,
+            recent: Vec::new(),
         }
     }
 

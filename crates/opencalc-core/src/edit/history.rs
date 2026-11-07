@@ -41,7 +41,8 @@ impl RunKey {
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetUnitSystem(_)
-            | Edit::SetCustomUnits(_) => None,
+            | Edit::SetCustomUnits(_)
+            | Edit::SetTitle(_) => None,
         }
     }
 }

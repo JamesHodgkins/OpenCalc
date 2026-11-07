@@ -367,6 +367,10 @@ mod tests {
             CommandId::DocPageSetupClose, // the Page setup window
             CommandId::ThemeNeutral,      // the Options window
             CommandId::ThemeSlate,        // the Options window
+            CommandId::DialogSave,        // the unsaved-changes dialog
+            CommandId::DialogDiscard,     // the unsaved-changes dialog
+            CommandId::DialogCancel,      // the unsaved-changes dialog
+            CommandId::DialogOk,          // the message dialog
         ]);
         for command in CommandId::ALL {
             assert!(reachable.contains(command), "{command:?} cannot be reached");

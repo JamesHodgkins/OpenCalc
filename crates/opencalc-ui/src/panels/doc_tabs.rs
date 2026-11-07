@@ -13,6 +13,21 @@ use crate::theme::{metrics, type_size, Theme};
 const HOME_WIDTH: f32 = 74.0;
 const PLUS_WIDTH: f32 = 28.0;
 
+/// A tab's text: the title, with a dot before it while there are unsaved changes.
+pub fn label(sheet: &crate::sheet::OpenSheet) -> String {
+    // A title from a file may hold line breaks or other control characters.
+    let title: String = sheet
+        .title()
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    if sheet.dirty() {
+        format!("\u{2022} {title}")
+    } else {
+        title
+    }
+}
+
 pub fn show(ui: &mut Ui, cx: &PanelCx, out: &mut Commands) {
     let theme = cx.state.theme;
     ui.spacing_mut().item_spacing = Vec2::new(2.0, 0.0);
@@ -28,9 +43,9 @@ pub fn show(ui: &mut Ui, cx: &PanelCx, out: &mut Commands) {
         out.push(CommandId::TabHome);
     }
     for (i, sheet) in cx.state.sheets.iter().enumerate() {
-        let label = sheet.title();
-        let width = w::text_width(ui, label, type_size::TAB) + 48.0;
-        let (rect, resp) = tab(ui, &theme, label, width, cx.state.active == Some(i));
+        let label = label(sheet);
+        let width = w::text_width(ui, &label, type_size::TAB) + 48.0;
+        let (rect, resp) = tab(ui, &theme, &label, width, cx.state.active == Some(i));
         let x = Rect::from_center_size(
             egui::pos2(rect.max.x - 14.0, rect.center().y),
             Vec2::splat(16.0),
