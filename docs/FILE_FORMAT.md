@@ -70,7 +70,7 @@ both in **document units of 1/96 inch**, and a `kind`:
 
 | `kind` | JSON | Notes |
 |---|---|---|
-| Math | `{ "Math": { "source": "…" } }` | The expression, as text. |
+| Math | `{ "Math": { "source": "…", "format": { "notation": "scientific", "decimals": 4 } } }` | The expression, as text. `format` is how the result is shown and may be omitted: `notation` is `"general"` (default), `"scientific"` or `"engineering"`; `decimals` is 0 to 15, or omitted for up to three with trailing zeros dropped. Display only. A count above 15 is read as 15. |
 | Text | `{ "Text": { "text": "…" } }` | |
 | Area | `{ "Area": { "title": "…" } }` | A titled box. |
 | Plot | `{ "Plot": { "title": "", "x_label": "", "y_label": "", "x": { "source": "…" }, "series": [ { "source": "…" } ] } }` | At most 8 series, at least 1. Titles and labels may be omitted. |

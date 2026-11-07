@@ -12,7 +12,7 @@ use super::errors;
 use super::result::{self, Beside};
 use super::view::{CanvasView, GRID};
 use super::Env;
-use crate::format::format_value;
+use crate::format::format_value_with;
 use crate::layout::{Layout, Op, Typesetter};
 use crate::theme::{metrics, type_size, Theme};
 use opencalc_core::document::{MathRegion, Region, RegionKind};
@@ -202,7 +202,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
             Beside::Pending => Some(plain(f, "= \u{2026}", theme.text_weak, size)),
             Beside::Value(v) => Some(plain(
                 f,
-                &format!("= {}", format_value(v, env.units)),
+                &format!("= {}", format_value_with(v, env.units, m.format())),
                 theme.text,
                 size,
             )),

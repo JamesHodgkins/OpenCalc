@@ -1,6 +1,8 @@
 //! Display formatting for results. Display precision and number-format control
 //! (spec section 2.4) and user-chosen display units will grow here.
 
+use crate::number_format::number_in;
+use opencalc_core::document::ResultFormat;
 use opencalc_core::numeric::Complex64;
 use opencalc_core::registry::UnitSystem;
 use opencalc_core::units::{Dimension, Quantity};
@@ -100,25 +102,9 @@ pub fn axis_unit(system: UnitSystem, dim: Dimension, peak: f64) -> (String, f64)
 /// A number to three decimal places with trailing zeros dropped (`10`, `0.333`,
 /// `-1.5`), as Mathcad shows results by default. Numbers too large or too small to
 /// read plainly use scientific notation (`1.5e-7`, `2.5e12`).
+#[cfg(test)]
 pub fn number_text(x: f64) -> String {
-    if x == 0.0 {
-        return "0".to_owned();
-    }
-    let magnitude = x.abs();
-    if !(1e-3..1e9).contains(&magnitude) {
-        let text = format!("{x:.3e}");
-        let (mantissa, exponent) = text.split_once('e').unwrap_or((&text, "0"));
-        return format!("{}e{exponent}", trim_zeros(mantissa));
-    }
-    trim_zeros(&format!("{x:.3}"))
-}
-
-fn trim_zeros(text: &str) -> String {
-    if text.contains('.') {
-        text.trim_end_matches('0').trim_end_matches('.').to_owned()
-    } else {
-        text.to_owned()
-    }
+    number_in(x, ResultFormat::default())
 }
 
 fn with_unit(text: String, label: &str) -> String {
@@ -130,8 +116,12 @@ fn with_unit(text: String, label: &str) -> String {
 }
 
 pub fn format_quantity(q: Quantity, system: UnitSystem) -> String {
+    format_quantity_with(q, system, ResultFormat::default())
+}
+
+fn format_quantity_with(q: Quantity, system: UnitSystem, format: ResultFormat) -> String {
     let (label, scale) = display_unit(system, q.dim, q.si.abs());
-    with_unit(number_text(q.si / scale), &label)
+    with_unit(number_in(q.si / scale, format), &label)
 }
 
 /// A part smaller than this fraction of the largest part shown alongside it is
@@ -152,28 +142,38 @@ fn snapped(x: f64, peak: f64) -> f64 {
 
 /// A complex number as `a + bi`, with a sign that never doubles up. `peak` is the
 /// largest magnitude it is shown alongside (itself, or its matrix).
-fn complex_text(z: Complex64, scale: f64, peak: f64) -> String {
+fn complex_text(z: Complex64, scale: f64, peak: f64, format: ResultFormat) -> String {
     let (re, im) = (snapped(z.re, peak) / scale, snapped(z.im, peak) / scale);
     if im == 0.0 {
-        return number_text(re);
+        return number_in(re, format);
     }
     let sign = if im < 0.0 { '-' } else { '+' };
-    format!("{} {sign} {}i", number_text(re), number_text(im.abs()))
+    format!(
+        "{} {sign} {}i",
+        number_in(re, format),
+        number_in(im.abs(), format)
+    )
 }
 
 /// Show any value. A complex scalar is `(3 + 4i) m`; a matrix lists its rows
 /// separated by semicolons (`2x2 [1, 2; 3, 4]`) until matrices get typeset.
+#[cfg(test)]
 pub fn format_value(v: &Value, system: UnitSystem) -> String {
+    format_value_with(v, system, ResultFormat::default())
+}
+
+/// [`format_value`] with the number format a region asks for.
+pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) -> String {
     // A list is shown on one line, so it gets fewer values than a matrix grid.
     const SHOWN_IN_LIST: usize = 8;
     const SHOWN: usize = 24;
     match v {
         Value::Scalar(s) => match s.as_real() {
-            Some(q) => format_quantity(q, system),
+            Some(q) => format_quantity_with(q, system, format),
             None => {
                 let peak = s.z.re.abs().max(s.z.im.abs());
                 let (label, scale) = display_unit(system, s.dim, peak);
-                let text = complex_text(s.z, scale, peak);
+                let text = complex_text(s.z, scale, peak, format);
                 if label.is_empty() {
                     text
                 } else {
@@ -197,7 +197,7 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
                         rows.push(row.join(", "));
                         break 'rows;
                     }
-                    row.push(complex_text(m.at(r, c), scale, peak));
+                    row.push(complex_text(m.at(r, c), scale, peak, format));
                     shown += 1;
                 }
                 rows.push(row.join(", "));
@@ -216,7 +216,7 @@ pub fn format_value(v: &Value, system: UnitSystem) -> String {
                 .elements()
                 .iter()
                 .take(SHOWN_IN_LIST)
-                .map(|z| complex_text(*z, scale, peak))
+                .map(|z| complex_text(*z, scale, peak, format))
                 .collect();
             if r.len() > SHOWN_IN_LIST {
                 items.push("\u{2026}".to_owned());

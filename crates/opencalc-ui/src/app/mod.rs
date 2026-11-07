@@ -11,6 +11,7 @@ mod exporting;
 mod files;
 pub(crate) mod filing;
 pub(crate) mod finding;
+mod formatting;
 mod frame;
 mod recovery;
 mod state;

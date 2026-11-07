@@ -9,6 +9,7 @@ mod format;
 mod icons;
 mod layout;
 mod logo;
+mod number_format;
 mod panels;
 mod ribbon;
 mod sheet;

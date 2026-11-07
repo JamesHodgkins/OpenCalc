@@ -12,6 +12,8 @@ pub struct CommandContext {
     pub has_sheet: bool,
     /// At least one region is selected.
     pub has_selection: bool,
+    /// The selection includes a math region (result formats apply to those).
+    pub selects_math: bool,
     pub can_undo: bool,
     pub can_redo: bool,
     /// A math region is open for editing (symbols can be inserted into it).
@@ -98,6 +100,11 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
     );
     (ctx.has_sheet || !needs_sheet)
         && (ctx.has_selection || !matches!(command, RegionDelete | ClipboardCut | ClipboardCopy))
+        && (ctx.selects_math
+            || !matches!(
+                command,
+                FormatDecimalsMore | FormatDecimalsLess | FormatScientific | FormatEngineering
+            ))
         && (ctx.can_undo || command != EditUndo)
         && (ctx.can_redo || command != EditRedo)
         && (ctx.editing_math || command != InsertGreek)
@@ -125,6 +132,7 @@ mod tests {
         CommandContext {
             has_sheet,
             has_selection,
+            selects_math: has_selection,
             can_undo,
             can_redo,
             editing_math: has_sheet,

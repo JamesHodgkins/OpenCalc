@@ -244,6 +244,48 @@ fn a_minimal_hand_written_worksheet_loads_with_defaults() {
 }
 
 #[test]
+fn a_result_format_is_read_and_an_out_of_range_count_is_brought_into_range() {
+    let json = sheet(
+        &[
+            region(
+                1,
+                r#"{"Math":{"source":"x =","format":{"notation":"engineering","decimals":2}}}"#,
+            ),
+            region(2, r#"{"Math":{"source":"y =","format":{"decimals":99}}}"#),
+        ],
+        3,
+    );
+    let l = load_json(&json).unwrap();
+    let formats: Vec<_> = l
+        .worksheet
+        .regions()
+        .iter()
+        .map(|r| match &r.kind {
+            RegionKind::Math(m) => m.format(),
+            _ => unreachable!(),
+        })
+        .collect();
+    assert_eq!(formats[0].decimals(), Some(2));
+    assert_eq!(
+        formats[1].decimals(),
+        Some(opencalc_core::document::MAX_DECIMALS)
+    );
+    // An unknown notation is an unreadable file, named as such, not a guess.
+    let bad = sheet(
+        &[region(
+            1,
+            r#"{"Math":{"source":"x","format":{"notation":"hex"}}}"#,
+        )],
+        2,
+    );
+    assert!(load_json(&bad).is_err());
+    // The default is not written, so older files stay as they were.
+    let plain = save_bytes(&l.worksheet).unwrap();
+    let again = load_bytes(&plain).unwrap();
+    assert_eq!(again.worksheet, l.worksheet);
+}
+
+#[test]
 fn unknown_entries_and_fields_are_ignored() {
     let json = r#"{"title":"t","regions":[],"next_id":1,"from_the_future":[1,2]}"#;
     let bytes = zip_of(&[

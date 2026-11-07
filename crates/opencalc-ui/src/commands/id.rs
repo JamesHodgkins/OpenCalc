@@ -227,7 +227,8 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            ClipboardPaste | ClipboardCut | ClipboardCopy | ArrangeSeparate | FileExportPdf
+            FormatDecimalsMore | FormatDecimalsLess | FormatScientific | FormatEngineering
+            | ClipboardPaste | ClipboardCut | ClipboardCopy | ArrangeSeparate | FileExportPdf
             | FileExportPng | EditFind | EditReplace | FindNext | FindPrev | FindReplaceOne
             | FindReplaceAll | FindClose | UnitsDefine | UnitsManage | UnitsClose | FileNew
             | FileOpen | FileSave | FileSaveAs | DialogSave | DialogDiscard | DialogCancel
@@ -240,11 +241,10 @@ impl CommandId {
             | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_)
             | PageLandscape(_) | PageMarginMm(_) | DocPageSetup | DocPageSetupClose
             | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => true,
-            RegionLock | RegionTag | FormatBold | FormatItalic | FormatDecimalsMore
-            | FormatDecimalsLess | FormatScientific | FormatEngineering | ArrangeAlignH
-            | ArrangeAlignV | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
-            | UnitsDisplayKn | UnitsDisplayReset | CalcCheck | WarnNext | WarnPrev
-            | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
+            RegionLock | RegionTag | FormatBold | FormatItalic | ArrangeAlignH | ArrangeAlignV
+            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
+            | UnitsDisplayReset | CalcCheck | WarnNext | WarnPrev | InsertMatrix | InsertRange
+            | HelpShortcuts | HelpGuide => false,
         }
     }
 

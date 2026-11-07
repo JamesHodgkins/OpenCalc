@@ -125,6 +125,7 @@ impl AppState {
         CommandContext {
             has_sheet: sheet.is_some(),
             has_selection: sheet.is_some_and(|s| !s.canvas.selection.is_empty()),
+            selects_math: !super::formatting::selected_formats(self).is_empty(),
             can_undo: sheet.is_some_and(OpenSheet::can_undo),
             can_redo: sheet.is_some_and(OpenSheet::can_redo),
             editing_math: sheet.is_some_and(|s| s.canvas.field.is_some()),
@@ -142,6 +143,7 @@ impl AppState {
         .into_iter()
         .filter_map(|(on, command)| on.then_some(command))
         .chain(self.unit_system_command())
+        .chain(self.notation_commands())
         .chain(Some(if self.draft {
             CommandId::ViewDraftView
         } else {
@@ -151,6 +153,19 @@ impl AppState {
             PaletteKey::Neutral => CommandId::ThemeNeutral,
             PaletteKey::Slate => CommandId::ThemeSlate,
         }))
+        .collect()
+    }
+
+    /// The notation commands switched on for the selected results.
+    fn notation_commands(&self) -> Vec<CommandId> {
+        use opencalc_core::document::Notation;
+        [
+            (Notation::Scientific, CommandId::FormatScientific),
+            (Notation::Engineering, CommandId::FormatEngineering),
+        ]
+        .into_iter()
+        .filter(|(n, _)| super::formatting::all_in(self, *n))
+        .map(|(_, c)| c)
         .collect()
     }
 

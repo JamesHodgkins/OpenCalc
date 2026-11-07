@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::geometry::{Point, Size};
 use super::plot::PlotSpec;
+use super::result_format::ResultFormat;
 use crate::expr::Expr;
 use crate::parser::parse;
 
@@ -22,23 +23,31 @@ pub struct RegionId(pub u64);
 pub struct MathRegion {
     source: String,
     expr: Expr,
+    format: ResultFormat,
 }
 
 /// The saved form of a [`MathRegion`]: the source text only.
 #[derive(Serialize, Deserialize)]
 struct MathSource {
     source: String,
+    #[serde(default, skip_serializing_if = "ResultFormat::is_default")]
+    format: ResultFormat,
 }
 
 impl From<MathSource> for MathRegion {
     fn from(s: MathSource) -> MathRegion {
-        MathRegion::new(&s.source)
+        let mut m = MathRegion::new(&s.source);
+        m.format = s.format;
+        m
     }
 }
 
 impl From<MathRegion> for MathSource {
     fn from(m: MathRegion) -> MathSource {
-        MathSource { source: m.source }
+        MathSource {
+            source: m.source,
+            format: m.format,
+        }
     }
 }
 
@@ -48,6 +57,7 @@ impl MathRegion {
         MathRegion {
             source: source.to_owned(),
             expr: parse(source),
+            format: ResultFormat::default(),
         }
     }
 
@@ -57,6 +67,15 @@ impl MathRegion {
 
     pub fn expr(&self) -> &Expr {
         &self.expr
+    }
+
+    /// How the result is shown.
+    pub fn format(&self) -> ResultFormat {
+        self.format
+    }
+
+    pub(crate) fn set_format(&mut self, format: ResultFormat) {
+        self.format = format;
     }
 
     pub(crate) fn set_source(&mut self, source: String) {

@@ -25,6 +25,7 @@ mod clipboard;
 mod export;
 mod files;
 mod find;
+mod format;
 mod text_edit;
 mod units;
 

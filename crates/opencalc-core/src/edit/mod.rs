@@ -10,7 +10,9 @@
 
 mod history;
 
-use crate::document::{PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, Size, Worksheet};
+use crate::document::{
+    PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Size, Worksheet,
+};
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
 
@@ -37,6 +39,11 @@ pub enum Edit {
     SetText {
         id: RegionId,
         text: String,
+    },
+    /// How a math region shows its result. Display only; no value changes.
+    SetResultFormat {
+        id: RegionId,
+        format: ResultFormat,
     },
     /// A size chosen by the user (resizing). Not the measured content size.
     SetRegionSize {
@@ -137,6 +144,18 @@ impl Worksheet {
                 Ok(Edit::SetMathSource {
                     id: *id,
                     source: old,
+                })
+            }
+            Edit::SetResultFormat { id, format } => {
+                let region = self.region_mut(*id)?;
+                let RegionKind::Math(m) = &mut region.kind else {
+                    return Err(EditError::WrongKind(*id));
+                };
+                let old = m.format();
+                m.set_format(*format);
+                Ok(Edit::SetResultFormat {
+                    id: *id,
+                    format: old,
                 })
             }
             Edit::SetText { id, text } => {
@@ -433,6 +452,13 @@ mod tests {
         round_trips(Edit::SetMathSource {
             id: ids[0],
             source: "a := 99".into(),
+        });
+        round_trips(Edit::SetResultFormat {
+            id: ids[0],
+            format: crate::document::ResultFormat::new(
+                crate::document::Notation::Engineering,
+                Some(2),
+            ),
         });
         round_trips(Edit::SetText {
             id: ids[1],
