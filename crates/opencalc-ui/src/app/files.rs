@@ -59,10 +59,11 @@ impl App {
             .and_then(|bytes| persist::load_bytes(&bytes).map_err(|e| e.to_string()));
         match loaded {
             Ok(loaded) => {
-                let sheet = OpenSheet::loaded(loaded.worksheet, path.to_owned());
+                let sheet = OpenSheet::loaded(loaded.worksheet, Some(path.to_owned()));
                 self.state.show_opened(sheet);
                 self.state.note_recent(path);
                 self.recalculate();
+                self.offer_recovery(path);
                 if !loaded.repairs.is_empty() {
                     let list: Vec<String> = loaded.repairs.iter().map(|r| r.to_string()).collect();
                     self.state.message(

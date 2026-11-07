@@ -116,6 +116,8 @@ impl App {
         for command in pending {
             self.run_command(ctx, command);
         }
+        self.state.next_recovery();
+        self.sync_recovery(ctx);
     }
 
     fn show_canvas(&mut self, ui: &mut egui::Ui, sheet: usize, ctx: &egui::Context) {

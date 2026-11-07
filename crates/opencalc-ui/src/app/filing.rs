@@ -30,9 +30,26 @@ pub enum Dialog {
         title: String,
         text: String,
     },
+    /// Changes that were not saved when the program last stopped.
+    Recover(Recovery),
+}
+
+/// A recovery file found at startup.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Recovery {
+    pub file: PathBuf,
+    /// The worksheet it belongs to, or `None` for one that was never saved.
+    pub original: Option<PathBuf>,
 }
 
 impl AppState {
+    /// Show the next recovery question if nothing else is in front.
+    pub fn next_recovery(&mut self) {
+        if self.dialog.is_none() && !self.recoveries.is_empty() {
+            self.dialog = Some(Dialog::Recover(self.recoveries.remove(0)));
+        }
+    }
+
     pub fn message(&mut self, title: &str, text: String) {
         self.dialog = Some(Dialog::Message {
             title: title.to_owned(),
@@ -162,6 +179,16 @@ pub fn dispatch_file(state: &mut AppState, command: CommandId) -> Option<Vec<Eff
                         request_quit(state, &mut fx);
                     }
                 }
+            }
+        }
+        DialogRestore => {
+            if let Some(Dialog::Recover(r)) = state.dialog.take() {
+                fx.push(Effect::Restore(r));
+            }
+        }
+        DialogDropRecovery => {
+            if let Some(Dialog::Recover(r)) = state.dialog.take() {
+                fx.push(Effect::DeleteFile(r.file));
             }
         }
         DialogCancel | DialogOk => state.dialog = None,

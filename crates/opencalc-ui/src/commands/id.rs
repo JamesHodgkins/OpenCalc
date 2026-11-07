@@ -96,6 +96,8 @@ commands! {
     DialogDiscard: "dialog.discard", "Don't save", icons::DELETE;
     DialogCancel: "dialog.cancel", "Cancel", icons::CLOSE;
     DialogOk: "dialog.ok", "OK", icons::CLOSE;
+    DialogRestore: "dialog.restore", "Restore", icons::REFRESH;
+    DialogDropRecovery: "dialog.drop_recovery", "Discard", icons::DELETE;
     FileClose: "file.close", "Close worksheet", icons::CLOSE;
     FileExample: "file.example", "Open example", icons::BOOK;
     AppQuit: "app.quit", "Quit", icons::CLOSE;
@@ -218,15 +220,17 @@ impl CommandId {
         use CommandId::*;
         match self {
             FileNew | FileOpen | FileSave | FileSaveAs | DialogSave | DialogDiscard
-            | DialogCancel | DialogOk | OpenRecent(_) | FileClose | FileExample | AppQuit
-            | TabHome | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText
-            | InsertArea | InsertPlot | InsertTable | InsertPicture | CalcAll | ViewZoomIn
-            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
-            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral
-            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
-            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
-            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
-            | InsertGreek | InsertSymbol(_) => true,
+            | DialogCancel | DialogOk | DialogRestore | DialogDropRecovery | OpenRecent(_)
+            | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo | RegionDelete
+            | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable | InsertPicture
+            | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid
+            | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
+            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
+            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
+                true
+            }
             ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind | EditReplace | RegionLock
             | RegionTag | FormatBold | FormatItalic | FormatDecimalsMore | FormatDecimalsLess
             | FormatScientific | FormatEngineering | ArrangeAlignH | ArrangeAlignV

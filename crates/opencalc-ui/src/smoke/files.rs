@@ -451,3 +451,258 @@ fn a_file_dropped_on_the_window_opens() {
     assert_eq!(t.state().sheets.len(), 1);
     assert_eq!(t.state().sheets[0].path.as_deref(), Some(target.as_path()));
 }
+
+// ---- auto-save and recovery ---------------------------------------------------
+
+use crate::app::filing::Recovery;
+
+impl Rig {
+    /// Turn on auto-save into this rig's own folder, ticking every second.
+    fn autosave(&mut self) -> PathBuf {
+        let dir = self.dir.join("app");
+        self.h.app.enable_autosave(Some(dir.clone()));
+        self.h.app.autosave_every = 1.0;
+        dir
+    }
+
+    /// Let the auto-save timer fire.
+    fn tick(&mut self) {
+        self.h.time += 5.0;
+        self.h.frame();
+    }
+
+    fn files_in(dir: &Path) -> Vec<String> {
+        let mut v: Vec<String> = std::fs::read_dir(dir)
+            .map(|d| {
+                d.flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        v.sort();
+        v
+    }
+
+    fn recovery_dialog(&self) -> Option<Recovery> {
+        match &self.state().dialog {
+            Some(Dialog::Recover(r)) => Some(r.clone()),
+            _ => None,
+        }
+    }
+
+    fn first_dirty(&self) -> bool {
+        self.state().sheets[0].dirty()
+    }
+}
+
+/// A second program run over the same folders: a rig whose directory is `dir`.
+fn restart(name: &str, dir: &Path, app_dir: Option<PathBuf>) -> Rig {
+    let mut next = setup(name, blank());
+    let own = std::mem::replace(&mut next.dir, dir.to_owned());
+    let _ = std::fs::remove_dir_all(own);
+    next.h.app.enable_autosave(app_dir);
+    next.h.app.autosave_every = 1.0;
+    next
+}
+
+#[test]
+fn a_modified_worksheet_is_written_to_a_recovery_file_and_the_real_file_is_untouched() {
+    let mut t = setup("auto1", blank());
+    t.autosave();
+    t.type_into_active("a := 1");
+    let target = t.dir.join("w.ocx");
+    t.answer_save(Some(target.clone()));
+    t.run(CommandId::FileSave);
+    let saved = std::fs::read(&target).unwrap();
+    t.tick();
+    assert_eq!(
+        Rig::files_in(&t.dir),
+        ["w.ocx"],
+        "clean: nothing to recover"
+    );
+
+    t.type_into_active("b := 2");
+    t.tick();
+    let recovery = t.dir.join("w.ocx.recovery");
+    assert!(recovery.exists());
+    assert_eq!(
+        std::fs::read(&target).unwrap(),
+        saved,
+        "only a save changes the file"
+    );
+
+    // Unchanged since: not written again.
+    std::fs::remove_file(&recovery).unwrap();
+    t.tick();
+    assert!(!recovery.exists());
+
+    // Saving makes the recovery file unnecessary.
+    t.type_into_active("c := 3");
+    t.tick();
+    assert!(recovery.exists());
+    t.run(CommandId::FileSave);
+    t.h.frame();
+    assert!(!recovery.exists());
+}
+
+#[test]
+fn an_unsaved_worksheet_recovers_to_the_app_folder_and_closing_it_deletes_the_file() {
+    let mut t = setup("auto2", blank());
+    let dir = t.autosave();
+    t.tick();
+    assert!(
+        Rig::files_in(&dir).is_empty(),
+        "a blank clean sheet writes nothing"
+    );
+    t.type_into_active("a := 1");
+    t.tick();
+    let files = Rig::files_in(&dir);
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert!(files[0].starts_with("untitled-") && files[0].ends_with(".ocx.recovery"));
+    t.run(CommandId::FileClose);
+    t.run(CommandId::DialogDiscard);
+    t.h.frame();
+    assert!(Rig::files_in(&dir).is_empty());
+}
+
+#[test]
+fn after_a_crash_the_next_start_offers_to_restore_and_restoring_leaves_it_unsaved() {
+    let mut t = setup("crash1", blank());
+    t.autosave();
+    t.type_into_active("a := 1");
+    let target = t.dir.join("w.ocx");
+    t.answer_save(Some(target.clone()));
+    t.run(CommandId::FileSave);
+    let saved = std::fs::read(&target).unwrap();
+    t.type_into_active("b := 2");
+    t.tick();
+    let recovery = t.dir.join("w.ocx.recovery");
+    assert!(recovery.exists());
+
+    // The program stops without a clean close. A new one starts and knows the file
+    // only from its recent list.
+    let mut next = restart("crash1_next", &t.dir, None);
+    std::mem::forget(t);
+    next.h.app.state.recent = vec![target.clone()];
+    next.h.app.scan_recovery();
+    next.h.frame();
+    let r = next
+        .recovery_dialog()
+        .expect("a question about the recovery file");
+    assert_eq!(r.original.as_deref(), Some(target.as_path()));
+
+    next.run(CommandId::DialogRestore);
+    let sheet = &next.state().sheets[0];
+    assert_eq!(sheet.doc.regions().len(), 2, "both inputs are back");
+    assert!(sheet.dirty(), "restored changes are not saved yet");
+    assert_eq!(sheet.path.as_deref(), Some(target.as_path()));
+    assert_eq!(std::fs::read(&target).unwrap(), saved);
+    assert!(recovery.exists(), "kept until the worksheet is saved");
+    next.run(CommandId::FileSave);
+    next.h.frame();
+    assert!(!next.first_dirty() && !recovery.exists());
+}
+
+#[test]
+fn discarding_deletes_the_recovery_file_and_cancel_keeps_it() {
+    let mut t = setup("crash2", blank());
+    let dir = t.autosave();
+    t.type_into_active("a := 1");
+    t.tick();
+    assert_eq!(Rig::files_in(&dir).len(), 1);
+
+    let mut next = restart("crash2_next", &t.dir, Some(dir.clone()));
+    std::mem::forget(t);
+    next.h.app.scan_recovery();
+    next.h.frame();
+    let r = next.recovery_dialog().expect("a question");
+    assert_eq!(r.original, None, "never saved");
+    next.run(CommandId::DialogCancel);
+    assert!(next.state().dialog.is_none());
+    assert_eq!(Rig::files_in(&dir).len(), 1, "cancel keeps it");
+
+    next.h.app.scan_recovery();
+    next.h.frame();
+    next.run(CommandId::DialogDropRecovery);
+    assert!(Rig::files_in(&dir).is_empty());
+}
+
+#[test]
+fn an_unsaved_worksheet_restored_from_the_app_folder_keeps_using_the_same_file() {
+    let mut t = setup("crash3", blank());
+    let dir = t.autosave();
+    t.type_into_active("a := 1");
+    t.tick();
+    let mut next = restart("crash3_next", &t.dir, Some(dir.clone()));
+    std::mem::forget(t);
+    next.h.app.scan_recovery();
+    next.h.frame();
+    next.run(CommandId::DialogRestore);
+    assert_eq!(next.state().sheets.len(), 1, "the blank sheet made way");
+    assert!(next.state().sheets[0].path.is_none() && next.first_dirty());
+    // Still one file, even after more changes and ticks.
+    next.type_into_active("b := 2");
+    next.tick();
+    assert_eq!(Rig::files_in(&dir).len(), 1);
+    // Saving it somewhere removes the recovery file.
+    let kept = next.dir.join("kept.ocx");
+    next.answer_save(Some(kept));
+    next.run(CommandId::FileSave);
+    next.h.frame();
+    assert!(Rig::files_in(&dir).is_empty());
+}
+
+#[test]
+fn opening_a_file_with_a_newer_recovery_file_asks_and_an_older_one_is_ignored() {
+    let mut t = setup("offer", blank());
+    t.type_into_active("a := 1");
+    let target = t.dir.join("o.ocx");
+    t.answer_save(Some(target.clone()));
+    t.run(CommandId::FileSave);
+    let recovery = t.dir.join("o.ocx.recovery");
+    let ago = |secs| std::time::SystemTime::now() - std::time::Duration::from_secs(secs);
+    let set_age = |path: &Path, secs| {
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(ago(secs))
+            .unwrap();
+    };
+    set_age(&target, 3600);
+    std::fs::copy(&target, &recovery).unwrap();
+    set_age(&recovery, 60); // newer than the worksheet
+    t.run(CommandId::FileClose);
+    t.answer_open(Some(target.clone()));
+    t.run(CommandId::FileOpen);
+    assert!(
+        t.recovery_dialog().is_some(),
+        "a recovery file that is newer"
+    );
+    t.run(CommandId::DialogCancel);
+
+    // Now clearly older than the worksheet.
+    t.run(CommandId::FileClose);
+    set_age(&recovery, 7200);
+    t.answer_open(Some(target));
+    t.run(CommandId::FileOpen);
+    assert!(
+        t.state().dialog.is_none(),
+        "an out-of-date recovery file is not offered"
+    );
+}
+
+#[test]
+fn a_damaged_recovery_file_says_so_and_is_kept() {
+    let mut t = setup("badrec", blank());
+    let dir = t.autosave();
+    std::fs::create_dir_all(&dir).unwrap();
+    let junk = dir.join("untitled-1-1.ocx.recovery");
+    std::fs::write(&junk, b"junk").unwrap();
+    t.h.app.scan_recovery();
+    t.h.frame();
+    t.run(CommandId::DialogRestore);
+    assert!(t.message().unwrap().contains("recovery file was kept"));
+    assert!(junk.exists());
+    assert_eq!(t.state().sheets.len(), 1);
+}

@@ -30,6 +30,9 @@ pub enum Effect {
     /// Ask which file to open, then open it.
     ChooseOpen,
     Open(PathBuf),
+    /// Put back the changes in a recovery file.
+    Restore(super::filing::Recovery),
+    DeleteFile(PathBuf),
     /// Save worksheet `sheet`. With no path yet, or `ask`, the user is asked where.
     /// Once saved, `then` carries on with what was waiting (closing, quitting).
     Save {

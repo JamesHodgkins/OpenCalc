@@ -61,6 +61,8 @@ pub struct AppState {
     pub dialog: Option<Dialog>,
     /// Recently opened or saved files, newest first.
     pub recent: Vec<PathBuf>,
+    /// Recovery files found and not yet asked about.
+    pub recoveries: Vec<super::filing::Recovery>,
 }
 
 impl AppState {
@@ -92,6 +94,7 @@ impl AppState {
             options_open: false,
             dialog: None,
             recent: Vec::new(),
+            recoveries: Vec::new(),
         }
     }
 

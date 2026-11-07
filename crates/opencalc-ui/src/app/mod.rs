@@ -9,7 +9,11 @@ pub(crate) mod dispatch;
 mod files;
 pub(crate) mod filing;
 mod frame;
+mod recovery;
 mod state;
+
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 use eframe::egui;
 use opencalc_core::worker::Worker;
@@ -20,6 +24,7 @@ use crate::ribbon::{Ribbon, RibbonState};
 use crate::theme::{self, PaletteKey};
 use dispatch::{dispatch, Effect};
 pub use files::{Files, NativeFiles};
+pub use recovery::default_dir as recovery_dir;
 pub use state::AppState;
 
 pub struct App {
@@ -35,6 +40,15 @@ pub struct App {
     pub(crate) allow_close: bool,
     /// The window title last sent, to send it only when it changes.
     window_title: String,
+    /// Whether modified worksheets are written to recovery files (off in tests).
+    autosave: bool,
+    /// Where recovery files of never-saved worksheets go.
+    recovery_dir: Option<PathBuf>,
+    pub(crate) autosave_every: f64,
+    /// When recovery files were last written, in egui time.
+    last_autosave: f64,
+    /// The recovery file written for each worksheet (by key), to delete it later.
+    recovery_files: HashMap<u32, PathBuf>,
 }
 
 impl App {
@@ -59,6 +73,11 @@ impl App {
             files,
             allow_close: false,
             window_title: String::new(),
+            autosave: false,
+            recovery_dir: None,
+            autosave_every: recovery::EVERY,
+            last_autosave: 0.0,
+            recovery_files: HashMap::new(),
         };
         app.recalculate();
         app
@@ -112,6 +131,10 @@ impl App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 Effect::ChooseOpen => self.choose_open(),
+                Effect::Restore(r) => self.restore(r),
+                Effect::DeleteFile(path) => {
+                    let _ = std::fs::remove_file(path);
+                }
                 Effect::Open(path) => self.open_path(&path),
                 Effect::Save { sheet, then, ask } => self.save_sheet(sheet, then, ask),
                 Effect::ResetDockWidths => {

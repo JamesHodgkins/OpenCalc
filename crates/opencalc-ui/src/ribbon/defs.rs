@@ -359,18 +359,20 @@ mod tests {
         reachable.extend(MENU);
         reachable.extend(QUICK_ACCESS);
         reachable.extend([
-            CommandId::FileClose,         // the worksheet tab's close button, Ctrl+W
-            CommandId::FileExample,       // the Home page
-            CommandId::TabHome,           // the Home tab
-            CommandId::HelpAboutClose,    // the About window
-            CommandId::AppOptionsClose,   // the Options window
-            CommandId::DocPageSetupClose, // the Page setup window
-            CommandId::ThemeNeutral,      // the Options window
-            CommandId::ThemeSlate,        // the Options window
-            CommandId::DialogSave,        // the unsaved-changes dialog
-            CommandId::DialogDiscard,     // the unsaved-changes dialog
-            CommandId::DialogCancel,      // the unsaved-changes dialog
-            CommandId::DialogOk,          // the message dialog
+            CommandId::FileClose,          // the worksheet tab's close button, Ctrl+W
+            CommandId::FileExample,        // the Home page
+            CommandId::TabHome,            // the Home tab
+            CommandId::HelpAboutClose,     // the About window
+            CommandId::AppOptionsClose,    // the Options window
+            CommandId::DocPageSetupClose,  // the Page setup window
+            CommandId::ThemeNeutral,       // the Options window
+            CommandId::ThemeSlate,         // the Options window
+            CommandId::DialogSave,         // the unsaved-changes dialog
+            CommandId::DialogDiscard,      // the unsaved-changes dialog
+            CommandId::DialogCancel,       // the unsaved-changes dialog
+            CommandId::DialogOk,           // the message dialog
+            CommandId::DialogRestore,      // the recovery dialog
+            CommandId::DialogDropRecovery, // the recovery dialog
         ]);
         for command in CommandId::ALL {
             assert!(reachable.contains(command), "{command:?} cannot be reached");

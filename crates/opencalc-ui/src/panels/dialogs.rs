@@ -42,6 +42,39 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
                     }
                 });
             }
+            Dialog::Recover(r) => {
+                let name = r.original.as_ref().map_or_else(
+                    || "a worksheet that was never saved".to_owned(),
+                    |p| format!("\u{201c}{}\u{201d}", p.display()),
+                );
+                ui.label(RichText::new("Restore unsaved changes?").strong());
+                ui.label(format!(
+                    "OpenCalc stopped before saving changes to {name}. They were kept in a recovery file."
+                ));
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    for (command, default) in [
+                        (CommandId::DialogRestore, true),
+                        (CommandId::DialogDropRecovery, false),
+                        (CommandId::DialogCancel, false),
+                    ] {
+                        let button = egui::Button::new(command.label());
+                        let button = if default {
+                            button.fill(state.theme.accent)
+                        } else {
+                            button
+                        };
+                        if ui.add(button).clicked() {
+                            out.push(command);
+                        }
+                    }
+                });
+                ui.label(
+                    RichText::new("Cancel leaves the recovery file for now.")
+                        .small()
+                        .color(state.theme.text_weak),
+                );
+            }
             Dialog::Message { title, text } => {
                 ui.label(RichText::new(title).strong());
                 ui.label(text);
@@ -55,7 +88,7 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
     // Escape, or a click outside, answers "Cancel" / "OK".
     if response.should_close() {
         out.push(match dialog {
-            Dialog::Unsaved { .. } => CommandId::DialogCancel,
+            Dialog::Unsaved { .. } | Dialog::Recover(_) => CommandId::DialogCancel,
             Dialog::Message { .. } => CommandId::DialogOk,
         });
     }

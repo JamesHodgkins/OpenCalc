@@ -46,6 +46,8 @@ fn main() -> eframe::Result {
                 .and_then(|s| s.get_string("recent"))
                 .map(|list| list.lines().map(std::path::PathBuf::from).collect())
                 .unwrap_or_default();
+            app.enable_autosave(app::recovery_dir());
+            app.scan_recovery();
             // `opencalc FILE...` opens those files.
             for arg in std::env::args_os().skip(1) {
                 app.open_path(std::path::Path::new(&arg));

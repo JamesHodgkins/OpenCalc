@@ -23,9 +23,19 @@ pub struct OpenSheet {
     pub path: Option<PathBuf>,
     /// The document revision that is on disk. The worksheet is modified when its
     /// revision differs. Undoing back to the saved state still counts as modified,
-    /// the safe way to be wrong (docs/PERSISTENCE.md).
-    saved_revision: u64,
+    /// the safe way to be wrong (docs/PERSISTENCE.md). `None`: nothing on disk
+    /// matches (recovered changes), so it is always modified until saved.
+    saved_revision: Option<u64>,
+    /// Identifies this worksheet within the session, for naming its recovery file.
+    pub key: u32,
+    /// The recovery file this untitled worksheet was restored from; it keeps
+    /// writing to the same file.
+    pub adopted_recovery: Option<PathBuf>,
+    /// The revision last written to a recovery file.
+    pub autosaved: Option<u64>,
 }
+
+static NEXT_KEY: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
 impl OpenSheet {
     pub fn new(title: &str) -> OpenSheet {
@@ -46,14 +56,17 @@ impl OpenSheet {
             view: CanvasView::default(),
             canvas,
             path: None,
-            saved_revision: doc_revision,
+            saved_revision: Some(doc_revision),
+            key: NEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            adopted_recovery: None,
+            autosaved: None,
         }
     }
 
     /// A worksheet read from `path`, unmodified, with a clean history.
-    pub fn loaded(doc: Worksheet, path: PathBuf) -> OpenSheet {
+    pub fn loaded(doc: Worksheet, path: Option<PathBuf>) -> OpenSheet {
         let mut s = OpenSheet::from_doc(doc);
-        s.path = Some(path);
+        s.path = path;
         // New regions go below what is already there, not on top of it.
         if let Some(bottom) = s.bounds().map(|b| b.max.y) {
             s.canvas.insert_at = snap(Pos2::new(s.canvas.insert_at.x, bottom + 12.0), GRID);
@@ -63,18 +76,24 @@ impl OpenSheet {
 
     /// Whether the worksheet has changes that are not on disk.
     pub fn dirty(&self) -> bool {
-        self.doc.revision() != self.saved_revision
+        self.saved_revision != Some(self.doc.revision())
+    }
+
+    /// Mark the document as having changes that are not on disk, as for one
+    /// restored from a recovery file.
+    pub fn mark_unsaved(&mut self) {
+        self.saved_revision = None;
     }
 
     /// Record that the document as it is now is on disk at `path`.
     pub fn mark_saved(&mut self, path: &Path) {
-        self.saved_revision = self.doc.revision();
+        self.saved_revision = Some(self.doc.revision());
         self.path = Some(path.to_owned());
     }
 
     /// Treat the document as unmodified (changes thrown away on purpose).
     pub fn mark_clean(&mut self) {
-        self.saved_revision = self.doc.revision();
+        self.saved_revision = Some(self.doc.revision());
     }
 
     /// Nothing typed, nothing saved: a blank sheet that opening a file may replace.
