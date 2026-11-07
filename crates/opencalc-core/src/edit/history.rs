@@ -23,6 +23,7 @@ enum RunKey {
     Plot(RegionId),
     Page,
     Format(RegionId),
+    Label(RegionId),
 }
 
 impl RunKey {
@@ -40,6 +41,7 @@ impl RunKey {
             Edit::SetPlot { id, .. } => Some(RunKey::Plot(*id)),
             Edit::SetPageSetup(_) => Some(RunKey::Page),
             Edit::SetResultFormat { id, .. } => Some(RunKey::Format(*id)),
+            Edit::SetLabel { id, .. } => Some(RunKey::Label(*id)),
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetFontStyle { .. }

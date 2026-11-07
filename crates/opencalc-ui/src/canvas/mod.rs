@@ -210,7 +210,7 @@ pub fn show(
         }
     }
 
-    overlay::locks(&painter, view, origin, regions, st, theme);
+    overlay::marks(ui, &painter, view, origin, regions, st, theme);
     // Regions with a Find match: a light wash, stronger on the current one.
     for r in regions.iter().filter(|r| env.found.regions.contains(&r.id)) {
         let screen = view

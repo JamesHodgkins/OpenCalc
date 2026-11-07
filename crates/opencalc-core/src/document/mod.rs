@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 pub use geometry::{Point, Size};
 pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
 pub use plot::{PlotInput, PlotSpec, MAX_SERIES};
-pub use region::{FontStyle, MathRegion, Region, RegionId, RegionKind};
+pub use region::{
+    clean_label, FontStyle, MathRegion, Region, RegionId, RegionKind, MAX_LABEL_CHARS,
+};
 pub use result_format::{DisplayUnit, Notation, ResultFormat, MAX_DECIMALS};
 
 use crate::expr::Expr;
@@ -132,6 +134,7 @@ impl Worksheet {
             kind,
             style: FontStyle::default(),
             locked: false,
+            label: String::new(),
         }
     }
 

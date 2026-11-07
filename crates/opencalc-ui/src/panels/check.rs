@@ -46,7 +46,13 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
                             Severity::Error => theme.error,
                             Severity::Warning => theme.warning,
                         };
-                        let what = f.source.as_deref().unwrap_or("");
+                        // A labelled region is named by its label, the source after it.
+                        let source = f.source.as_deref().unwrap_or("");
+                        let what = if f.label.is_empty() {
+                            source.to_owned()
+                        } else {
+                            format!("{}  {source}", f.label)
+                        };
                         let line = format!("{}  {what}\n{}", icons::WARNING, f.message);
                         let button = egui::Button::new(RichText::new(line).color(colour));
                         if ui.add(button.frame(false)).clicked() {

@@ -28,6 +28,7 @@ mod files;
 mod find;
 mod format;
 mod insert;
+mod label;
 mod text_edit;
 mod units;
 

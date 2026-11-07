@@ -42,11 +42,35 @@ fn toggle_lock(state: &mut AppState) {
     }
 }
 
+/// Open the Label window for the first selected region. The region is no longer
+/// being edited, so the text box can have the keyboard.
+fn open_label(state: &mut AppState) {
+    let Some(i) = state.active else { return };
+    let canvas = &mut state.sheets[i].canvas;
+    let Some(id) = canvas.selection.first().copied() else {
+        return;
+    };
+    canvas.editing = None;
+    canvas.field = None;
+    state.label_for = Some(id);
+}
+
 /// Run an arrange command. `None` if `command` is not one.
 pub fn dispatch_arrange(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>> {
     let row = match command {
         CommandId::RegionLock => {
             toggle_lock(state);
+            return Some(Vec::new());
+        }
+        CommandId::RegionTag => {
+            open_label(state);
+            return Some(Vec::new());
+        }
+        CommandId::LabelClose => {
+            state.label_for = None;
+            if let Some(i) = state.active {
+                state.sheets[i].seal();
+            }
             return Some(Vec::new());
         }
         CommandId::ArrangeAlignH => true,

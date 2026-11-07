@@ -135,6 +135,7 @@ commands! {
     RegionDelete: "region.delete", "Delete", icons::DELETE;
     RegionLock: "region.lock", "Lock", icons::LOCK;
     RegionTag: "region.tag", "Tag", icons::TAG;
+    LabelClose: "region.label_close", "Close Label", icons::CLOSE;
     InsertMath: "insert.math", "Math region", icons::MATH;
     InsertText: "insert.text", "Text region", icons::TEXT;
     InsertArea: "insert.area", "Area", icons::AREA;
@@ -239,14 +240,14 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            RegionLock | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic
-            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
-            | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
-            | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
-            | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace
-            | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
-            | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
-            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
+            RegionTag | LabelClose | RegionLock | ArrangeAlignH | ArrangeAlignV | FormatBold
+            | FormatItalic | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
+            | UnitsDisplayKn | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess
+            | FormatScientific | FormatEngineering | ClipboardPaste | ClipboardCut
+            | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind
+            | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose
+            | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave
+            | FileSaveAs | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
             | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..)
             | MatrixClose | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext
             | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
@@ -259,7 +260,7 @@ impl CommandId {
             | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
                 true
             }
-            RegionTag | HelpShortcuts | HelpGuide => false,
+            HelpShortcuts | HelpGuide => false,
         }
     }
 
@@ -331,7 +332,7 @@ mod tests {
     fn some_commands_are_implemented_and_some_deliberately_are_not() {
         assert!(CommandId::EditUndo.is_implemented());
         assert!(CommandId::SelectSheet(3).is_implemented());
-        assert!(!CommandId::RegionTag.is_implemented());
+        assert!(!CommandId::HelpGuide.is_implemented());
         let implemented = CommandId::ALL.iter().filter(|c| c.is_implemented()).count();
         assert!(implemented > 20 && implemented < CommandId::ALL.len());
     }

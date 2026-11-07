@@ -113,7 +113,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
         && (ctx.has_selection
             || !matches!(
                 command,
-                RegionDelete | ClipboardCut | ClipboardCopy | RegionLock
+                RegionDelete | ClipboardCut | ClipboardCopy | RegionLock | RegionTag
             ))
         && (ctx.selects_math
             || !matches!(

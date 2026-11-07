@@ -185,6 +185,7 @@ impl App {
                     kind: RegionKind::Text { text: region_text },
                     style: Default::default(),
                     locked: false,
+                    label: String::new(),
                 }],
                 None => return,
             },
@@ -214,6 +215,7 @@ impl App {
             let mut region = sheet.doc.new_region(original.kind, pos);
             region.size = original.size;
             region.style = original.style;
+            region.label = original.label;
             bottom = bottom.max(region.pos.y + region.size.h);
             inserted.push((base + n, region));
         }

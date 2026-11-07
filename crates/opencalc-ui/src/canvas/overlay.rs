@@ -258,9 +258,11 @@ pub(super) fn marquee(
     }
 }
 
-/// Locked regions: a padlock at the top right of each, and no editing of them (a
-/// region locked while it was open stops being edited).
-pub(super) fn locks(
+/// Marks on regions: a padlock on a locked one, a tag (with the label as a hover
+/// tip) on a labelled one. Editing marks only: never exported or printed. A locked
+/// region is not edited, and one locked while open stops being edited.
+pub(super) fn marks(
+    ui: &Ui,
     painter: &eframe::egui::Painter,
     view: &CanvasView,
     origin: Pos2,
@@ -275,15 +277,28 @@ pub(super) fn locks(
         st.editing = None;
         st.field = None;
     }
-    for r in regions.iter().filter(|r| r.locked) {
+    let size = (11.0 * view.zoom).clamp(8.0, 18.0);
+    let font = eframe::egui::FontId::proportional(size);
+    for r in regions.iter().filter(|r| r.locked || !r.label.is_empty()) {
         let screen = view.rect_to_screen(rect_of(r, &st.sizes), origin);
-        let size = (11.0 * view.zoom).clamp(8.0, 18.0);
-        painter.text(
-            screen.right_top() + eframe::egui::vec2(-2.0, 2.0),
-            Align2::RIGHT_TOP,
-            crate::icons::LOCK,
-            eframe::egui::FontId::proportional(size),
-            theme.text_weak,
-        );
+        let mut right = screen.right() - 2.0;
+        let top = screen.top() + 2.0;
+        let icons = [
+            (r.locked, crate::icons::LOCK),
+            (!r.label.is_empty(), crate::icons::TAG),
+        ];
+        for (shown, icon) in icons {
+            if !shown {
+                continue;
+            }
+            let at = Pos2::new(right, top);
+            let area = painter.text(at, Align2::RIGHT_TOP, icon, font.clone(), theme.text_weak);
+            right = area.left() - 3.0;
+            if icon == crate::icons::TAG {
+                let id = eframe::egui::Id::new(("tag", r.id.0));
+                ui.interact(area.expand(3.0), id, eframe::egui::Sense::hover())
+                    .on_hover_text(&r.label);
+            }
+        }
     }
 }

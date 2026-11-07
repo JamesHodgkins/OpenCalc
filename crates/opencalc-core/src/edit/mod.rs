@@ -11,8 +11,8 @@
 mod history;
 
 use crate::document::{
-    FontStyle, PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Size,
-    Worksheet,
+    clean_label, FontStyle, PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat,
+    Size, Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -40,6 +40,12 @@ pub enum Edit {
     SetText {
         id: RegionId,
         text: String,
+    },
+    /// Name a region, or clear its name. Allowed on a locked region: a label is
+    /// not content. The label is cleaned as [`clean_label`] says.
+    SetLabel {
+        id: RegionId,
+        label: String,
     },
     /// Lock or unlock a region.
     SetLocked {
@@ -158,6 +164,14 @@ impl Worksheet {
                 Ok(Edit::SetMathSource {
                     id: *id,
                     source: old,
+                })
+            }
+            Edit::SetLabel { id, label } => {
+                let region = self.region_mut(*id)?;
+                let old = std::mem::replace(&mut region.label, clean_label(label));
+                Ok(Edit::SetLabel {
+                    id: *id,
+                    label: old,
                 })
             }
             Edit::SetLocked { id, locked } => {
@@ -562,6 +576,10 @@ mod tests {
         round_trips(Edit::SetMathSource {
             id: ids[0],
             source: "a := 99".into(),
+        });
+        round_trips(Edit::SetLabel {
+            id: ids[0],
+            label: "Beam check".into(),
         });
         round_trips(Edit::SetLocked {
             id: ids[0],

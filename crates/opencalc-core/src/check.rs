@@ -22,6 +22,8 @@ pub struct Finding {
     pub region: RegionId,
     /// The region's top-left corner, in document units.
     pub at: (f32, f32),
+    /// The region's label, if it has one.
+    pub label: String,
     pub message: String,
     /// The region's source text, for a math region.
     pub source: Option<String>,
@@ -34,6 +36,7 @@ pub fn check(ws: &Worksheet) -> Vec<Finding> {
     let units = ws.units().unwrap_or_else(|_| UnitRegistry::builtin());
     let regions = ws.math_regions();
     let out = evaluate_all(&regions, &ws.plot_inputs(), &units);
+    let label = |id: RegionId| ws.region(id).map(|r| r.label.clone()).unwrap_or_default();
     let place = |id: RegionId| ws.region(id).map_or((0.0, 0.0), |r| (r.pos.x, r.pos.y));
     let mut findings = Vec::new();
     for region in ws.regions() {
@@ -57,6 +60,7 @@ pub fn check(ws: &Worksheet) -> Vec<Finding> {
                     severity: Severity::Error,
                     region: id,
                     at: place(id),
+                    label: label(id),
                     message,
                     source: Some(m.source().to_owned()),
                     range,
@@ -68,6 +72,7 @@ pub fn check(ws: &Worksheet) -> Vec<Finding> {
                         severity: Severity::Error,
                         region: id,
                         at: place(id),
+                        label: label(id),
                         message: format!("plot: {error}"),
                         source: None,
                         range: None,
@@ -89,6 +94,7 @@ pub fn check(ws: &Worksheet) -> Vec<Finding> {
                         severity: Severity::Warning,
                         region: *id,
                         at: place(*id),
+                        label: label(*id),
                         message: format!("'{name}' is defined more than once; the last one wins"),
                         source,
                         range: None,
@@ -104,6 +110,7 @@ pub fn check(ws: &Worksheet) -> Vec<Finding> {
                     severity: Severity::Warning,
                     region: *region,
                     at: place(*region),
+                    label: label(*region),
                     message: format!(
                         "'{name}' is not defined, so this only calculates the value; use := to define it"
                     ),

@@ -59,6 +59,8 @@ pub struct AppState {
     pub options_open: bool,
     /// The Units window (custom units).
     pub units_open: bool,
+    /// The region whose Label window is open.
+    pub label_for: Option<opencalc_core::document::RegionId>,
     /// The Insert Matrix window.
     pub matrix_open: bool,
     /// The Check Worksheet window and the problems it lists.
@@ -103,6 +105,7 @@ impl AppState {
             draft: false,
             options_open: false,
             units_open: false,
+            label_for: None,
             matrix_open: false,
             check: Default::default(),
             find: Default::default(),

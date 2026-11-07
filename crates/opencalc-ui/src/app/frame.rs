@@ -103,6 +103,7 @@ impl App {
         }
         panels::check::show(ctx, &self.state, &mut cmds);
         panels::matrix::show(ctx, &self.state, &mut cmds);
+        panels::label::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         self.state.refresh_find();
         let mut typed: Vec<super::finding::FindCmd> = Vec::new();
         panels::find::show(ctx, &self.state, &mut cmds, &mut typed);

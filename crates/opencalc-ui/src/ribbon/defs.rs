@@ -378,6 +378,7 @@ mod tests {
             CommandId::FindClose,          // the Find window
             CommandId::CheckClose,         // the Check window
             CommandId::MatrixClose,        // the Matrix window
+            CommandId::LabelClose,         // the Label window
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog

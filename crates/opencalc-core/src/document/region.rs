@@ -171,4 +171,36 @@ pub struct Region {
     /// change one by mistake.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub locked: bool,
+    /// A short name for finding the region again (empty: none). Shown beside the
+    /// region while editing, never on the printed page.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub label: String,
+}
+
+/// Longest label the program sets, in characters.
+pub const MAX_LABEL_CHARS: usize = 60;
+
+/// A label as it will be kept: control characters and surrounding blanks removed,
+/// cut to [`MAX_LABEL_CHARS`].
+pub fn clean_label(raw: &str) -> String {
+    let flat: String = raw
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    flat.trim().chars().take(MAX_LABEL_CHARS).collect()
+}
+
+#[cfg(test)]
+mod label_tests {
+    use super::*;
+
+    #[test]
+    fn a_label_is_one_line_trimmed_and_cut_to_length() {
+        assert_eq!(clean_label("  Beam check  "), "Beam check");
+        assert_eq!(clean_label("a\nb\tc"), "a b c");
+        assert_eq!(clean_label("   "), "");
+        let long = "x".repeat(MAX_LABEL_CHARS + 20);
+        assert_eq!(clean_label(&long).chars().count(), MAX_LABEL_CHARS);
+        assert_eq!(clean_label("\u{3c0} r\u{b2}"), "\u{3c0} r\u{b2}");
+    }
 }

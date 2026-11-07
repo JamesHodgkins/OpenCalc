@@ -69,7 +69,9 @@ A region has an `id` (unique whole number), a `pos` (top-left corner) and a `siz
 both in **document units of 1/96 inch**, and a `kind`. A text region may also have
 a `style`, `{ "bold": true, "italic": false }` (both default to false; omitted
 when plain). Any region may be `"locked": true` (default false, omitted when
-unlocked): it cannot be moved, edited or deleted until unlocked:
+unlocked): it cannot be moved, edited or deleted until unlocked. Any region may
+also have a `"label"`, a short name to find it by (the program sets at most 60
+characters; omitted when empty):
 
 | `kind` | JSON | Notes |
 |---|---|---|

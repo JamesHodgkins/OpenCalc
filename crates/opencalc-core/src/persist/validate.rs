@@ -65,6 +65,7 @@ fn math(what: &'static str, m: &MathRegion) -> Result<(), LoadError> {
 }
 
 fn check_text(r: &Region) -> Result<(), LoadError> {
+    too_long("a region label", &r.label)?;
     match &r.kind {
         RegionKind::Math(m) => math("a math source", m),
         RegionKind::Text { text } => too_long("a text region", text),

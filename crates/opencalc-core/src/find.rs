@@ -4,7 +4,7 @@
 //!
 //! Replacing builds one [`Edit::Batch`], so "replace all" is a single undo step.
 
-use crate::document::{MathRegion, PlotSpec, RegionId, RegionKind, Worksheet};
+use crate::document::{MathRegion, PlotSpec, Region, RegionId, RegionKind, Worksheet};
 use crate::edit::Edit;
 
 /// Longest text searched for or put in, in characters.
@@ -32,6 +32,8 @@ pub enum Field {
     PlotYLabel,
     PlotX,
     PlotSeries(usize),
+    /// The region's label (any kind of region has one).
+    Label,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -44,7 +46,13 @@ pub struct Match {
 }
 
 /// The searchable text of a region, in reading order.
-fn fields(kind: &RegionKind) -> Vec<(Field, &str)> {
+fn fields(region: &Region) -> Vec<(Field, &str)> {
+    let mut fields = kind_fields(&region.kind);
+    fields.push((Field::Label, region.label.as_str()));
+    fields
+}
+
+fn kind_fields(kind: &RegionKind) -> Vec<(Field, &str)> {
     match kind {
         RegionKind::Math(m) => vec![(Field::Math, m.source())],
         RegionKind::Text { text } => vec![(Field::Text, text.as_str())],
@@ -115,7 +123,7 @@ pub fn find_all(ws: &Worksheet, query: &str, options: Options) -> Vec<Match> {
     });
     let mut out = Vec::new();
     for region in regions {
-        for (field, text) in fields(&region.kind) {
+        for (field, text) in fields(region) {
             let chars: Vec<char> = text.chars().collect();
             for (start, end) in scan(&chars, &query, options) {
                 out.push(Match {
@@ -197,6 +205,9 @@ pub fn replace_edit(ws: &Worksheet, matches: &[Match], replacement: &str) -> Opt
             }
             RegionKind::Area { .. } | RegionKind::Table | RegionKind::Picture => {}
         }
+        if let Some(label) = new_text(Field::Label, &region.label) {
+            edits.push(Edit::SetLabel { id, label });
+        }
     }
     match edits.len() {
         0 => None,
@@ -260,6 +271,37 @@ mod tests {
 
     fn all(w: &Worksheet, q: &str) -> Vec<Match> {
         find_all(w, q, Options::default())
+    }
+
+    #[test]
+    fn labels_are_searched_and_replaced_like_other_text() {
+        let mut w = sheet(&[
+            (math("a := 1"), 0.0, 0.0),
+            (RegionKind::Table, 0.0, 50.0),
+            (math("b := 2"), 0.0, 100.0),
+        ]);
+        let ids: Vec<RegionId> = w.regions().iter().map(|r| r.id).collect();
+        for (id, label) in [(ids[0], "Beam check"), (ids[1], "Beam table")] {
+            w.apply(Edit::SetLabel {
+                id,
+                label: label.into(),
+            })
+            .unwrap();
+        }
+        // A label on any kind of region is found, in the region's own place.
+        let found = all(&w, "beam");
+        assert_eq!(
+            found
+                .iter()
+                .map(|m| (m.region, m.field))
+                .collect::<Vec<_>>(),
+            [(ids[0], Field::Label), (ids[1], Field::Label)]
+        );
+        let edit = replace_edit(&w, &found, "Column").unwrap();
+        w.apply(edit).unwrap();
+        assert_eq!(w.region(ids[0]).unwrap().label, "Column check");
+        assert_eq!(w.region(ids[1]).unwrap().label, "Column table");
+        assert!(all(&w, "beam").is_empty());
     }
 
     #[test]
