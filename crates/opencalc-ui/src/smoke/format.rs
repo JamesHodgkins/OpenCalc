@@ -183,3 +183,88 @@ fn the_format_is_saved_with_the_worksheet_and_survives_copy_and_paste() {
     assert_ne!(pasted, shown);
     assert_eq!(notation(&h, pasted), Notation::Scientific);
 }
+
+/// A worksheet with `L := 2 m`, `L =` and `F := 5 kN`, `F =`.
+fn setup_units() -> (Harness, RegionId, RegionId) {
+    let mut h = Harness::new();
+    h.settle();
+    let sheet = &mut h.app.state.sheets[0];
+    sheet.add(RegionKind::math("L := 2 m"), Point::new(40.0, 700.0));
+    let length = sheet.add(RegionKind::math("L ="), Point::new(40.0, 760.0));
+    sheet.add(RegionKind::math("F := 5 kN"), Point::new(40.0, 820.0));
+    let force = sheet.add(RegionKind::math("F ="), Point::new(40.0, 880.0));
+    h.app.recalculate();
+    h.settle();
+    (h, length, force)
+}
+
+#[test]
+fn display_in_shows_a_result_in_the_chosen_unit_and_reset_puts_it_back() {
+    let (mut h, length, force) = setup_units();
+    assert_eq!(result(&h, length), "2 m");
+    select(&mut h, &[length]);
+    h.command(CommandId::UnitsDisplayMm);
+    assert_eq!(result(&h, length), "2000 mm");
+    h.command(CommandId::UnitsDisplayIn);
+    assert_eq!(result(&h, length), "78.74 in");
+    assert!(h
+        .app
+        .state
+        .active_toggles()
+        .contains(&CommandId::UnitsDisplayIn));
+    h.command(CommandId::UnitsDisplayReset);
+    assert_eq!(result(&h, length), "2 m");
+
+    select(&mut h, &[force]);
+    h.command(CommandId::UnitsDisplayN);
+    assert_eq!(result(&h, force), "5000 N");
+    h.command(CommandId::UnitsDisplayKn);
+    assert_eq!(result(&h, force), "5 kN");
+    // Undo goes back one choice at a time.
+    h.command(CommandId::EditUndo);
+    assert_eq!(result(&h, force), "5000 N");
+}
+
+#[test]
+fn a_unit_of_another_kind_is_ignored_and_the_choice_combines_with_the_number_format() {
+    let (mut h, length, force) = setup_units();
+    select(&mut h, &[force]);
+    h.command(CommandId::UnitsDisplayMm);
+    assert_eq!(result(&h, force), "5 kN", "metres do not apply to a force");
+    // Length in millimetres to two decimals, in scientific notation.
+    select(&mut h, &[length]);
+    h.command(CommandId::UnitsDisplayMm);
+    h.command(CommandId::FormatDecimalsLess);
+    h.command(CommandId::FormatScientific);
+    assert_eq!(result(&h, length), "2.00e3 mm");
+    // A format change keeps the unit, and the other way round.
+    h.command(CommandId::FormatScientific);
+    assert_eq!(result(&h, length), "2000.00 mm");
+}
+
+#[test]
+fn display_in_is_saved_and_the_buttons_need_a_math_region() {
+    let (mut h, length, _) = setup_units();
+    let formats = [
+        CommandId::UnitsDisplayM,
+        CommandId::UnitsDisplayMm,
+        CommandId::UnitsDisplayIn,
+        CommandId::UnitsDisplayN,
+        CommandId::UnitsDisplayKn,
+        CommandId::UnitsDisplayReset,
+    ];
+    select(&mut h, &[]);
+    assert!(formats.iter().all(|c| !h.app.registry().allows(*c)));
+    select(&mut h, &[length]);
+    assert!(formats.iter().all(|c| h.app.registry().allows(*c)));
+    h.command(CommandId::UnitsDisplayMm);
+    let bytes = save_bytes(&h.sheet().doc).unwrap();
+    let loaded = load_bytes(&bytes).unwrap();
+    let RegionKind::Math(m) = &loaded.worksheet.region(length).unwrap().kind else {
+        panic!()
+    };
+    assert_eq!(
+        m.format().unit(),
+        Some(opencalc_core::document::DisplayUnit::Millimetre)
+    );
+}

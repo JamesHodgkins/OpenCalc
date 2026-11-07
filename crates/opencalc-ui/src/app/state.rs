@@ -166,6 +166,7 @@ impl AppState {
         .into_iter()
         .filter(|(n, _)| super::formatting::all_in(self, *n))
         .map(|(_, c)| c)
+        .chain(super::formatting::units_in_use(self))
         .collect()
     }
 

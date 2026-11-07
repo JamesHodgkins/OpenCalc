@@ -279,6 +279,29 @@ fn a_result_format_is_read_and_an_out_of_range_count_is_brought_into_range() {
         2,
     );
     assert!(load_json(&bad).is_err());
+    let unit = sheet(
+        &[region(
+            1,
+            r#"{"Math":{"source":"x =","format":{"unit":"kN"}}}"#,
+        )],
+        2,
+    );
+    let l2 = load_json(&unit).unwrap();
+    match &l2.worksheet.regions()[0].kind {
+        RegionKind::Math(m) => assert_eq!(
+            m.format().unit(),
+            Some(opencalc_core::document::DisplayUnit::Kilonewton)
+        ),
+        _ => unreachable!(),
+    }
+    let odd = sheet(
+        &[region(
+            1,
+            r#"{"Math":{"source":"x","format":{"unit":"parsec"}}}"#,
+        )],
+        2,
+    );
+    assert!(load_json(&odd).is_err());
     // The default is not written, so older files stay as they were.
     let plain = save_bytes(&l.worksheet).unwrap();
     let again = load_bytes(&plain).unwrap();

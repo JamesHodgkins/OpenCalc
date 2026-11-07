@@ -5,7 +5,7 @@ use crate::number_format::number_in;
 use opencalc_core::document::ResultFormat;
 use opencalc_core::numeric::Complex64;
 use opencalc_core::registry::UnitSystem;
-use opencalc_core::units::{Dimension, Quantity};
+use opencalc_core::units::{builtin_unit, Dimension, Quantity};
 use opencalc_core::value::Value;
 
 /// Units offered for automatic display in each unit system, smallest first
@@ -93,6 +93,23 @@ fn display_unit(system: UnitSystem, dim: Dimension, magnitude: f64) -> (String, 
     }
 }
 
+/// [`display_unit`], unless the region asks for a unit of this dimension.
+fn unit_in(
+    system: UnitSystem,
+    dim: Dimension,
+    magnitude: f64,
+    format: ResultFormat,
+) -> (String, f64) {
+    let asked = format
+        .unit()
+        .and_then(|u| builtin_unit(u.symbol()))
+        .filter(|u| u.dimension == dim && !dim.is_dimensionless());
+    match asked {
+        Some(u) => (u.symbol, u.to_si_scale),
+        None => display_unit(system, dim, magnitude),
+    }
+}
+
 /// The unit label and scale (divide SI values by it) to show an axis in, for
 /// data up to `peak` in the given dimension.
 pub fn axis_unit(system: UnitSystem, dim: Dimension, peak: f64) -> (String, f64) {
@@ -120,7 +137,7 @@ pub fn format_quantity(q: Quantity, system: UnitSystem) -> String {
 }
 
 fn format_quantity_with(q: Quantity, system: UnitSystem, format: ResultFormat) -> String {
-    let (label, scale) = display_unit(system, q.dim, q.si.abs());
+    let (label, scale) = unit_in(system, q.dim, q.si.abs(), format);
     with_unit(number_in(q.si / scale, format), &label)
 }
 
@@ -172,7 +189,7 @@ pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) ->
             Some(q) => format_quantity_with(q, system, format),
             None => {
                 let peak = s.z.re.abs().max(s.z.im.abs());
-                let (label, scale) = display_unit(system, s.dim, peak);
+                let (label, scale) = unit_in(system, s.dim, peak, format);
                 let text = complex_text(s.z, scale, peak, format);
                 if label.is_empty() {
                     text
@@ -186,7 +203,7 @@ pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) ->
                 .elements()
                 .iter()
                 .fold(0.0_f64, |p, z| p.max(z.re.abs()).max(z.im.abs()));
-            let (label, scale) = display_unit(system, m.dim, peak);
+            let (label, scale) = unit_in(system, m.dim, peak, format);
             let mut rows = Vec::new();
             let mut shown = 0;
             'rows: for r in 0..m.rows() {
@@ -211,7 +228,7 @@ pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) ->
                 .elements()
                 .iter()
                 .fold(0.0_f64, |p, z| p.max(z.re.abs()).max(z.im.abs()));
-            let (label, scale) = display_unit(system, r.dim, peak);
+            let (label, scale) = unit_in(system, r.dim, peak, format);
             let mut items: Vec<String> = r
                 .elements()
                 .iter()

@@ -20,11 +20,42 @@ pub enum Notation {
     Engineering,
 }
 
+/// A unit a result can be asked to be shown in. It applies to results of the same
+/// kind (lengths for the length units, forces for the force units); a result of
+/// any other kind is shown as it would be without the choice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DisplayUnit {
+    #[serde(rename = "m")]
+    Metre,
+    #[serde(rename = "mm")]
+    Millimetre,
+    #[serde(rename = "in")]
+    Inch,
+    #[serde(rename = "N")]
+    Newton,
+    #[serde(rename = "kN")]
+    Kilonewton,
+}
+
+impl DisplayUnit {
+    /// The unit's symbol, as the evaluator knows it.
+    pub fn symbol(self) -> &'static str {
+        match self {
+            DisplayUnit::Metre => "m",
+            DisplayUnit::Millimetre => "mm",
+            DisplayUnit::Inch => "in",
+            DisplayUnit::Newton => "N",
+            DisplayUnit::Kilonewton => "kN",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "Saved", into = "Saved")]
 pub struct ResultFormat {
     notation: Notation,
     decimals: Option<u8>,
+    unit: Option<DisplayUnit>,
 }
 
 /// The saved form; `from` brings an out-of-range count back into range.
@@ -32,13 +63,15 @@ pub struct ResultFormat {
 struct Saved {
     #[serde(default)]
     notation: Notation,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     decimals: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    unit: Option<DisplayUnit>,
 }
 
 impl From<Saved> for ResultFormat {
     fn from(s: Saved) -> ResultFormat {
-        ResultFormat::new(s.notation, s.decimals)
+        ResultFormat::new(s.notation, s.decimals).with_unit(s.unit)
     }
 }
 
@@ -47,6 +80,7 @@ impl From<ResultFormat> for Saved {
         Saved {
             notation: f.notation,
             decimals: f.decimals,
+            unit: f.unit,
         }
     }
 }
@@ -57,6 +91,7 @@ impl ResultFormat {
         ResultFormat {
             notation,
             decimals: decimals.map(|d| d.min(MAX_DECIMALS)),
+            unit: None,
         }
     }
 
@@ -77,17 +112,32 @@ impl ResultFormat {
     /// the default shows) and stops at the most that means anything.
     pub fn more_decimals(self) -> ResultFormat {
         let next = self.decimals.map_or(4, |d| d.saturating_add(1));
-        ResultFormat::new(self.notation, Some(next))
+        ResultFormat {
+            decimals: Some(next.min(MAX_DECIMALS)),
+            ..self
+        }
     }
 
     /// One fewer decimal, down to none.
     pub fn fewer_decimals(self) -> ResultFormat {
         let next = self.decimals.map_or(2, |d| d.saturating_sub(1));
-        ResultFormat::new(self.notation, Some(next))
+        ResultFormat {
+            decimals: Some(next),
+            ..self
+        }
+    }
+
+    pub fn unit(self) -> Option<DisplayUnit> {
+        self.unit
+    }
+
+    /// Show results in `unit` (`None`: chosen automatically).
+    pub fn with_unit(self, unit: Option<DisplayUnit>) -> ResultFormat {
+        ResultFormat { unit, ..self }
     }
 
     pub fn with_notation(self, notation: Notation) -> ResultFormat {
-        ResultFormat::new(notation, self.decimals)
+        ResultFormat { notation, ..self }
     }
 }
 

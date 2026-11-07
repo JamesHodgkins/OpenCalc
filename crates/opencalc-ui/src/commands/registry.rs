@@ -103,7 +103,16 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
         && (ctx.selects_math
             || !matches!(
                 command,
-                FormatDecimalsMore | FormatDecimalsLess | FormatScientific | FormatEngineering
+                FormatDecimalsMore
+                    | FormatDecimalsLess
+                    | FormatScientific
+                    | FormatEngineering
+                    | UnitsDisplayM
+                    | UnitsDisplayMm
+                    | UnitsDisplayIn
+                    | UnitsDisplayN
+                    | UnitsDisplayKn
+                    | UnitsDisplayReset
             ))
         && (ctx.can_undo || command != EditUndo)
         && (ctx.can_redo || command != EditRedo)

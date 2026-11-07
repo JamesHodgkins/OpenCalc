@@ -3,7 +3,7 @@
 //! Display only. These change a region's `ResultFormat`, as one undoable step, and
 //! never a value, so nothing is recalculated.
 
-use opencalc_core::document::{Notation, RegionId, RegionKind, ResultFormat};
+use opencalc_core::document::{DisplayUnit, Notation, RegionId, RegionKind, ResultFormat};
 use opencalc_core::edit::Edit;
 
 use super::dispatch::Effect;
@@ -33,6 +33,32 @@ pub fn all_in(state: &AppState, notation: Notation) -> bool {
     !formats.is_empty() && formats.iter().all(|(_, f)| f.notation() == notation)
 }
 
+fn unit_choice(unit: Option<DisplayUnit>) -> Box<dyn Fn(ResultFormat) -> ResultFormat> {
+    Box::new(move |f| f.with_unit(unit))
+}
+
+/// The display units that every selected math region has chosen.
+pub fn units_in_use(state: &AppState) -> Vec<CommandId> {
+    let formats = selected_formats(state);
+    let Some((_, first)) = formats.first() else {
+        return Vec::new();
+    };
+    let same = formats.iter().all(|(_, f)| f.unit() == first.unit());
+    let command = match first.unit() {
+        Some(DisplayUnit::Metre) => CommandId::UnitsDisplayM,
+        Some(DisplayUnit::Millimetre) => CommandId::UnitsDisplayMm,
+        Some(DisplayUnit::Inch) => CommandId::UnitsDisplayIn,
+        Some(DisplayUnit::Newton) => CommandId::UnitsDisplayN,
+        Some(DisplayUnit::Kilonewton) => CommandId::UnitsDisplayKn,
+        None => return Vec::new(),
+    };
+    if same {
+        vec![command]
+    } else {
+        Vec::new()
+    }
+}
+
 /// Run a Format command. `None` if `command` is not one of them.
 pub fn dispatch_format(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>> {
     use CommandId::*;
@@ -53,6 +79,12 @@ pub fn dispatch_format(state: &mut AppState, command: CommandId) -> Option<Vec<E
             };
             Box::new(move |f| f.with_notation(target))
         }
+        UnitsDisplayM => unit_choice(Some(DisplayUnit::Metre)),
+        UnitsDisplayMm => unit_choice(Some(DisplayUnit::Millimetre)),
+        UnitsDisplayIn => unit_choice(Some(DisplayUnit::Inch)),
+        UnitsDisplayN => unit_choice(Some(DisplayUnit::Newton)),
+        UnitsDisplayKn => unit_choice(Some(DisplayUnit::Kilonewton)),
+        UnitsDisplayReset => unit_choice(None),
         _ => return None,
     };
     let formats = selected_formats(state);
