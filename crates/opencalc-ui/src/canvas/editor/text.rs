@@ -189,6 +189,11 @@ impl Field {
     pub fn backspace(&mut self) {
         if !self.has_selection() && self.caret > 0 {
             self.anchor = self.caret - 1;
+            // Between an empty pair of brackets, take both away together.
+            let pair = (self.chars[self.caret - 1], self.chars.get(self.caret));
+            if matches!(pair, ('(', Some(')')) | ('[', Some(']'))) {
+                self.caret += 1;
+            }
         }
         self.insert("");
     }
@@ -415,6 +420,26 @@ mod tests {
         f.set_caret(1, false);
         f.sync("ab+cde");
         assert_eq!(f.caret, 2, "the caret keeps its distance from the end");
+    }
+
+    #[test]
+    fn backspace_inside_an_empty_pair_of_brackets_removes_both() {
+        let mut f = Field::new("f()");
+        f.set_caret(2, false);
+        f.backspace();
+        assert_eq!(f.text(), "f");
+        let mut g = Field::new("[]");
+        g.set_caret(1, false);
+        g.backspace();
+        assert_eq!(g.text(), "");
+        let mut h = Field::new("(1)");
+        h.set_caret(1, false);
+        h.backspace();
+        assert_eq!(
+            h.text(),
+            "1)",
+            "a pair with something inside is not touched"
+        );
     }
 
     #[test]

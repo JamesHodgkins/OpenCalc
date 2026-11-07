@@ -193,6 +193,8 @@ The cursor specification is implemented as follows. The caret is transient UI st
 - An insertion cut short by the 8,192-character limit shows a notice under the region.
 - Sources over the limit are never truncated; editing is refused with a message.
 
-Deferred, as in the specification: shrinking a selection, paired-bracket deletion,
-operator-aware deletion, cross-region keyboard traversal, placeholder traversal, text-region caret,
+Backspace between an empty `()` or `[]` removes both.
+
+Deferred, as in the specification: shrinking a selection, deleting a bracket pair that
+has content, operator-aware deletion, cross-region keyboard traversal, placeholder traversal, text-region caret,
 IME verification, and validation against a named Mathcad Prime release.

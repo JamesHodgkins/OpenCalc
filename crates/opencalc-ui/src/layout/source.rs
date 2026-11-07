@@ -589,6 +589,28 @@ mod tests {
     }
 
     #[test]
+    fn unspaced_source_is_drawn_exactly_like_spaced_source() {
+        with_fonts(|fonts| {
+            for (tight, loose) in [
+                ("x+1", "x + 1"),
+                ("q:=7*a/b", "q := 7 * a / b"),
+                ("f(x,y)^2-3", "f(x, y)^2 - 3"),
+                ("a<=b", "a <= b"),
+            ] {
+                let (a, b) = (lay(fonts, tight), lay(fonts, loose));
+                assert!(
+                    (a.layout.w - b.layout.w).abs() < 0.5 && (a.layout.h - b.layout.h).abs() < 0.5,
+                    "{tight}: {}x{} vs {loose}: {}x{}",
+                    a.layout.w,
+                    a.layout.h,
+                    b.layout.w,
+                    b.layout.h
+                );
+            }
+        });
+    }
+
+    #[test]
     fn grow_climbs_the_expression_one_level_at_a_time_and_stops_at_the_top() {
         with_fonts(|fonts| {
             let l = lay(fonts, "alpha + (b * c)");
