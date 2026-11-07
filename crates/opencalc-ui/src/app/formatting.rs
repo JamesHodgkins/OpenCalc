@@ -21,7 +21,7 @@ pub fn selected_formats(state: &AppState) -> Vec<(RegionId, ResultFormat)> {
         .doc
         .regions()
         .iter()
-        .filter(|r| sheet.canvas.selection.contains(&r.id))
+        .filter(|r| sheet.canvas.selection.contains(&r.id) && !r.locked)
         .filter_map(|r| match &r.kind {
             RegionKind::Math(m) => Some((r.id, m.format())),
             _ => None,
@@ -38,7 +38,7 @@ pub fn selected_styles(state: &AppState) -> Vec<(RegionId, FontStyle)> {
         .doc
         .regions()
         .iter()
-        .filter(|r| sheet.canvas.selection.contains(&r.id))
+        .filter(|r| sheet.canvas.selection.contains(&r.id) && !r.locked)
         .filter(|r| matches!(r.kind, RegionKind::Text { .. }))
         .map(|r| (r.id, r.style))
         .collect()

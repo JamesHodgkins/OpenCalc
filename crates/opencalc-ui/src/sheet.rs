@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use eframe::egui::{Pos2, Rect};
 use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind, Worksheet};
-use opencalc_core::edit::{Edit, History};
+use opencalc_core::edit::{Edit, EditError, History};
 
 use crate::canvas::adapt::{point, rect_of};
 use crate::canvas::view::{snap, GRID};
@@ -159,6 +159,8 @@ impl OpenSheet {
                 }
                 changed
             }
+            // A locked region refusing a change is expected, not a bug.
+            Err(EditError::Locked(_)) => false,
             Err(e) => {
                 debug_assert!(false, "edit rejected: {e}");
                 false
@@ -249,7 +251,14 @@ impl OpenSheet {
 
     /// Delete the selected regions as one undo step. Returns whether any were.
     pub fn delete_selection(&mut self) -> bool {
-        let ids = self.canvas.selection.clone();
+        // A locked region stays, with everything else selected going.
+        let ids: Vec<RegionId> = self
+            .canvas
+            .selection
+            .iter()
+            .copied()
+            .filter(|id| self.doc.region(*id).is_some_and(|r| !r.locked))
+            .collect();
         if ids.is_empty() {
             return false;
         }

@@ -110,7 +110,11 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | WarnPrev
     );
     (ctx.has_sheet || !needs_sheet)
-        && (ctx.has_selection || !matches!(command, RegionDelete | ClipboardCut | ClipboardCopy))
+        && (ctx.has_selection
+            || !matches!(
+                command,
+                RegionDelete | ClipboardCut | ClipboardCopy | RegionLock
+            ))
         && (ctx.selects_math
             || !matches!(
                 command,

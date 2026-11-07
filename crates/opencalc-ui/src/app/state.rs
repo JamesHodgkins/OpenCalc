@@ -176,6 +176,7 @@ impl AppState {
         .map(|(_, c)| c)
         .chain(super::formatting::units_in_use(self))
         .chain(super::formatting::style_commands(self))
+        .chain(super::arranging::all_locked(self).then_some(CommandId::RegionLock))
         .collect()
     }
 

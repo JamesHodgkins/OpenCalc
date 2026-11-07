@@ -145,3 +145,98 @@ fn aligning_needs_two_regions_and_leaves_the_unselected_alone() {
     assert_eq!(h.region_pos(c).y, 700.0);
     assert_eq!(h.region_pos(b).y, 660.0, "not selected, not moved");
 }
+
+#[test]
+fn a_locked_region_cannot_be_deleted_moved_edited_or_restyled_and_unlocking_frees_it() {
+    let mut h = Harness::new();
+    h.settle();
+    let [a, b, _] = three(&mut h);
+    select(&mut h, &[a]);
+    h.command(CommandId::RegionLock);
+    assert!(h.sheet().doc.region(a).unwrap().locked);
+    assert!(h
+        .app
+        .state
+        .active_toggles()
+        .contains(&CommandId::RegionLock));
+
+    // Delete, with another region selected too: only the unlocked one goes.
+    select(&mut h, &[a, b]);
+    h.command(CommandId::RegionDelete);
+    assert!(h.sheet().doc.region(a).is_some(), "locked stays");
+    assert!(h.sheet().doc.region(b).is_none());
+    h.command(CommandId::EditUndo);
+    assert!(h.sheet().doc.region(b).is_some());
+
+    // Moved by an edit: refused. Aligned with another: it stays put.
+    let at = h.region_pos(a);
+    assert!(
+        !h.app.state.sheets[0].edit(opencalc_core::edit::Edit::MoveRegions {
+            moves: vec![(a, Point::new(1.0, 1.0))],
+        })
+    );
+    select(&mut h, &[a, b]);
+    h.command(CommandId::ArrangeAlignV);
+    assert_eq!(h.region_pos(a), at);
+    assert_eq!(h.region_pos(b).x, at.x.min(h.region_pos(b).x));
+
+    // Opening it for editing is not possible.
+    h.app.state.sheets[0].canvas.editing = Some(a);
+    h.frame();
+    assert_eq!(h.sheet().canvas.editing, None);
+    assert_eq!(h.source_of(a), "a := 1");
+
+    // Unlocking (the same button) frees it, and undo puts the lock back.
+    select(&mut h, &[a]);
+    h.command(CommandId::RegionLock);
+    assert!(!h.sheet().doc.region(a).unwrap().locked);
+    h.command(CommandId::RegionDelete);
+    assert!(h.sheet().doc.region(a).is_none());
+    h.command(CommandId::EditUndo);
+    h.command(CommandId::EditUndo);
+    assert!(h.sheet().doc.region(a).unwrap().locked, "undo re-locks it");
+}
+
+#[test]
+fn locking_is_saved_and_a_copy_is_not_locked_and_find_replace_skips_it() {
+    use opencalc_core::persist::{load_bytes, save_bytes};
+    let mut h = Harness::new();
+    h.settle();
+    let [a, b, _] = three(&mut h);
+    select(&mut h, &[a]);
+    h.command(CommandId::RegionLock);
+    let loaded = load_bytes(&save_bytes(&h.sheet().doc).unwrap()).unwrap();
+    assert!(loaded.worksheet.region(a).unwrap().locked);
+    assert!(!loaded.worksheet.region(b).unwrap().locked);
+
+    h.command(CommandId::ClipboardCopy);
+    h.command(CommandId::ClipboardPaste);
+    let copy = *h.sheet().canvas.selection.first().unwrap();
+    assert_ne!(copy, a);
+    assert!(!h.sheet().doc.region(copy).unwrap().locked);
+
+    // Replace everywhere changes the unlocked regions and leaves the locked one.
+    let doc = &h.sheet().doc;
+    let matches = opencalc_core::find::find_all(doc, "1", Default::default());
+    let edit = opencalc_core::find::replace_edit(doc, &matches, "9").unwrap();
+    let mut w = doc.clone();
+    w.apply(edit).unwrap();
+    assert_eq!(
+        match &w.region(a).unwrap().kind {
+            RegionKind::Math(m) => m.source().to_owned(),
+            _ => unreachable!(),
+        },
+        "a := 1"
+    );
+}
+
+#[test]
+fn lock_needs_a_selection() {
+    let mut h = Harness::new();
+    h.settle();
+    select(&mut h, &[]);
+    assert!(!h.app.registry().allows(CommandId::RegionLock));
+    let [a, _, _] = three(&mut h);
+    select(&mut h, &[a]);
+    assert!(h.app.registry().allows(CommandId::RegionLock));
+}

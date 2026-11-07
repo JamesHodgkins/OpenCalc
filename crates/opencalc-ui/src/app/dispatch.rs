@@ -289,8 +289,12 @@ fn separate_regions(state: &mut AppState) {
                 crate::canvas::separate::MAX_REGIONS
             ),
         ),
-        Some(moves) if moves.is_empty() => {}
-        Some(moves) => {
+        Some(mut moves) => {
+            // A locked region stays where it is.
+            moves.retain(|(id, _)| sheet.doc.region(*id).is_some_and(|r| !r.locked));
+            if moves.is_empty() {
+                return;
+            }
             sheet.seal();
             sheet.edit(Edit::MoveRegions { moves });
             sheet.seal();

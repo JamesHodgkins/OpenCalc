@@ -164,6 +164,9 @@ pub fn replace_edit(ws: &Worksheet, matches: &[Match], replacement: &str) -> Opt
     let mut edits = Vec::new();
     for id in ids {
         let region = ws.region(id)?;
+        if region.locked {
+            continue;
+        }
         let new_text = |field: Field, current: &str| -> Option<String> {
             let mut ranges: Vec<(usize, usize)> = matches
                 .iter()

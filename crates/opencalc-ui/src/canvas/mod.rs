@@ -210,6 +210,7 @@ pub fn show(
         }
     }
 
+    overlay::locks(&painter, view, origin, regions, st, theme);
     // Regions with a Find match: a light wash, stronger on the current one.
     for r in regions.iter().filter(|r| env.found.regions.contains(&r.id)) {
         let screen = view
@@ -307,7 +308,7 @@ fn pointer(
                     }
                     let origins: Vec<_> = regions
                         .iter()
-                        .filter(|r| st.selection.contains(&r.id))
+                        .filter(|r| st.selection.contains(&r.id) && !r.locked)
                         .map(|r| (r.id, adapt::pos(r.pos)))
                         .collect();
                     st.drag = Some(Drag::Move {

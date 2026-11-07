@@ -5,7 +5,8 @@ use opencalc_core::document::{Point, Region, RegionId};
 
 /// The new top-left of each selected region that has to move. Aligned in a `row`,
 /// every region takes the top of the highest; in a column, the left edge of the
-/// leftmost. Fewer than two regions selected: nothing moves.
+/// leftmost. A locked region counts for the target but is not moved. Fewer than
+/// two regions selected: nothing moves.
 pub fn align(regions: &[Region], selected: &[RegionId], row: bool) -> Vec<(RegionId, Point)> {
     let chosen: Vec<&Region> = regions
         .iter()
@@ -18,7 +19,7 @@ pub fn align(regions: &[Region], selected: &[RegionId], row: bool) -> Vec<(Regio
     let target = chosen.iter().map(|r| edge(r)).fold(f32::INFINITY, f32::min);
     chosen
         .into_iter()
-        .filter(|r| edge(r) != target)
+        .filter(|r| edge(r) != target && !r.locked)
         .map(|r| {
             let pos = if row {
                 Point::new(r.pos.x, target)
@@ -42,6 +43,7 @@ mod tests {
             size: Size::new(50.0, 30.0),
             kind: RegionKind::Table,
             style: Default::default(),
+            locked: false,
         }
     }
 

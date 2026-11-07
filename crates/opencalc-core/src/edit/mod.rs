@@ -41,6 +41,11 @@ pub enum Edit {
         id: RegionId,
         text: String,
     },
+    /// Lock or unlock a region.
+    SetLocked {
+        id: RegionId,
+        locked: bool,
+    },
     /// Bold and italic of a region (a text region uses them). Display only.
     SetFontStyle {
         id: RegionId,
@@ -86,6 +91,8 @@ pub enum EditError {
     UnorderedIndices,
     #[error("region {0:?} is not the right kind for this edit")]
     WrongKind(RegionId),
+    #[error("region {0:?} is locked")]
+    Locked(RegionId),
     #[error("invalid unit definitions: {0}")]
     BadUnits(#[from] RegistryError),
 }
@@ -141,6 +148,7 @@ impl Worksheet {
             Edit::DeleteRegions { ids } => self.delete(ids),
             Edit::MoveRegions { moves } => self.move_regions(moves),
             Edit::SetMathSource { id, source } => {
+                self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
                 let RegionKind::Math(m) = &mut region.kind else {
                     return Err(EditError::WrongKind(*id));
@@ -152,7 +160,16 @@ impl Worksheet {
                     source: old,
                 })
             }
+            Edit::SetLocked { id, locked } => {
+                let region = self.region_mut(*id)?;
+                let old = std::mem::replace(&mut region.locked, *locked);
+                Ok(Edit::SetLocked {
+                    id: *id,
+                    locked: old,
+                })
+            }
             Edit::SetFontStyle { id, style } => {
+                self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
                 let old = std::mem::replace(&mut region.style, *style);
                 Ok(Edit::SetFontStyle {
@@ -161,6 +178,7 @@ impl Worksheet {
                 })
             }
             Edit::SetResultFormat { id, format } => {
+                self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
                 let RegionKind::Math(m) = &mut region.kind else {
                     return Err(EditError::WrongKind(*id));
@@ -173,6 +191,7 @@ impl Worksheet {
                 })
             }
             Edit::SetText { id, text } => {
+                self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
                 let RegionKind::Text { text: current } = &mut region.kind else {
                     return Err(EditError::WrongKind(*id));
@@ -181,6 +200,7 @@ impl Worksheet {
                 Ok(Edit::SetText { id: *id, text: old })
             }
             Edit::SetPlot { id, spec } => {
+                self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
                 let RegionKind::Plot(current) = &mut region.kind else {
                     return Err(EditError::WrongKind(*id));
@@ -189,6 +209,7 @@ impl Worksheet {
                 Ok(Edit::SetPlot { id: *id, spec: old })
             }
             Edit::SetRegionSize { id, size } => {
+                self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
                 let old = std::mem::replace(&mut region.size, *size);
                 Ok(Edit::SetRegionSize { id: *id, size: old })
@@ -232,6 +253,14 @@ impl Worksheet {
         }
     }
 
+    /// `Ok` if the region is missing or not locked: the check before changing it.
+    fn unlocked(&self, id: RegionId) -> Result<(), EditError> {
+        match self.region(id) {
+            Some(r) if r.locked => Err(EditError::Locked(id)),
+            _ => Ok(()),
+        }
+    }
+
     fn region_mut(&mut self, id: RegionId) -> Result<&mut Region, EditError> {
         self.regions
             .iter_mut()
@@ -265,6 +294,7 @@ impl Worksheet {
 
     fn delete(&mut self, ids: &[RegionId]) -> Result<Edit, EditError> {
         for (k, id) in ids.iter().enumerate() {
+            self.unlocked(*id)?;
             if ids[..k].contains(id) {
                 return Err(EditError::Duplicate(*id));
             }
@@ -291,6 +321,7 @@ impl Worksheet {
             if self.region(*id).is_none() {
                 return Err(EditError::NoSuchRegion(*id));
             }
+            self.unlocked(*id)?;
         }
         let mut undo = Vec::with_capacity(moves.len());
         for (id, to) in moves {
@@ -455,6 +486,71 @@ mod tests {
     }
 
     #[test]
+    fn a_locked_region_refuses_every_change_until_it_is_unlocked() {
+        let (mut w, ids) = sheet();
+        let id = ids[0];
+        let lock = |locked| Edit::SetLocked { id, locked };
+        let applied = w.apply(lock(true)).unwrap();
+        assert!(applied.changed);
+        let locked = w.clone();
+        let refused = [
+            Edit::SetMathSource {
+                id,
+                source: "a := 9".into(),
+            },
+            Edit::MoveRegions {
+                moves: vec![(id, Point::new(1.0, 1.0))],
+            },
+            Edit::DeleteRegions { ids: vec![id] },
+            Edit::SetRegionSize {
+                id,
+                size: Size::new(5.0, 5.0),
+            },
+            Edit::SetFontStyle {
+                id,
+                style: FontStyle {
+                    bold: true,
+                    italic: false,
+                },
+            },
+        ];
+        for edit in refused {
+            assert_eq!(
+                w.apply(edit.clone()),
+                Err(EditError::Locked(id)),
+                "{edit:?}"
+            );
+            assert_eq!(w, locked, "nothing changed");
+        }
+        // One locked region in a batch stops the whole batch.
+        let other = ids[1];
+        let batch = Edit::Batch(vec![
+            Edit::MoveRegions {
+                moves: vec![(other, Point::new(7.0, 7.0))],
+            },
+            Edit::SetMathSource {
+                id,
+                source: "x".into(),
+            },
+        ]);
+        assert!(w.apply(batch).is_err());
+        assert_eq!(w, locked, "the first half was put back");
+        // Other regions are free, and unlocking (and its inverse) always work.
+        w.apply(Edit::MoveRegions {
+            moves: vec![(other, Point::new(7.0, 7.0))],
+        })
+        .unwrap();
+        let undo = w.apply(lock(false)).unwrap();
+        assert!(!w.region(id).unwrap().locked);
+        w.apply(Edit::MoveRegions {
+            moves: vec![(id, Point::new(1.0, 1.0))],
+        })
+        .unwrap();
+        w.apply(undo.inverse).unwrap();
+        assert!(w.region(id).unwrap().locked);
+    }
+
+    #[test]
     fn every_edit_has_an_exact_inverse() {
         let (w, ids) = sheet();
         round_trips(Edit::MoveRegions {
@@ -466,6 +562,10 @@ mod tests {
         round_trips(Edit::SetMathSource {
             id: ids[0],
             source: "a := 99".into(),
+        });
+        round_trips(Edit::SetLocked {
+            id: ids[0],
+            locked: true,
         });
         round_trips(Edit::SetFontStyle {
             id: ids[0],

@@ -60,6 +60,7 @@ mod tests {
             size,
             kind,
             style: Default::default(),
+            locked: false,
         }
     }
 

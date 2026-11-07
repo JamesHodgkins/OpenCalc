@@ -68,7 +68,8 @@ suit version control. A reader must not rely on that.
 A region has an `id` (unique whole number), a `pos` (top-left corner) and a `size`,
 both in **document units of 1/96 inch**, and a `kind`. A text region may also have
 a `style`, `{ "bold": true, "italic": false }` (both default to false; omitted
-when plain):
+when plain). Any region may be `"locked": true` (default false, omitted when
+unlocked): it cannot be moved, edited or deleted until unlocked:
 
 | `kind` | JSON | Notes |
 |---|---|---|

@@ -43,6 +43,7 @@ impl RunKey {
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetFontStyle { .. }
+            | Edit::SetLocked { .. }
             | Edit::SetUnitSystem(_)
             | Edit::SetCustomUnits(_)
             | Edit::SetTitle(_)

@@ -61,6 +61,7 @@ mod tests {
             size: Size::new(w, h),
             kind: RegionKind::Table,
             style: Default::default(),
+            locked: false,
         }
     }
 

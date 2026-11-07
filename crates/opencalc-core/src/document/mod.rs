@@ -131,6 +131,7 @@ impl Worksheet {
             size,
             kind,
             style: FontStyle::default(),
+            locked: false,
         }
     }
 

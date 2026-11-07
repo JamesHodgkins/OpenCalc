@@ -239,8 +239,8 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | UnitsDisplayM
-            | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
+            RegionLock | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic
+            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
             | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
             | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
             | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace
@@ -259,7 +259,7 @@ impl CommandId {
             | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
                 true
             }
-            RegionLock | RegionTag | HelpShortcuts | HelpGuide => false,
+            RegionTag | HelpShortcuts | HelpGuide => false,
         }
     }
 
@@ -331,7 +331,7 @@ mod tests {
     fn some_commands_are_implemented_and_some_deliberately_are_not() {
         assert!(CommandId::EditUndo.is_implemented());
         assert!(CommandId::SelectSheet(3).is_implemented());
-        assert!(!CommandId::RegionLock.is_implemented());
+        assert!(!CommandId::RegionTag.is_implemented());
         let implemented = CommandId::ALL.iter().filter(|c| c.is_implemented()).count();
         assert!(implemented > 20 && implemented < CommandId::ALL.len());
     }

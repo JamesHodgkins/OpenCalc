@@ -257,3 +257,33 @@ pub(super) fn marquee(
         painter.rect_stroke(m, 0.0, line, eframe::egui::StrokeKind::Inside);
     }
 }
+
+/// Locked regions: a padlock at the top right of each, and no editing of them (a
+/// region locked while it was open stops being edited).
+pub(super) fn locks(
+    painter: &eframe::egui::Painter,
+    view: &CanvasView,
+    origin: Pos2,
+    regions: &[Region],
+    st: &mut CanvasUi,
+    theme: &crate::theme::Theme,
+) {
+    if st
+        .editing
+        .is_some_and(|id| regions.iter().any(|r| r.id == id && r.locked))
+    {
+        st.editing = None;
+        st.field = None;
+    }
+    for r in regions.iter().filter(|r| r.locked) {
+        let screen = view.rect_to_screen(rect_of(r, &st.sizes), origin);
+        let size = (11.0 * view.zoom).clamp(8.0, 18.0);
+        painter.text(
+            screen.right_top() + eframe::egui::vec2(-2.0, 2.0),
+            Align2::RIGHT_TOP,
+            crate::icons::LOCK,
+            eframe::egui::FontId::proportional(size),
+            theme.text_weak,
+        );
+    }
+}

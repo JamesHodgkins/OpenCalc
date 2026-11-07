@@ -166,4 +166,9 @@ pub struct Region {
     /// Bold and italic. Only a text region uses them; others keep the default.
     #[serde(default, skip_serializing_if = "FontStyle::is_default")]
     pub style: FontStyle,
+    /// A locked region cannot be moved, resized, edited, restyled or deleted until
+    /// it is unlocked. Core refuses such edits, so no part of the program can
+    /// change one by mistake.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
 }

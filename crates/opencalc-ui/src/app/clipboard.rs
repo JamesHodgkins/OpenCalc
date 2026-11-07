@@ -184,6 +184,7 @@ impl App {
                     .default_size(),
                     kind: RegionKind::Text { text: region_text },
                     style: Default::default(),
+                    locked: false,
                 }],
                 None => return,
             },
