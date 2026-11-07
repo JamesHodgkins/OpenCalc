@@ -16,9 +16,14 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
         .collapsible(false)
         .resizable(false)
         .show(ctx, |ui| {
-            ui.label(format!("OpenCalc {}", opencalc_core::version()));
-            ui.label("An original engineering worksheet written in Rust.");
-            ui.label("GPL-3.0-or-later. Milestone 1 (skeleton).");
+            ui.horizontal(|ui| {
+                ui.add(crate::logo::image(ctx, 56.0));
+                ui.vertical(|ui| {
+                    ui.label(format!("OpenCalc {}", opencalc_core::version()));
+                    ui.label("An original engineering worksheet written in Rust.");
+                    ui.label("GPL-3.0-or-later.");
+                });
+            });
         });
     if !open {
         out.push(CommandId::HelpAboutClose);

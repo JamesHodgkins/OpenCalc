@@ -18,8 +18,8 @@ use crate::theme::{metrics, type_size, Theme};
 use opencalc_core::document::{MathRegion, Region, RegionKind};
 
 /// Typeset size of a math region at 100% zoom.
-pub(super) const MATH_SIZE: f32 = 20.0;
-const TEXT_SIZE: f32 = 14.0;
+pub(super) const MATH_SIZE: f32 = 16.0;
+const TEXT_SIZE: f32 = 13.0;
 /// Padding around region content, in document units.
 pub(super) const PAD: f32 = 6.0;
 /// Gap between an expression and its result, in document units.
@@ -37,7 +37,8 @@ pub fn grid(painter: &Painter, rect: Rect, view: &CanvasView, origin: Pos2, them
     }
     let base = origin + view.offset;
     let minor = Stroke::new(1.0_f32, theme.raised);
-    let major = Stroke::new(1.0_f32, theme.border);
+    // A little fainter than the border colour: halfway to the minor lines.
+    let major = Stroke::new(1.0_f32, theme.raised.lerp_to_gamma(theme.border, 0.5));
 
     let first = ((rect.min.x - base.x) / step).floor() as i64;
     let last = ((rect.max.x - base.x) / step).ceil() as i64;

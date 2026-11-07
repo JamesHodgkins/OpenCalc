@@ -79,7 +79,8 @@ pub fn margin_box(page: Rect, margin: f32) -> Rect {
 }
 
 /// Draw the pages that are visible in `viewport`. Returns the screen rectangle of
-/// each drawn page, for clipping what is painted on them.
+/// each page's text area (inside the margins; the whole sheet in draft view), for
+/// clipping what is painted on them, such as the grid.
 pub fn paint(
     painter: &Painter,
     viewport: Rect,
@@ -125,7 +126,7 @@ pub fn paint(
         ];
         let stroke = Stroke::new(1.0_f32, paper.border);
         painter.extend(Shape::dashed_line(&corners, stroke, 5.0, 4.0));
-        drawn.push(screen);
+        drawn.push(inner);
     }
     drawn
 }

@@ -21,11 +21,18 @@ pub struct OpenSheet {
 
 impl OpenSheet {
     pub fn new(title: &str) -> OpenSheet {
+        let doc = Worksheet::new(title);
+        // The first input goes at the top left of the page margin, rounded in to
+        // the snap grid so it sits inside the margin, not across its edge.
+        let margin = doc.page().margin();
+        let corner = (margin / GRID).ceil() * GRID;
+        let mut canvas = CanvasUi::default();
+        canvas.insert_at = Pos2::new(corner, corner);
         OpenSheet {
-            doc: Worksheet::new(title),
+            doc,
             history: History::default(),
             view: CanvasView::default(),
-            canvas: CanvasUi::default(),
+            canvas,
         }
     }
 

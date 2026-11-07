@@ -873,6 +873,85 @@ fn arrows_skip_characters_that_draw_nothing_and_up_down_move_between_fraction_li
 }
 
 #[test]
+fn arrows_off_the_edge_of_an_equation_leave_it_and_arrows_on_the_page_move_the_crosshair() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x+1");
+    h.press_key(Key::ArrowRight, Modifiers::NONE);
+    assert!(
+        h.sheet().canvas.editing.is_none(),
+        "Right at the end leaves the equation"
+    );
+    let right = h.sheet().canvas.insert_at;
+    let r = h.sheet().doc.region(id).expect("region").pos;
+    assert!(right.x > r.x, "the crosshair is right of the equation");
+    h.press_key(Key::ArrowDown, Modifiers::NONE);
+    let down = h.sheet().canvas.insert_at;
+    assert!(down.y > right.y && down.x == right.x, "Down moves one step");
+    h.press_key(Key::ArrowLeft, Modifiers::NONE);
+    assert!(h.sheet().canvas.insert_at.x < down.x);
+    assert!(h.sheet().canvas.armed, "typing starts a region there");
+    // Walking back (along the equation's own line) hands control to it.
+    h.press_key(Key::ArrowUp, Modifiers::NONE);
+    for _ in 0..30 {
+        h.press_key(Key::ArrowLeft, Modifiers::NONE);
+        if h.sheet().canvas.editing.is_some() {
+            break;
+        }
+    }
+    h.frame();
+    let (at, rect) = (
+        h.sheet().canvas.insert_at,
+        h.sheet().doc.region(id).map(|r| (r.pos, r.size)),
+    );
+    assert_eq!(
+        h.sheet().canvas.editing,
+        Some(id),
+        "the equation took over: {at:?} {rect:?}"
+    );
+    assert!(!h.sheet().canvas.armed);
+}
+
+#[test]
+fn the_crosshair_can_walk_back_onto_a_region_that_is_off_the_grid() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("x+1");
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    // A region at a position that is not a multiple of the grid step.
+    let moves = vec![(id, Point { x: 41.0, y: 523.0 })];
+    h.app.state.sheets[0].edit(Edit::MoveRegions { moves });
+    h.frame();
+    h.frame();
+    h.app.state.sheets[0].canvas.editing = Some(id);
+    h.app.state.sheets[0].canvas.focus_edit = true;
+    h.frame();
+    h.frame();
+    assert_eq!(h.sheet().canvas.editing, Some(id));
+    h.press_key(Key::End, Modifiers::NONE);
+    h.press_key(Key::ArrowRight, Modifiers::NONE);
+    assert!(
+        h.sheet().canvas.editing.is_none(),
+        "Right at the end leaves"
+    );
+    for _ in 0..30 {
+        h.press_key(Key::ArrowLeft, Modifiers::NONE);
+        if h.sheet().canvas.editing.is_some() {
+            break;
+        }
+    }
+    assert_eq!(
+        h.sheet().canvas.editing,
+        Some(id),
+        "the region took over again"
+    );
+}
+
+#[test]
 fn clicking_in_the_region_places_the_caret_and_a_double_click_selects_a_node() {
     let mut h = Harness::new();
     h.settle();

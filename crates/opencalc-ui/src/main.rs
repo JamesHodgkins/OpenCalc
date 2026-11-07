@@ -7,6 +7,7 @@ mod fonts;
 mod format;
 mod icons;
 mod layout;
+mod logo;
 mod panels;
 mod ribbon;
 mod sheet;
@@ -24,6 +25,7 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("OpenCalc")
+            .with_icon(logo::icon_data())
             .with_inner_size([INITIAL_WIDTH, 780.0])
             .with_min_inner_size([MIN_WIDTH, 520.0]),
         ..Default::default()

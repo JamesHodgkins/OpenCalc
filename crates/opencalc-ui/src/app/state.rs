@@ -70,7 +70,7 @@ impl AppState {
                 applied: 0,
                 worker_ok: true,
             },
-            show_grid: false,
+            show_grid: true,
             page: (1, 1),
             snap: true,
             live_recalc: true,
@@ -203,11 +203,10 @@ mod tests {
     #[test]
     fn active_toggles_list_exactly_the_switched_on_ones() {
         let mut s = AppState::new(PaletteKey::Neutral);
-        // The grid and both optional panels start off; snapping, automatic
+        // Both optional panels start off; the grid, snapping, automatic
         // calculation, the unit system and the theme choice are on.
-        assert_eq!(s.active_toggles().len(), 5);
-        assert!(!s.active_toggles().contains(&CommandId::ViewGrid));
-        s.show_grid = true;
+        assert_eq!(s.active_toggles().len(), 6);
+        assert!(s.active_toggles().contains(&CommandId::ViewGrid));
         s.snap = false;
         s.show_functions = true;
         let on = s.active_toggles();

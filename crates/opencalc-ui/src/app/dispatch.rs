@@ -316,12 +316,12 @@ mod tests {
     #[test]
     fn toggles_flip_and_flip_back() {
         let mut s = state();
-        // (command, how to read it, whether it starts on). The grid starts off.
+        // (command, how to read it, whether it starts on). The grid starts on.
         for (command, get, starts_on) in [
             (
                 CommandId::ViewGrid,
                 (|s: &AppState| s.show_grid) as fn(&AppState) -> bool,
-                false,
+                true,
             ),
             (CommandId::ViewSnap, |s| s.snap, true),
             (CommandId::CalcAuto, |s| s.live_recalc, true),

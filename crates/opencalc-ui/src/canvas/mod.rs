@@ -78,6 +78,9 @@ pub struct CanvasUi {
     pub editing: Option<RegionId>,
     /// Ask the in-place editor to take keyboard focus on its next frame.
     pub focus_edit: bool,
+    /// The editor opens with the caret at the start rather than the end (the
+    /// crosshair came in from the left or above).
+    pub enter_at_start: bool,
     /// The math editor's text, caret and selection while a math region is edited.
     pub field: Option<editor::Field>,
     /// Where the next inserted region goes (document space).
@@ -98,6 +101,7 @@ impl Default for CanvasUi {
             selection: Vec::new(),
             editing: None,
             focus_edit: false,
+            enter_at_start: false,
             field: None,
             insert_at: Pos2::new(40.0, 40.0),
             armed: false,
@@ -161,7 +165,7 @@ pub fn show(
     }
     navigate(ui, &resp, origin, view);
 
-    // The pages, and the grid on them. Pages exist as far down as content reaches.
+    // The pages, and the grid inside their margins. Pages exist as far down as content reaches.
     let pages = page::page_count(&env.page, page::content_bottom(regions, &st.sizes));
     for screen in page::paint(&painter, rect, view, origin, &env.page, pages, env) {
         if env.show_grid {
@@ -192,10 +196,17 @@ pub fn show(
         }
     }
 
+    let was_editing = st.editing.is_some();
     overlay::edit_overlay(ui, env, regions, view, origin, st, &mut cmds);
     if st.editing.is_none() {
-        overlay::crosshair(&painter, view, origin, st, env);
-        overlay::type_to_create(ui, st, &mut cmds);
+        // (A key that just ended editing has already placed the crosshair.)
+        if !was_editing {
+            overlay::move_crosshair(ui, regions, st);
+        }
+        if st.editing.is_none() {
+            overlay::crosshair(&painter, view, origin, st, env);
+            overlay::type_to_create(ui, st, &mut cmds);
+        }
     }
     let scene = Scene {
         env,

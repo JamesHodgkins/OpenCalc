@@ -118,6 +118,56 @@ pub(super) fn type_to_create(ui: &Ui, st: &mut CanvasUi, cmds: &mut Vec<CanvasCm
     cmds.push(CanvasCmd::TypeAhead(typed));
 }
 
+/// Arrow keys on the blank page move the crosshair one grid step. Does nothing
+/// while a region is edited or another widget wants the keyboard.
+pub(super) fn move_crosshair(ui: &Ui, regions: &[Region], st: &mut CanvasUi) {
+    if ui.ctx().wants_keyboard_input() {
+        return;
+    }
+    let step = |k: Key| ui.input(|i| i.key_pressed(k)) as i8;
+    let dx = step(Key::ArrowRight) - step(Key::ArrowLeft);
+    let dy = step(Key::ArrowDown) - step(Key::ArrowUp);
+    if dx == 0 && dy == 0 {
+        return;
+    }
+    let g = super::view::GRID;
+    let at = st.insert_at + Vec2::new(f32::from(dx) * g, f32::from(dy) * g);
+    st.insert_at = super::view::snap(Pos2::new(at.x.max(0.0), at.y.max(0.0)), g);
+    st.selection.clear();
+    st.armed = true;
+    // Moving onto an existing region hands control to it: the crosshair gives way
+    // to that region's caret, which enters on the side the crosshair came from.
+    let hit = super::hit::hit_test(regions, &st.sizes, st.insert_at)
+        .filter(|id| regions.iter().any(|r| r.id == *id && r.kind.is_editable()));
+    if let Some(id) = hit {
+        st.selection = vec![id];
+        st.editing = Some(id);
+        st.focus_edit = true;
+        st.armed = false;
+        st.enter_at_start = dx > 0 || dy > 0;
+    }
+}
+
+/// An arrow press ran off the edge of the region being edited: put the crosshair
+/// just beyond that edge, in the direction pressed.
+pub(super) fn leave_toward(st: &mut CanvasUi, region: &Region, (dx, dy): (i8, i8)) {
+    let r = rect_of(region, &st.sizes);
+    let gap = 12.0;
+    // Leave along the region's middle line (sideways) or just inside its left edge
+    // (up and down), so that snapping to the grid cannot land the crosshair off the
+    // row or column of a region that is not itself on the grid.
+    let (cx, cy) = (r.min.x + gap, (r.min.y + r.max.y) / 2.0);
+    let at = match (dx, dy) {
+        (-1, _) => Pos2::new((r.min.x - gap).max(0.0), cy),
+        (1, _) => Pos2::new(r.max.x + gap, cy),
+        (_, -1) => Pos2::new(cx, (r.min.y - gap).max(0.0)),
+        _ => Pos2::new(cx, r.max.y + gap),
+    };
+    st.insert_at = super::view::snap(at, super::view::GRID);
+    st.selection.clear();
+    st.armed = true;
+}
+
 /// Enter ends an input and readies the next: the insertion point drops just below
 /// the finished region, nothing stays selected, and typing starts a new math region.
 pub(super) fn next_input_below(st: &mut CanvasUi, region: &Region) {

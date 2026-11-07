@@ -24,6 +24,9 @@ pub struct Field {
     pub goal_x: Option<f32>,
     /// The last insertion dropped characters because the editor is full.
     pub clipped: bool,
+    /// An arrow press had nowhere left to go inside the expression: the direction
+    /// (dx, dy) the caret is leaving by. The editor takes it and ends editing.
+    pub leave: Option<(i8, i8)>,
 }
 
 impl Field {
@@ -42,6 +45,7 @@ impl Field {
             dismissed: None,
             goal_x: None,
             clipped: false,
+            leave: None,
         }
     }
 

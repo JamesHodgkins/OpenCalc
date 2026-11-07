@@ -104,6 +104,9 @@ pub(super) fn math(
     let field = st.field.get_or_insert_with(|| Field::new(source));
     if fresh {
         *field = Field::new(source);
+        if std::mem::take(&mut st.enter_at_start) {
+            field.set_caret(0, false);
+        }
     } else if field.text() != source {
         field.sync(source);
     }
@@ -214,6 +217,8 @@ pub(super) fn math(
             && !on_popup
     });
     finished |= pressed_elsewhere;
+    let leaving = field.leave.take();
+    finished |= leaving.is_some();
 
     let text = field.text();
     if text != source {
@@ -225,6 +230,10 @@ pub(super) fn math(
     if finished {
         if !pressed_elsewhere && ui.input(|i| i.key_pressed(Key::Enter)) {
             super::overlay::next_input_below(st, r);
+        } else if let Some(dir) = leaving {
+            super::overlay::leave_toward(st, r, dir);
+            // Let the next arrow press move the crosshair rather than be held here.
+            ui.memory_mut(|m| m.surrender_focus(id));
         }
         st.editing = None;
         st.field = None;
@@ -327,6 +336,9 @@ fn key_down(
                     (true, false) => field.word_right(field.caret),
                     (false, _) => step(lay, field.caret, if left { -1 } else { 1 }, len),
                 };
+                if target == field.caret && !shift {
+                    field.leave = Some((if left { -1 } else { 1 }, 0));
+                }
                 field.set_caret(target, shift);
             }
         }
@@ -337,6 +349,8 @@ fn key_down(
             let o = lay.offset_at(Pos2::new(x, c.center().y + dy));
             if o != field.caret {
                 field.set_caret(o, shift);
+            } else if !shift {
+                field.leave = Some((0, if key == Key::ArrowUp { -1 } else { 1 }));
             }
             field.goal_x = Some(x);
         }

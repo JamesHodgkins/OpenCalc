@@ -15,7 +15,10 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
 
 fn content(ui: &mut Ui, state: &AppState, out: &mut Commands) {
     let theme = state.theme;
-    ui.label(RichText::new("OpenCalc").size(26.0).color(theme.text));
+    ui.horizontal(|ui| {
+        ui.add(crate::logo::image(ui.ctx(), 40.0));
+        ui.label(RichText::new("OpenCalc").size(26.0).color(theme.text));
+    });
     ui.label(
         RichText::new("Engineering worksheets with units and live recalculation")
             .color(theme.text_weak),
