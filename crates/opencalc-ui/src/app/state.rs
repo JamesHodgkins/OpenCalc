@@ -57,6 +57,8 @@ pub struct AppState {
     pub draft: bool,
     /// The Options window (settings such as the theme).
     pub options_open: bool,
+    /// The Units window (custom units).
+    pub units_open: bool,
     /// The question or message in front of everything, if any.
     pub dialog: Option<Dialog>,
     /// Recently opened or saved files, newest first.
@@ -92,6 +94,7 @@ impl AppState {
             text_box_focus: false,
             draft: false,
             options_open: false,
+            units_open: false,
             dialog: None,
             recent: Vec::new(),
             recoveries: Vec::new(),

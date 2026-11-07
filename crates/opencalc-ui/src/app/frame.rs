@@ -97,6 +97,7 @@ impl App {
             });
 
         panels::plot_window::show(ctx, &self.state, &mut panel_edits);
+        panels::units::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         if let (Some(i), false) = (self.state.active, panel_edits.is_empty()) {
             let effects = super::dispatch::apply_canvas(&mut self.state, i, panel_edits);
             self.run_effects(ctx, effects);

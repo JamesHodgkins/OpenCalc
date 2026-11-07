@@ -149,6 +149,7 @@ commands! {
     UnitsDisplayReset: "units.display_reset", "Reset display", icons::RESET;
     UnitsDefine: "units.define", "Define unit", icons::PLUS;
     UnitsManage: "units.manage", "Manage units", icons::LIST;
+    UnitsClose: "units.close", "Close Units", icons::CLOSE;
     // Calculate.
     CalcAll: "calc.all", "Recalculate all", icons::REFRESH;
     CalcAuto: "calc.auto", "Automatic calculation", icons::ZAP;
@@ -219,24 +220,23 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            FileNew | FileOpen | FileSave | FileSaveAs | DialogSave | DialogDiscard
-            | DialogCancel | DialogOk | DialogRestore | DialogDropRecovery | OpenRecent(_)
-            | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo | RegionDelete
-            | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable | InsertPicture
-            | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid
-            | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
-            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
-            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
-            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
-            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
-                true
-            }
+            UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
+            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
+            | DialogDropRecovery | OpenRecent(_) | FileClose | FileExample | AppQuit | TabHome
+            | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea
+            | InsertPlot | InsertTable | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut
+            | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto | ViewFunctions
+            | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate
+            | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_)
+            | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_)
+            | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek
+            | InsertSymbol(_) => true,
             ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind | EditReplace | RegionLock
             | RegionTag | FormatBold | FormatItalic | FormatDecimalsMore | FormatDecimalsLess
             | FormatScientific | FormatEngineering | ArrangeAlignH | ArrangeAlignV
             | ArrangeSeparate | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
-            | UnitsDisplayKn | UnitsDisplayReset | UnitsDefine | UnitsManage | CalcCheck
-            | WarnNext | WarnPrev | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
+            | UnitsDisplayKn | UnitsDisplayReset | CalcCheck | WarnNext | WarnPrev
+            | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
         }
     }
 

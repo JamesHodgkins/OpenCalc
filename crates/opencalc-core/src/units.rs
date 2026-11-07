@@ -137,6 +137,10 @@ pub struct UnitDef {
     pub symbol: String,
     pub dimension: Dimension,
     pub to_si_scale: f64,
+    /// What the user typed to define a custom unit, such as `4 in`. Empty for a
+    /// built-in unit or a file that did not record it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub definition: String,
 }
 
 /// The built-in units: symbol, dimension, and the factor that turns a value in
@@ -176,6 +180,7 @@ pub fn builtin_unit(symbol: &str) -> Option<UnitDef> {
             symbol: (*s).to_owned(),
             dimension: *dimension,
             to_si_scale: *scale,
+            definition: String::new(),
         })
 }
 

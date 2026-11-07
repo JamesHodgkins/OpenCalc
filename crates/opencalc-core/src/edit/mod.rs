@@ -251,6 +251,7 @@ mod tests {
             symbol: "furlong".into(),
             dimension: crate::units::Dimension::LENGTH,
             to_si_scale: 201.168,
+            definition: String::new(),
         }
     }
 

@@ -129,6 +129,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         }
         ThemeNeutral => set_palette(state, &mut fx, PaletteKey::Neutral),
         ThemeSlate => set_palette(state, &mut fx, PaletteKey::Slate),
+        UnitsDefine | UnitsManage => state.units_open = true,
+        UnitsClose => state.units_open = false,
         AppOptions => state.options_open = true,
         AppOptionsClose => state.options_open = false,
         DocPageSetup => state.page_setup_open = true,

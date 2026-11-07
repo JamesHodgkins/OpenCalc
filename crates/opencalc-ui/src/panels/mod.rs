@@ -11,6 +11,7 @@ pub mod page_setup;
 pub mod plot_window;
 pub mod status;
 pub mod title;
+pub mod units;
 
 use crate::app::AppState;
 use crate::commands::{CommandId, Registry};

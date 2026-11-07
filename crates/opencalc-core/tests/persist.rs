@@ -69,6 +69,7 @@ fn sample() -> Worksheet {
         symbol: "hand".into(),
         dimension: Dimension::LENGTH,
         to_si_scale: 0.1016,
+        definition: String::new(),
     }]))
     .unwrap();
     w
@@ -94,6 +95,17 @@ fn every_region_type_and_setting_round_trips_exactly() {
     // Region numbers keep counting, so none is ever reused.
     assert_eq!(back.new_region(RegionKind::Table, Point::default()).id.0, 8);
     assert!(round_trip(&Worksheet::new("")).regions().is_empty());
+}
+
+#[test]
+fn a_units_definition_text_is_saved_and_a_file_without_it_still_loads() {
+    let hand = opencalc_core::unit_define::define_unit("hand", "4 in", &[], None).unwrap();
+    let mut w = Worksheet::new("u");
+    w.apply(Edit::SetCustomUnits(vec![hand])).unwrap();
+    let back = round_trip(&w);
+    assert_eq!(back.custom_units()[0].definition, "4 in");
+    // The committed format-1 fixture has a unit with no definition.
+    assert!(sample().custom_units()[0].definition.is_empty());
 }
 
 #[test]

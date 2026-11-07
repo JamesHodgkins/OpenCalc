@@ -62,6 +62,8 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
     let needs_sheet = matches!(
         command,
         FileClose
+            | UnitsDefine
+            | UnitsManage
             | FileSave
             | FileSaveAs
             | CalcAll

@@ -370,6 +370,7 @@ mod tests {
             CommandId::DialogSave,         // the unsaved-changes dialog
             CommandId::DialogDiscard,      // the unsaved-changes dialog
             CommandId::DialogCancel,       // the unsaved-changes dialog
+            CommandId::UnitsClose,         // the Units window
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog

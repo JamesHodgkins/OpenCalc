@@ -125,7 +125,8 @@ keep what it does not understand where it can, but is not required to.
     {
       "symbol": "hand",
       "dimension": { "length": 1, "mass": 0, "time": 0, "current": 0, "temperature": 0, "amount": 0, "luminosity": 0 },
-      "to_si_scale": 0.1016
+      "to_si_scale": 0.1016,
+      "definition": "4 in"
     }
   ],
   "page": { "paper": "Letter", "landscape": true, "margin_mm": 12.5 }
@@ -136,7 +137,9 @@ keep what it does not understand where it can, but is not required to.
 
 Each entry has a `symbol`, a `dimension` (whole-number exponents of length, mass,
 time, current, temperature, amount and luminosity) and a `to_si_scale`: a value in
-the unit times the scale is the value in SI. The symbol must start with a letter or
+the unit times the scale is the value in SI. An optional `definition` holds what
+the user typed to define it (`4 in`), for showing and editing; the scale and
+dimension are what count, and a file may leave `definition` out. The symbol must start with a letter or
 underscore, then letters, digits or underscores (at most 32 characters); it must
 not be a built-in unit, a function or a constant, and must not repeat. The scale
 must be finite and greater than zero. A file that breaks these rules is refused,

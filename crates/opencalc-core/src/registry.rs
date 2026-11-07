@@ -120,6 +120,7 @@ mod tests {
             symbol: symbol.into(),
             dimension: Dimension::LENGTH,
             to_si_scale: scale,
+            definition: String::new(),
         }
     }
 

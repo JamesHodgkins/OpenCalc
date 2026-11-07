@@ -13,6 +13,7 @@ pub mod numeric;
 pub mod parser;
 pub mod persist;
 pub mod registry;
+pub mod unit_define;
 pub mod units;
 pub mod value;
 pub mod worker;

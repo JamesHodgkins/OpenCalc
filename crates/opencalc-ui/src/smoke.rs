@@ -21,6 +21,7 @@ use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
 mod files;
+mod units;
 
 /// File dialogs that are never answered: a test must not open a real one.
 struct NoFiles;

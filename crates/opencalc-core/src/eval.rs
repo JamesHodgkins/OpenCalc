@@ -504,6 +504,7 @@ mod tests {
             symbol: "furlong".into(),
             dimension: Dimension::LENGTH,
             to_si_scale: 201.168,
+            definition: String::new(),
         }])
         .unwrap();
         let regions = vec![
@@ -528,6 +529,7 @@ mod tests {
             symbol: "w".into(),
             dimension: Dimension::LENGTH,
             to_si_scale: 10.0,
+            definition: String::new(),
         }])
         .unwrap();
         let regions = vec![
