@@ -141,6 +141,21 @@ impl RegionKind {
     }
 }
 
+/// Bold and italic for a text region (the whole region, not parts of it).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FontStyle {
+    #[serde(default)]
+    pub bold: bool,
+    #[serde(default)]
+    pub italic: bool,
+}
+
+impl FontStyle {
+    pub fn is_default(&self) -> bool {
+        *self == FontStyle::default()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Region {
     pub id: RegionId,
@@ -148,4 +163,7 @@ pub struct Region {
     pub pos: Point,
     pub size: Size,
     pub kind: RegionKind,
+    /// Bold and italic. Only a text region uses them; others keep the default.
+    #[serde(default, skip_serializing_if = "FontStyle::is_default")]
+    pub style: FontStyle,
 }

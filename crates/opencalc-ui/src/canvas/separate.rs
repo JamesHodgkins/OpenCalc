@@ -60,6 +60,7 @@ mod tests {
             pos: Point::new(x, y),
             size: Size::new(w, h),
             kind: RegionKind::Table,
+            style: Default::default(),
         }
     }
 

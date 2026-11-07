@@ -3,7 +3,9 @@
 //! Display only. These change a region's `ResultFormat`, as one undoable step, and
 //! never a value, so nothing is recalculated.
 
-use opencalc_core::document::{DisplayUnit, Notation, RegionId, RegionKind, ResultFormat};
+use opencalc_core::document::{
+    DisplayUnit, FontStyle, Notation, RegionId, RegionKind, ResultFormat,
+};
 use opencalc_core::edit::Edit;
 
 use super::dispatch::Effect;
@@ -25,6 +27,62 @@ pub fn selected_formats(state: &AppState) -> Vec<(RegionId, ResultFormat)> {
             _ => None,
         })
         .collect()
+}
+
+/// The selected text regions and their styles, in layout order.
+pub fn selected_styles(state: &AppState) -> Vec<(RegionId, FontStyle)> {
+    let Some(sheet) = state.active_sheet() else {
+        return Vec::new();
+    };
+    sheet
+        .doc
+        .regions()
+        .iter()
+        .filter(|r| sheet.canvas.selection.contains(&r.id))
+        .filter(|r| matches!(r.kind, RegionKind::Text { .. }))
+        .map(|r| (r.id, r.style))
+        .collect()
+}
+
+/// Whether every selected text region has `flag` on (and there is one).
+pub fn all_styled(state: &AppState, flag: fn(&FontStyle) -> bool) -> bool {
+    let styles = selected_styles(state);
+    !styles.is_empty() && styles.iter().all(|(_, s)| flag(s))
+}
+
+/// Bold and italic, as the toggles switched on for the selected text regions.
+pub fn style_commands(state: &AppState) -> Vec<CommandId> {
+    let mut on = Vec::new();
+    if all_styled(state, |s| s.bold) {
+        on.push(CommandId::FormatBold);
+    }
+    if all_styled(state, |s| s.italic) {
+        on.push(CommandId::FormatItalic);
+    }
+    on
+}
+
+/// Bold or italic: on for every selected text region, or off if all had it on.
+fn toggle_style(state: &mut AppState, bold: bool) {
+    let flag: fn(&FontStyle) -> bool = if bold { |s| s.bold } else { |s| s.italic };
+    let on = !all_styled(state, flag);
+    let edits: Vec<Edit> = selected_styles(state)
+        .into_iter()
+        .map(|(id, mut style)| {
+            if bold {
+                style.bold = on;
+            } else {
+                style.italic = on;
+            }
+            Edit::SetFontStyle { id, style }
+        })
+        .collect();
+    if let (Some(i), false) = (state.active, edits.is_empty()) {
+        let sheet = &mut state.sheets[i];
+        sheet.seal();
+        sheet.edit(Edit::Batch(edits));
+        sheet.seal();
+    }
 }
 
 /// Whether every selected math region shows `notation` (and there is one).
@@ -62,6 +120,10 @@ pub fn units_in_use(state: &AppState) -> Vec<CommandId> {
 /// Run a Format command. `None` if `command` is not one of them.
 pub fn dispatch_format(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>> {
     use CommandId::*;
+    if matches!(command, FormatBold | FormatItalic) {
+        toggle_style(state, command == FormatBold);
+        return Some(Vec::new());
+    }
     let choose: Box<dyn Fn(ResultFormat) -> ResultFormat> = match command {
         FormatDecimalsMore => Box::new(ResultFormat::more_decimals),
         FormatDecimalsLess => Box::new(ResultFormat::fewer_decimals),

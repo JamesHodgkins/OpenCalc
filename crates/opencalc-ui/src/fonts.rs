@@ -14,7 +14,11 @@ use std::sync::Arc;
 use eframe::egui::{self, FontData, FontDefinitions, FontFamily};
 
 const INTER: &[u8] = include_bytes!("../assets/fonts/Inter-Regular.ttf");
+const INTER_BOLD: &[u8] = include_bytes!("../assets/fonts/Inter-Bold.ttf");
 const LUCIDE: &[u8] = include_bytes!("../assets/fonts/lucide.ttf");
+
+/// The name of the bold font family.
+pub const BOLD: &str = "bold";
 
 pub fn definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
@@ -24,9 +28,19 @@ pub fn definitions() -> FontDefinitions {
     fonts
         .font_data
         .insert("lucide".to_owned(), Arc::new(FontData::from_static(LUCIDE)));
+    fonts.font_data.insert(
+        "inter-bold".to_owned(),
+        Arc::new(FontData::from_static(INTER_BOLD)),
+    );
     let proportional = fonts.families.entry(FontFamily::Proportional).or_default();
     proportional.insert(0, "lucide".to_owned());
     proportional.insert(1, "inter".to_owned());
+    // Bold is the same stack with Inter Bold in Inter's place.
+    let bold = proportional
+        .iter()
+        .map(|n| if n == "inter" { "inter-bold" } else { n }.to_owned())
+        .collect();
+    fonts.families.insert(FontFamily::Name(BOLD.into()), bold);
     fonts
 }
 

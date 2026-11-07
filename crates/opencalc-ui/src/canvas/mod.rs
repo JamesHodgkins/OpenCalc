@@ -17,6 +17,7 @@ pub(crate) mod paint;
 mod plot;
 mod result;
 pub(crate) mod separate;
+pub mod text_style;
 pub mod view;
 
 use eframe::egui::{self, FontId, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};

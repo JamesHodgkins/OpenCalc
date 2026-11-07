@@ -648,3 +648,17 @@ mod properties {
         }
     }
 }
+
+#[test]
+fn a_text_regions_style_is_read_written_and_left_out_when_plain() {
+    let json = sheet(
+        &[region(1, r#"{"Text":{"text":"hi"}}"#)
+            .replace(r#""kind""#, r#""style":{"bold":true},"kind""#)],
+        2,
+    );
+    let l = load_json(&json).unwrap();
+    let r = &l.worksheet.regions()[0];
+    assert!(r.style.bold && !r.style.italic);
+    let again = load_bytes(&save_bytes(&l.worksheet).unwrap()).unwrap();
+    assert_eq!(again.worksheet, l.worksheet);
+}

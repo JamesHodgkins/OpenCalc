@@ -42,6 +42,7 @@ impl RunKey {
             Edit::SetResultFormat { id, .. } => Some(RunKey::Format(*id)),
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
+            | Edit::SetFontStyle { .. }
             | Edit::SetUnitSystem(_)
             | Edit::SetCustomUnits(_)
             | Edit::SetTitle(_)

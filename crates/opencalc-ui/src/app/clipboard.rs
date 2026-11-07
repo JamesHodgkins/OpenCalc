@@ -183,6 +183,7 @@ impl App {
                     }
                     .default_size(),
                     kind: RegionKind::Text { text: region_text },
+                    style: Default::default(),
                 }],
                 None => return,
             },
@@ -211,6 +212,7 @@ impl App {
             );
             let mut region = sheet.doc.new_region(original.kind, pos);
             region.size = original.size;
+            region.style = original.style;
             bottom = bottom.max(region.pos.y + region.size.h);
             inserted.push((base + n, region));
         }

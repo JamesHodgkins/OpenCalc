@@ -14,6 +14,8 @@ pub struct CommandContext {
     pub has_selection: bool,
     /// The selection includes a math region (result formats apply to those).
     pub selects_math: bool,
+    /// The selection includes a text region (bold and italic apply to those).
+    pub selects_text: bool,
     pub can_undo: bool,
     pub can_redo: bool,
     /// A math region is open for editing (symbols can be inserted into it).
@@ -121,6 +123,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
                     | UnitsDisplayKn
                     | UnitsDisplayReset
             ))
+        && (ctx.selects_text || !matches!(command, FormatBold | FormatItalic))
         && (ctx.can_undo || command != EditUndo)
         && (ctx.can_redo || command != EditRedo)
         && (ctx.editing_math || command != InsertGreek)
@@ -149,6 +152,7 @@ mod tests {
             has_sheet,
             has_selection,
             selects_math: has_selection,
+            selects_text: has_selection,
             can_undo,
             can_redo,
             editing_math: has_sheet,

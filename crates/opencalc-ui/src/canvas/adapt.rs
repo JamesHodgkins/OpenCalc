@@ -59,6 +59,7 @@ mod tests {
             pos: Point::new(10.0, 20.0),
             size,
             kind,
+            style: Default::default(),
         }
     }
 

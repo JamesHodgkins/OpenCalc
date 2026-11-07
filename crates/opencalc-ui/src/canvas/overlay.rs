@@ -63,9 +63,18 @@ pub(super) fn edit_overlay(
                 .map(|range| range.primary.index);
             let out = ui
                 .scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+                    // Laid out in the region's own style, so it does not jump to
+                    // upright regular type while it is being edited.
+                    let style = r.style;
+                    let mut layouter = |ui: &Ui, text: &str, wrap: f32| {
+                        let colour = ui.visuals().text_color();
+                        let job = super::text_style::job(text, style, 14.0 * zoom, colour, wrap);
+                        ui.fonts(|f| f.layout_job(job))
+                    };
                     TextEdit::multiline(&mut buf)
                         .id(widget_id)
-                        .font(FontId::proportional(14.0 * zoom))
+                        .font(super::text_style::font_id(14.0 * zoom, style))
+                        .layouter(&mut layouter)
                         .char_limit(opencalc_core::persist::MAX_TEXT_CHARS)
                         .desired_width(rect.width())
                         .show(ui)

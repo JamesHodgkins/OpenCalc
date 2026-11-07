@@ -268,3 +268,104 @@ fn display_in_is_saved_and_the_buttons_need_a_math_region() {
         Some(opencalc_core::document::DisplayUnit::Millimetre)
     );
 }
+
+fn text_region(h: &mut Harness, text: &str, y: f32) -> RegionId {
+    h.app.state.sheets[0].add(
+        RegionKind::Text {
+            text: text.to_owned(),
+        },
+        Point::new(40.0, y),
+    )
+}
+
+fn style(h: &Harness, id: RegionId) -> (bool, bool) {
+    let s = h.sheet().doc.region(id).unwrap().style;
+    (s.bold, s.italic)
+}
+
+#[test]
+fn bold_and_italic_toggle_on_text_regions_and_undo_together() {
+    let mut h = Harness::new();
+    h.settle();
+    let a = text_region(&mut h, "Design notes", 700.0);
+    let b = text_region(&mut h, "Assumptions", 760.0);
+    select(&mut h, &[a, b]);
+    h.command(CommandId::FormatBold);
+    assert_eq!((style(&h, a), style(&h, b)), ((true, false), (true, false)));
+    assert!(h
+        .app
+        .state
+        .active_toggles()
+        .contains(&CommandId::FormatBold));
+    h.command(CommandId::FormatItalic);
+    assert_eq!(style(&h, a), (true, true));
+    // With one already bold, the button makes both bold; with both, it clears.
+    select(&mut h, &[a]);
+    h.command(CommandId::FormatBold);
+    assert_eq!(style(&h, a), (false, true));
+    select(&mut h, &[a, b]);
+    h.command(CommandId::FormatBold);
+    assert_eq!((style(&h, a).0, style(&h, b).0), (true, true));
+    h.command(CommandId::EditUndo);
+    assert_eq!((style(&h, a).0, style(&h, b).0), (false, true));
+}
+
+#[test]
+fn bold_and_italic_need_a_text_region_selected() {
+    let (mut h, shown, _) = setup();
+    let text = text_region(&mut h, "note", 900.0);
+    let both = [CommandId::FormatBold, CommandId::FormatItalic];
+    select(&mut h, &[shown]);
+    assert!(both.iter().all(|c| !h.app.registry().allows(*c)));
+    select(&mut h, &[shown, text]);
+    assert!(both.iter().all(|c| h.app.registry().allows(*c)));
+    // A math region in the selection is left alone.
+    h.command(CommandId::FormatBold);
+    assert_eq!(style(&h, shown), (false, false));
+    assert_eq!(style(&h, text), (true, false));
+}
+
+#[test]
+fn the_style_is_saved_copied_and_drawn() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = text_region(&mut h, "Heading", 700.0);
+    select(&mut h, &[id]);
+    h.command(CommandId::FormatBold);
+    h.command(CommandId::FormatItalic);
+
+    let loaded = load_bytes(&save_bytes(&h.sheet().doc).unwrap()).unwrap();
+    assert!(loaded.repairs.is_empty());
+    let s = loaded.worksheet.region(id).unwrap().style;
+    assert!(s.bold && s.italic);
+
+    h.command(CommandId::ClipboardCopy);
+    h.command(CommandId::ClipboardPaste);
+    let pasted = *h.sheet().canvas.selection.first().unwrap();
+    assert_ne!(pasted, id);
+    assert_eq!(style(&h, pasted), (true, true));
+
+    // Bold is a real heavier face, not the same letters again.
+    let width = |bold: bool| {
+        let fonts = crate::fonts::definitions();
+        let ctx = eframe::egui::Context::default();
+        ctx.set_fonts(fonts);
+        let _ = ctx.run(Default::default(), |_| {});
+        let style = opencalc_core::document::FontStyle {
+            bold,
+            italic: false,
+        };
+        ctx.fonts(|f| {
+            f.layout_job(crate::canvas::text_style::job(
+                "Heading",
+                style,
+                20.0,
+                eframe::egui::Color32::BLACK,
+                1000.0,
+            ))
+            .size()
+            .x
+        })
+    };
+    assert!(width(true) > width(false) + 1.0);
+}

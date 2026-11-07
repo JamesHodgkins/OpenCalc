@@ -262,12 +262,9 @@ fn text(painter: &Painter, theme: &Theme, r: &Region, text: &str, place: Place) 
     } else {
         (text, theme.text)
     };
-    let galley = painter.layout(
-        shown.to_owned(),
-        FontId::proportional(TEXT_SIZE * zoom),
-        colour,
-        (r.size.w * zoom - 2.0 * pad).max(10.0),
-    );
+    let wrap = (r.size.w * zoom - 2.0 * pad).max(10.0);
+    let job = super::text_style::job(shown, r.style, TEXT_SIZE * zoom, colour, wrap);
+    let galley = painter.layout_job(job);
     if !skip_content {
         painter.galley(top_left + Vec2::splat(pad), galley.clone(), colour);
     }

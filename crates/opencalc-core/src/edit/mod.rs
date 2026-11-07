@@ -11,7 +11,8 @@
 mod history;
 
 use crate::document::{
-    PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Size, Worksheet,
+    FontStyle, PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Size,
+    Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -39,6 +40,11 @@ pub enum Edit {
     SetText {
         id: RegionId,
         text: String,
+    },
+    /// Bold and italic of a region (a text region uses them). Display only.
+    SetFontStyle {
+        id: RegionId,
+        style: FontStyle,
     },
     /// How a math region shows its result. Display only; no value changes.
     SetResultFormat {
@@ -144,6 +150,14 @@ impl Worksheet {
                 Ok(Edit::SetMathSource {
                     id: *id,
                     source: old,
+                })
+            }
+            Edit::SetFontStyle { id, style } => {
+                let region = self.region_mut(*id)?;
+                let old = std::mem::replace(&mut region.style, *style);
+                Ok(Edit::SetFontStyle {
+                    id: *id,
+                    style: old,
                 })
             }
             Edit::SetResultFormat { id, format } => {
@@ -452,6 +466,13 @@ mod tests {
         round_trips(Edit::SetMathSource {
             id: ids[0],
             source: "a := 99".into(),
+        });
+        round_trips(Edit::SetFontStyle {
+            id: ids[0],
+            style: FontStyle {
+                bold: true,
+                italic: false,
+            },
         });
         round_trips(Edit::SetResultFormat {
             id: ids[0],
