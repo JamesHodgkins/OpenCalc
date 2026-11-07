@@ -2,7 +2,7 @@
 
 Status: **accepted** (decisions in section 8 settled: ZIP, `.ocx`, native dialogs via `rfd`, revision-based dirty).
 
-**Progress:** S1, S2 and S3 done (S3: Save, Save As, Open, recent files, dirty dot, close and quit prompts, window-close guard, drag and drop, `opencalc FILE`; tests in `opencalc-ui/src/smoke/files.rs`). S1 done (`opencalc-core/src/persist*`, `tests/persist.rs`, fixtures in
+**Progress:** S1 to S4 done (S4: `opencalc-cli check`, `opencalc-core/src/check.rs`) (S3: Save, Save As, Open, recent files, dirty dot, close and quit prompts, window-close guard, drag and drop, `opencalc FILE`; tests in `opencalc-ui/src/smoke/files.rs`). S1 done (`opencalc-core/src/persist*`, `tests/persist.rs`, fixtures in
 `tests/fixtures/v1/`). Measured on the reference machine: save of 500 regions 0.9 ms,
 load 2.1 ms (budget 20 ms each, in the benchmark gate).
 

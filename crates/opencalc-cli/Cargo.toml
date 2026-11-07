@@ -13,3 +13,6 @@ path = "src/main.rs"
 [dependencies]
 clap.workspace = true
 opencalc-core.workspace = true
+
+[dev-dependencies]
+zip.workspace = true

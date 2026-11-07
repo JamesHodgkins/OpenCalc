@@ -26,7 +26,7 @@ Requires the Rust stable toolchain (`rust-toolchain.toml` sets it up).
 
 ```
 cargo run -p opencalc-ui          # desktop app
-cargo run -p opencalc-cli -- check some.ocx
+cargo run -p opencalc-cli -- check some.ocx --quiet
 cargo test --workspace            # all tests
 cargo clippy --workspace          # lints
 powershell -File scripts/check.ps1   # all commit checks (fmt, clippy, tests, file sizes)

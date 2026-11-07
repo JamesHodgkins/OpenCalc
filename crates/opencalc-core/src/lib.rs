@@ -3,6 +3,7 @@
 //! This crate must not depend on any UI or windowing code. The UI and the
 //! CLI both build on it, and it is the part tested most heavily.
 
+pub mod check;
 pub mod document;
 pub mod edit;
 pub mod eval;

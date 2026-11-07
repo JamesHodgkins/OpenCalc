@@ -55,10 +55,7 @@ impl App {
             return;
         }
         let loaded = persist::read_limited(path)
-            .map_err(|e| match e.kind() {
-                std::io::ErrorKind::NotFound => "the file was not found".to_owned(),
-                _ => e.to_string(),
-            })
+            .map_err(|e| e.to_string())
             .and_then(|bytes| persist::load_bytes(&bytes).map_err(|e| e.to_string()));
         match loaded {
             Ok(loaded) => {

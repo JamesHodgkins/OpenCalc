@@ -59,7 +59,10 @@ pub fn read_limited(path: &Path) -> io::Result<Vec<u8>> {
 }
 
 pub(super) fn read_with_limit(path: &Path, limit: u64) -> io::Result<Vec<u8>> {
-    let file = File::open(path)?;
+    let file = File::open(path).map_err(|e| match e.kind() {
+        io::ErrorKind::NotFound => io::Error::new(e.kind(), "the file was not found"),
+        _ => e,
+    })?;
     let too_big = || {
         io::Error::new(
             io::ErrorKind::InvalidData,
@@ -134,7 +137,9 @@ mod tests {
         assert_eq!(read_with_limit(&path, 100).unwrap().len(), 100);
         let err = read_with_limit(&path, 99).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidData);
-        assert!(read_limited(&dir.join("nope")).is_err());
+        let missing = read_limited(&dir.join("nope")).unwrap_err();
+        assert_eq!(missing.kind(), io::ErrorKind::NotFound);
+        assert_eq!(missing.to_string(), "the file was not found");
         fs::remove_dir_all(dir).unwrap();
     }
 }
