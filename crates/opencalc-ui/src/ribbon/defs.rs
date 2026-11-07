@@ -377,6 +377,7 @@ mod tests {
             CommandId::FindReplaceAll,     // the Find window
             CommandId::FindClose,          // the Find window
             CommandId::CheckClose,         // the Check window
+            CommandId::MatrixClose,        // the Matrix window
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog
@@ -410,12 +411,5 @@ mod tests {
             .expect("a Symbols panel");
         let ids: HashSet<_> = symbols.extra.iter().map(|i| i.command).collect();
         assert_eq!(ids.len(), 16);
-    }
-
-    #[test]
-    fn the_new_controls_that_are_not_built_yet_are_dimmed_not_live() {
-        for command in [CommandId::InsertMatrix, CommandId::InsertRange] {
-            assert!(!command.is_implemented(), "{command:?}");
-        }
     }
 }

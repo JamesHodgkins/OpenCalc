@@ -3,6 +3,8 @@
 //! is tested without a window.
 
 use opencalc_core::constants::CONSTANTS;
+use opencalc_core::document::{Region, RegionKind};
+use opencalc_core::expr::{AssignKind, Expr};
 use opencalc_core::functions::FUNCTIONS;
 use opencalc_core::units::builtin_symbols;
 
@@ -172,6 +174,27 @@ pub fn defines_by_equals(field: &Field, defined: &[String]) -> bool {
         known.values.get(&id),
         Some(Err(opencalc_core::eval::EvalError::Undefined(_)))
     )
+}
+
+/// The names the worksheet defines (variables and functions), for autocomplete.
+pub fn defined_names(regions: &[Region]) -> Vec<String> {
+    let mut out = Vec::new();
+    for r in regions {
+        if let RegionKind::Math(m) = &r.kind {
+            match m.expr() {
+                Expr::Assign {
+                    kind: AssignKind::Define,
+                    target,
+                    ..
+                } => out.push(target.clone()),
+                Expr::FunctionDef { name, .. } => out.push(name.clone()),
+                _ => {}
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 #[cfg(test)]

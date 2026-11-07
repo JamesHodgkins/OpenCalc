@@ -27,6 +27,7 @@ mod export;
 mod files;
 mod find;
 mod format;
+mod insert;
 mod text_edit;
 mod units;
 

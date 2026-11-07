@@ -80,6 +80,8 @@ enum Drag {
 pub struct CanvasUi {
     pub selection: Vec<RegionId>,
     pub editing: Option<RegionId>,
+    /// Characters to select when the editor next opens (a template just inserted).
+    pub preselect: Option<(usize, usize)>,
     /// What was being edited at the end of the last frame.
     last_editing: Option<RegionId>,
     /// Ask the in-place editor to take keyboard focus on its next frame.
@@ -106,6 +108,7 @@ impl Default for CanvasUi {
         CanvasUi {
             selection: Vec::new(),
             editing: None,
+            preselect: None,
             last_editing: None,
             focus_edit: false,
             enter_at_start: false,

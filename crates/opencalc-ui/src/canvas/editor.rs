@@ -17,7 +17,6 @@ use eframe::egui::{
 };
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::edit::Edit;
-use opencalc_core::expr::{AssignKind, Expr};
 
 use complete::Candidate;
 pub use text::Field;
@@ -33,27 +32,6 @@ pub(super) struct Ctx<'a> {
     pub regions: &'a [Region],
     pub view: &'a CanvasView,
     pub origin: Pos2,
-}
-
-/// The names the worksheet defines (variables and functions), for autocomplete.
-fn defined_names(regions: &[Region]) -> Vec<String> {
-    let mut out = Vec::new();
-    for r in regions {
-        if let RegionKind::Math(m) = &r.kind {
-            match m.expr() {
-                Expr::Assign {
-                    kind: AssignKind::Define,
-                    target,
-                    ..
-                } => out.push(target.clone()),
-                Expr::FunctionDef { name, .. } => out.push(name.clone()),
-                _ => {}
-            }
-        }
-    }
-    out.sort();
-    out.dedup();
-    out
 }
 
 /// Edit the math region `r` in place. Called every frame while it is being edited.
@@ -105,13 +83,16 @@ pub(super) fn math(
     let field = st.field.get_or_insert_with(|| Field::new(source));
     if fresh {
         *field = Field::new(source);
+        if let Some((a, b)) = st.preselect.take() {
+            field.select(a, b);
+        }
         if std::mem::take(&mut st.enter_at_start) {
             field.set_caret(0, false);
         }
     } else if field.text() != source {
         field.sync(source);
     }
-    let defined = defined_names(cx.regions);
+    let defined = complete::defined_names(cx.regions);
     let layout_of = |ui: &Ui, text: &str| {
         ui.ctx()
             .fonts(|f| SourceLayout::new(f, paper.text, text, size))

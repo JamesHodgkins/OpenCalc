@@ -30,6 +30,8 @@ macro_rules! commands {
             OpenRecent(u8),
             /// Go to the n-th finding of the Check window.
             GoToFinding(u16),
+            /// Insert a matrix of this many rows and columns.
+            InsertMatrixSize(u8, u8),
         }
 
         impl CommandId {
@@ -52,6 +54,7 @@ macro_rules! commands {
                     CommandId::PageMarginMm(_) => "page.margin",
                     CommandId::OpenRecent(_) => "file.open_recent",
                     CommandId::GoToFinding(_) => "check.go_to",
+                    CommandId::InsertMatrixSize(..) => "insert.matrix_size",
                 }
             }
 
@@ -69,6 +72,7 @@ macro_rules! commands {
                     CommandId::PageMarginMm(_) => "Margin",
                     CommandId::OpenRecent(_) => "Open recent file",
                     CommandId::GoToFinding(_) => "Go to problem",
+                    CommandId::InsertMatrixSize(..) => "Insert matrix",
                 }
             }
 
@@ -84,6 +88,7 @@ macro_rules! commands {
                     | CommandId::PageMarginMm(_) => icons::FIT,
                     CommandId::OpenRecent(_) => icons::FOLDER_OPEN,
                     CommandId::GoToFinding(_) => icons::WARNING,
+                    CommandId::InsertMatrixSize(..) => icons::TABLE,
                 }
             }
         }
@@ -139,6 +144,7 @@ commands! {
     InsertGreek: "insert.greek", "Greek letters", icons::GREEK;
     InsertMatrix: "insert.matrix", "Matrix", icons::TABLE;
     InsertRange: "insert.range", "Range", icons::LIST;
+    MatrixClose: "insert.matrix_close", "Close Matrix", icons::CLOSE;
     // Format.
     FormatBold: "format.bold", "Bold", icons::BOLD;
     FormatItalic: "format.italic", "Italic", icons::ITALIC;
@@ -240,19 +246,20 @@ impl CommandId {
             | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
             | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
             | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
-            | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | CheckClose | CalcCheck
-            | WarnNext | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo
-            | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot
-            | InsertTable | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit
-            | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout
-            | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs
-            | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_)
-            | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..)
+            | MatrixClose | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext
+            | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
+            | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
+            | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
+            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
+            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
+            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
             | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
                 true
             }
             RegionLock | RegionTag | FormatBold | FormatItalic | ArrangeAlignH | ArrangeAlignV
-            | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
+            | HelpShortcuts | HelpGuide => false,
         }
     }
 
