@@ -107,7 +107,9 @@ impl Default for CanvasUi {
             enter_at_start: false,
             field: None,
             insert_at: Pos2::new(40.0, 40.0),
-            armed: false,
+            // The initial insertion point is ready for type-to-create, just like
+            // the point after moving the crosshair or clicking the blank page.
+            armed: true,
             sizes: Sizes::new(),
             fit_pending: true,
             drag: None,

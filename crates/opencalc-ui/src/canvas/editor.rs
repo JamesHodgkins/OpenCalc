@@ -55,6 +55,30 @@ fn defined_names(regions: &[Region]) -> Vec<String> {
     out
 }
 
+/// Whether an `=` typed now should be `:=`: the region holds nothing but one name,
+/// the caret is after it, and nothing in the worksheet, the units or the constants
+/// has that name. Evaluating a name that means nothing is only ever an error, so
+/// the person almost certainly meant to define it. Anything else stays as typed.
+fn defines_by_equals(field: &Field, defined: &[String]) -> bool {
+    let chars = field.chars();
+    if field.has_selection() || field.caret != chars.len() || chars.is_empty() {
+        return false;
+    }
+    let name: String = chars.iter().collect();
+    let is_name = (chars[0].is_alphabetic() || chars[0] == '_')
+        && chars.iter().all(|c| c.is_alphanumeric() || *c == '_');
+    if !is_name || defined.contains(&name) {
+        return false;
+    }
+    // Units and constants are known to the evaluator; ask it.
+    let id = opencalc_core::eval::RegionId(0);
+    let known = opencalc_core::eval::evaluate(&[(id, opencalc_core::parser::parse(&name))]);
+    matches!(
+        known.values.get(&id),
+        Some(Err(opencalc_core::eval::EvalError::Undefined(_)))
+    )
+}
+
 /// Edit the math region `r` in place. Called every frame while it is being edited.
 pub(super) fn math(
     ui: &mut Ui,
@@ -169,6 +193,9 @@ pub(super) fn math(
                     if field.has_selection() || !field.expand_greek(greek_by_name) {
                         grow(field, &lay);
                     }
+                }
+                Event::Text(s) if s == "=" && defines_by_equals(field, &defined) => {
+                    field.insert(":=");
                 }
                 Event::Text(s) => field.typed(&s, greek_by_name),
                 Event::Paste(s) => field.insert(&s),

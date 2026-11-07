@@ -165,3 +165,36 @@ fn enter_after_a_name_typed_in_full_finishes_instead_of_taking_a_longer_suggesti
     let last = h.sheet().doc.regions().last().unwrap();
     assert!(matches!(&last.kind, RegionKind::Math(m) if m.source() == "b"));
 }
+
+#[test]
+fn an_equals_after_a_lone_undefined_name_becomes_a_definition() {
+    let mut h = Harness::new();
+    h.settle();
+    h.new_math();
+    h.type_text("b:=1");
+    h.press_key(Key::Enter, Modifiers::NONE);
+
+    let typed = |h: &mut Harness, text: &str| -> String {
+        let id = h.new_math();
+        h.type_text(text);
+        let source = h.source_of(id);
+        h.press_key(Key::Escape, Modifiers::NONE);
+        source
+    };
+    assert_eq!(
+        typed(&mut h, "zz=5m"),
+        "zz:=5m",
+        "zz is not defined: define it"
+    );
+    assert_eq!(typed(&mut h, "b="), "b=", "b is defined: this evaluates it");
+    assert_eq!(typed(&mut h, "m="), "m=", "a unit");
+    assert_eq!(typed(&mut h, "i="), "i=", "a constant");
+    assert_eq!(
+        typed(&mut h, "zz="),
+        "zz=",
+        "zz is now defined by the first region"
+    );
+    assert_eq!(typed(&mut h, "q+r=5"), "q+r=5", "not a lone name");
+    assert_eq!(typed(&mut h, "x:=2"), "x:=2", "already a definition");
+    assert_eq!(typed(&mut h, "f(x)=x"), "f(x)=x", "left alone");
+}
