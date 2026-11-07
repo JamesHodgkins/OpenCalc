@@ -6,6 +6,7 @@
 //! - This module: owns the worker thread and the ribbon, and carries out effects.
 
 pub(crate) mod dispatch;
+mod exporting;
 mod files;
 pub(crate) mod filing;
 pub(crate) mod finding;
@@ -41,6 +42,8 @@ pub struct App {
     pub(crate) allow_close: bool,
     /// The window title last sent, to send it only when it changes.
     window_title: String,
+    /// Multiplies the export resolution; tests lower it to stay quick.
+    pub(crate) export_shrink: f32,
     /// Whether modified worksheets are written to recovery files (off in tests).
     autosave: bool,
     /// Where recovery files of never-saved worksheets go.
@@ -74,6 +77,7 @@ impl App {
             files,
             allow_close: false,
             window_title: String::new(),
+            export_shrink: 1.0,
             autosave: false,
             recovery_dir: None,
             autosave_every: recovery::EVERY,
@@ -132,6 +136,7 @@ impl App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 Effect::ChooseOpen => self.choose_open(),
+                Effect::Export(kind) => self.export_active(kind),
                 Effect::Restore(r) => self.restore(r),
                 Effect::DeleteFile(path) => {
                     let _ = std::fs::remove_file(path);

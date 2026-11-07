@@ -20,6 +20,7 @@ use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
+mod export;
 mod files;
 mod find;
 mod units;
@@ -33,6 +34,15 @@ impl crate::app::Files for NoFiles {
     }
 
     fn pick_save(&mut self, _: &str, _: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
+        None
+    }
+
+    fn pick_export(
+        &mut self,
+        _: &str,
+        _: crate::export::Kind,
+        _: Option<&std::path::Path>,
+    ) -> Option<std::path::PathBuf> {
         None
     }
 }

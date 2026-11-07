@@ -29,6 +29,8 @@ pub enum Effect {
     ResetDockWidths,
     /// Ask which file to open, then open it.
     ChooseOpen,
+    /// Export the active worksheet.
+    Export(crate::export::Kind),
     Open(PathBuf),
     /// Put back the changes in a recovery file.
     Restore(super::filing::Recovery),
@@ -104,6 +106,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             s.redo();
         }),
         CalcAll => fx.push(Effect::Recalculate),
+        FileExportPdf => fx.push(Effect::Export(crate::export::Kind::Pdf)),
+        FileExportPng => fx.push(Effect::Export(crate::export::Kind::Png)),
         UnitsSi => set_unit_system(state, UnitSystem::Si),
         UnitsUscs => set_unit_system(state, UnitSystem::Uscs),
         UnitsCgs => set_unit_system(state, UnitSystem::Cgs),

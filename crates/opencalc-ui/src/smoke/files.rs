@@ -22,6 +22,7 @@ use crate::theme::PaletteKey;
 struct Script {
     open: VecDeque<Option<PathBuf>>,
     save: VecDeque<Option<PathBuf>>,
+    export: VecDeque<Option<PathBuf>>,
     /// The file names suggested by Save dialogs.
     suggested: Vec<String>,
 }
@@ -38,12 +39,21 @@ impl Files for Fake {
         s.suggested.push(name.to_owned());
         s.save.pop_front().flatten()
     }
+
+    fn pick_export(
+        &mut self,
+        _name: &str,
+        _kind: crate::export::Kind,
+        _folder: Option<&Path>,
+    ) -> Option<PathBuf> {
+        self.0.borrow_mut().export.pop_front().flatten()
+    }
 }
 
-struct Rig {
-    h: Harness,
+pub(super) struct Rig {
+    pub h: Harness,
     script: Rc<RefCell<Script>>,
-    dir: PathBuf,
+    pub dir: PathBuf,
 }
 
 impl Drop for Rig {
@@ -52,7 +62,7 @@ impl Drop for Rig {
     }
 }
 
-fn setup(name: &str, state: AppState) -> Rig {
+pub(super) fn setup(name: &str, state: AppState) -> Rig {
     let script = Rc::new(RefCell::new(Script::default()));
     let ctx = egui::Context::default();
     let app = App::with_files(ctx.clone(), state, Box::new(Fake(script.clone())));
@@ -72,7 +82,7 @@ fn setup(name: &str, state: AppState) -> Rig {
 }
 
 impl Rig {
-    fn run(&mut self, command: CommandId) {
+    pub fn run(&mut self, command: CommandId) {
         self.h.app.queue.push(command);
         // One frame runs the command; a second runs what it queued (close after save).
         self.h.frame();
@@ -83,15 +93,19 @@ impl Rig {
         self.script.borrow_mut().save.push_back(path);
     }
 
+    pub fn answer_export(&mut self, path: Option<PathBuf>) {
+        self.script.borrow_mut().export.push_back(path);
+    }
+
     fn answer_open(&mut self, path: Option<PathBuf>) {
         self.script.borrow_mut().open.push_back(path);
     }
 
-    fn state(&self) -> &AppState {
+    pub fn state(&self) -> &AppState {
         &self.h.app.state
     }
 
-    fn type_into_active(&mut self, source: &str) {
+    pub fn type_into_active(&mut self, source: &str) {
         let i = self.state().active.unwrap();
         self.h.app.state.sheets[i].insert(RegionKind::math(source));
         self.h.frame();

@@ -62,6 +62,8 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
     let needs_sheet = matches!(
         command,
         FileClose
+            | FileExportPdf
+            | FileExportPng
             | EditFind
             | EditReplace
             | FindNext

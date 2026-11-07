@@ -20,6 +20,13 @@ pub trait Files {
     fn pick_open(&mut self) -> Option<PathBuf>;
     /// `name` is the suggested file name.
     fn pick_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf>;
+    /// Where to export to: `name` is suggested, `kind` decides the file type.
+    fn pick_export(
+        &mut self,
+        name: &str,
+        kind: crate::export::Kind,
+        folder: Option<&Path>,
+    ) -> Option<PathBuf>;
 }
 
 /// The operating system's own dialogs.
@@ -39,6 +46,26 @@ impl Files for NativeFiles {
     fn pick_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf> {
         let mut dialog = filter(rfd::FileDialog::new())
             .set_title("Save worksheet")
+            .set_file_name(name);
+        if let Some(folder) = folder {
+            dialog = dialog.set_directory(folder);
+        }
+        dialog.save_file()
+    }
+
+    fn pick_export(
+        &mut self,
+        name: &str,
+        kind: crate::export::Kind,
+        folder: Option<&Path>,
+    ) -> Option<PathBuf> {
+        let (label, title) = match kind {
+            crate::export::Kind::Pdf => ("PDF document", "Export as PDF"),
+            crate::export::Kind::Png => ("PNG image", "Export as PNG"),
+        };
+        let mut dialog = rfd::FileDialog::new()
+            .add_filter(label, &[kind.extension()])
+            .set_title(title)
             .set_file_name(name);
         if let Some(folder) = folder {
             dialog = dialog.set_directory(folder);

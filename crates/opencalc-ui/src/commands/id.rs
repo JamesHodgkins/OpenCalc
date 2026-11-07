@@ -91,6 +91,8 @@ commands! {
     FileOpen: "file.open", "Open", icons::FOLDER_OPEN;
     FileSave: "file.save", "Save", icons::SAVE;
     FileSaveAs: "file.save_as", "Save As", icons::SAVE;
+    FileExportPdf: "file.export_pdf", "Export as PDF", icons::SAVE;
+    FileExportPng: "file.export_png", "Export as PNG", icons::PICTURE;
     // Answers to the dialogs that ask about unsaved changes or report a problem.
     DialogSave: "dialog.save", "Save", icons::SAVE;
     DialogDiscard: "dialog.discard", "Don't save", icons::DELETE;
@@ -225,18 +227,20 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            EditFind | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll
-            | FindClose | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen
-            | FileSave | FileSaveAs | DialogSave | DialogDiscard | DialogCancel | DialogOk
-            | DialogRestore | DialogDropRecovery | OpenRecent(_) | FileClose | FileExample
-            | AppQuit | TabHome | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText
-            | InsertArea | InsertPlot | InsertTable | InsertPicture | CalcAll | ViewZoomIn
-            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
-            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral
-            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
-            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
-            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
-            | InsertGreek | InsertSymbol(_) => true,
+            FileExportPdf | FileExportPng | EditFind | EditReplace | FindNext | FindPrev
+            | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine | UnitsManage
+            | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs | DialogSave
+            | DialogDiscard | DialogCancel | DialogOk | DialogRestore | DialogDropRecovery
+            | OpenRecent(_) | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
+            | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
+            | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
+            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
+            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
+            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
+                true
+            }
             ClipboardPaste | ClipboardCut | ClipboardCopy | RegionLock | RegionTag | FormatBold
             | FormatItalic | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
             | FormatEngineering | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate

@@ -3,6 +3,7 @@
 mod app;
 mod canvas;
 mod commands;
+mod export;
 mod fonts;
 mod format;
 mod icons;
