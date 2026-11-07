@@ -62,6 +62,9 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
     let needs_sheet = matches!(
         command,
         FileClose
+            | ClipboardPaste
+            | ClipboardCut
+            | ClipboardCopy
             | ArrangeSeparate
             | FileExportPdf
             | FileExportPng
@@ -94,7 +97,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | RegionDelete
     );
     (ctx.has_sheet || !needs_sheet)
-        && (ctx.has_selection || command != RegionDelete)
+        && (ctx.has_selection || !matches!(command, RegionDelete | ClipboardCut | ClipboardCopy))
         && (ctx.can_undo || command != EditUndo)
         && (ctx.can_redo || command != EditRedo)
         && (ctx.editing_math || command != InsertGreek)

@@ -65,6 +65,8 @@ pub struct AppState {
     pub dialog: Option<Dialog>,
     /// Recently opened or saved files, newest first.
     pub recent: Vec<PathBuf>,
+    /// The regions last copied inside the app.
+    pub clip: Option<super::clipboard::Clip>,
     /// Recovery files found and not yet asked about.
     pub recoveries: Vec<super::filing::Recovery>,
 }
@@ -100,6 +102,7 @@ impl AppState {
             find: Default::default(),
             dialog: None,
             recent: Vec::new(),
+            clip: None,
             recoveries: Vec::new(),
         }
     }

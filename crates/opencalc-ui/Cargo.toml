@@ -16,6 +16,7 @@ rfd.workspace = true
 opencalc-core.workspace = true
 png = "0.18"
 flate2 = "1"
+arboard = { version = "3", default-features = false }
 
 [dev-dependencies]
 proptest.workspace = true

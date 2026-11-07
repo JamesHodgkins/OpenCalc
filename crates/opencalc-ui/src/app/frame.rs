@@ -189,5 +189,26 @@ impl App {
                 self.queue.push(b.command);
             }
         }
+        // Windowing systems report Ctrl+C, X and V as these events, not as keys.
+        // With a text box or the math editor focused they belong to it.
+        if !typing {
+            let seen = ctx.input(|i| {
+                [
+                    i.events.iter().any(|e| matches!(e, egui::Event::Copy)),
+                    i.events.iter().any(|e| matches!(e, egui::Event::Cut)),
+                    i.events.iter().any(|e| matches!(e, egui::Event::Paste(_))),
+                ]
+            });
+            let commands = [
+                CommandId::ClipboardCopy,
+                CommandId::ClipboardCut,
+                CommandId::ClipboardPaste,
+            ];
+            for (on, command) in seen.into_iter().zip(commands) {
+                if on && registry.allows(command) && !self.queue.contains(&command) {
+                    self.queue.push(command);
+                }
+            }
+        }
     }
 }

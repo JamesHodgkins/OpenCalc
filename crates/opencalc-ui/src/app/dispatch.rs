@@ -31,6 +31,10 @@ pub enum Effect {
     ChooseOpen,
     /// Export the active worksheet.
     Export(crate::export::Kind),
+    /// Clipboard work, which needs the system clipboard.
+    Copy,
+    Cut,
+    Paste,
     Open(PathBuf),
     /// Put back the changes in a recovery file.
     Restore(super::filing::Recovery),
@@ -106,6 +110,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             s.redo();
         }),
         CalcAll => fx.push(Effect::Recalculate),
+        ClipboardCopy => fx.push(Effect::Copy),
+        ClipboardCut => fx.push(Effect::Cut),
+        ClipboardPaste => fx.push(Effect::Paste),
         ArrangeSeparate => separate_regions(state),
         FileExportPdf => fx.push(Effect::Export(crate::export::Kind::Pdf)),
         FileExportPng => fx.push(Effect::Export(crate::export::Kind::Png)),

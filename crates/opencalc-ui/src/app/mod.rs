@@ -5,6 +5,7 @@
 //! - `frame`: lays out the window and gathers commands from panels and keys.
 //! - This module: owns the worker thread and the ribbon, and carries out effects.
 
+mod clipboard;
 pub(crate) mod dispatch;
 mod exporting;
 mod files;
@@ -24,6 +25,7 @@ use crate::commands::{CommandId, Registry};
 use crate::ribbon::defs::opencalc_ribbon;
 use crate::ribbon::{Ribbon, RibbonState};
 use crate::theme::{self, PaletteKey};
+pub use clipboard::{Clipboard, MemoryClipboard, NativeClipboard};
 use dispatch::{dispatch, Effect};
 pub use files::{Files, NativeFiles};
 pub use recovery::default_dir as recovery_dir;
@@ -38,6 +40,8 @@ pub struct App {
     pub queue: Vec<CommandId>,
     /// How the app asks for file paths.
     files: Box<dyn Files>,
+    /// The system clipboard.
+    pub(crate) clipboard: Box<dyn Clipboard>,
     /// Set once quitting has been decided, so closing the window is let through.
     pub(crate) allow_close: bool,
     /// The window title last sent, to send it only when it changes.
@@ -61,7 +65,9 @@ impl App {
     }
 
     pub fn with_state(ctx: egui::Context, state: AppState) -> App {
-        App::with_files(ctx, state, Box::new(NativeFiles))
+        let mut app = App::with_files(ctx, state, Box::new(NativeFiles));
+        app.clipboard = Box::new(NativeClipboard);
+        app
     }
 
     pub fn with_files(ctx: egui::Context, state: AppState, files: Box<dyn Files>) -> App {
@@ -75,6 +81,7 @@ impl App {
             ribbon_state: RibbonState::default(),
             queue: Vec::new(),
             files,
+            clipboard: Box::new(MemoryClipboard::default()),
             allow_close: false,
             window_title: String::new(),
             export_shrink: 1.0,
@@ -136,6 +143,9 @@ impl App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 Effect::ChooseOpen => self.choose_open(),
+                Effect::Copy => self.copy(),
+                Effect::Cut => self.cut(),
+                Effect::Paste => self.paste(),
                 Effect::Export(kind) => self.export_active(kind),
                 Effect::Restore(r) => self.restore(r),
                 Effect::DeleteFile(path) => {

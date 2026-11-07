@@ -21,6 +21,7 @@ use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
 mod arrange;
+mod clipboard;
 mod export;
 mod files;
 mod find;
