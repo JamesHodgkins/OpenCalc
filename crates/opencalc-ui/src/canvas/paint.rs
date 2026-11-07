@@ -200,6 +200,18 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
         let after = match result::beside(expr, result) {
             Beside::Nothing => None,
             Beside::Pending => Some(plain(f, "= \u{2026}", theme.text_weak, size)),
+            // `b = 5 m` with no `b` defined only echoes the right side: say so.
+            Beside::Value(_)
+                if result::undefined_evaluation(&env.output.warnings, r.id).is_some() =>
+            {
+                let name = result::undefined_evaluation(&env.output.warnings, r.id);
+                let text = format!(
+                    "{} '{}' is not defined here: use := to define it",
+                    crate::icons::WARNING,
+                    name.unwrap_or_default()
+                );
+                Some(plain(f, &text, theme.warning, size))
+            }
             Beside::Value(v) => Some(plain(
                 f,
                 &format!("= {}", format_value_with(v, env.units, m.format())),

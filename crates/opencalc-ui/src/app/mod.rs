@@ -5,6 +5,7 @@
 //! - `frame`: lays out the window and gathers commands from panels and keys.
 //! - This module: owns the worker thread and the ribbon, and carries out effects.
 
+mod checking;
 mod clipboard;
 pub(crate) mod dispatch;
 mod exporting;

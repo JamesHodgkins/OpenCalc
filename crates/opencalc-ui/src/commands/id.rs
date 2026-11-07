@@ -28,6 +28,8 @@ macro_rules! commands {
             PageMarginMm(u8),
             /// Open the n-th recently used file.
             OpenRecent(u8),
+            /// Go to the n-th finding of the Check window.
+            GoToFinding(u16),
         }
 
         impl CommandId {
@@ -49,6 +51,7 @@ macro_rules! commands {
                     CommandId::PageLandscape(_) => "page.orientation",
                     CommandId::PageMarginMm(_) => "page.margin",
                     CommandId::OpenRecent(_) => "file.open_recent",
+                    CommandId::GoToFinding(_) => "check.go_to",
                 }
             }
 
@@ -65,6 +68,7 @@ macro_rules! commands {
                     CommandId::PageLandscape(false) => "Portrait",
                     CommandId::PageMarginMm(_) => "Margin",
                     CommandId::OpenRecent(_) => "Open recent file",
+                    CommandId::GoToFinding(_) => "Go to problem",
                 }
             }
 
@@ -79,6 +83,7 @@ macro_rules! commands {
                     | CommandId::PageLandscape(_)
                     | CommandId::PageMarginMm(_) => icons::FIT,
                     CommandId::OpenRecent(_) => icons::FOLDER_OPEN,
+                    CommandId::GoToFinding(_) => icons::WARNING,
                 }
             }
         }
@@ -163,6 +168,7 @@ commands! {
     CalcCheck: "calc.check", "Run checks", icons::CHECK;
     WarnNext: "warn.next", "Next", icons::ARROW_DOWN;
     WarnPrev: "warn.prev", "Previous", icons::ARROW_UP;
+    CheckClose: "check.close", "Close Check", icons::CLOSE;
     // View.
     ViewZoomIn: "view.zoom_in", "Zoom in", icons::ZOOM_IN;
     ViewZoomOut: "view.zoom_out", "Zoom out", icons::ZOOM_OUT;
@@ -234,18 +240,19 @@ impl CommandId {
             | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
             | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
             | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
-            | DialogDropRecovery | OpenRecent(_) | FileClose | FileExample | AppQuit | TabHome
-            | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea
-            | InsertPlot | InsertTable | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut
-            | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto | ViewFunctions
-            | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate
-            | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_)
-            | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_)
-            | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek
-            | InsertSymbol(_) => true,
+            | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | CheckClose | CalcCheck
+            | WarnNext | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo
+            | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot
+            | InsertTable | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit
+            | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout
+            | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs
+            | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_)
+            | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
+                true
+            }
             RegionLock | RegionTag | FormatBold | FormatItalic | ArrangeAlignH | ArrangeAlignV
-            | CalcCheck | WarnNext | WarnPrev | InsertMatrix | InsertRange | HelpShortcuts
-            | HelpGuide => false,
+            | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
         }
     }
 

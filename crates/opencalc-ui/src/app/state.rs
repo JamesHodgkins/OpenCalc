@@ -59,6 +59,8 @@ pub struct AppState {
     pub options_open: bool,
     /// The Units window (custom units).
     pub units_open: bool,
+    /// The Check Worksheet window and the problems it lists.
+    pub check: super::checking::CheckState,
     /// The Find and Replace window.
     pub find: super::finding::FindState,
     /// The question or message in front of everything, if any.
@@ -99,6 +101,7 @@ impl AppState {
             draft: false,
             options_open: false,
             units_open: false,
+            check: Default::default(),
             find: Default::default(),
             dialog: None,
             recent: Vec::new(),

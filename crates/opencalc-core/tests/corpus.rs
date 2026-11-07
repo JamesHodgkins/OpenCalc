@@ -312,6 +312,7 @@ fn check(case: &Case, regions: &[(RegionId, Expr)], out: &Output) -> Vec<String>
             Expect::Warn { name, line } => {
                 let warned = out.warnings.iter().any(|w| match w {
                     Warning::Redefinition { name: n, .. } => n == name,
+                    Warning::UndefinedEvaluation { .. } => false,
                 });
                 if !warned {
                     fail(

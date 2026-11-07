@@ -98,6 +98,10 @@ impl App {
 
         panels::plot_window::show(ctx, &self.state, &mut panel_edits);
         panels::units::show(ctx, &self.state, &mut cmds, &mut panel_edits);
+        if self.state.check.open {
+            self.state.refresh_findings();
+        }
+        panels::check::show(ctx, &self.state, &mut cmds);
         self.state.refresh_find();
         let mut typed: Vec<super::finding::FindCmd> = Vec::new();
         panels::find::show(ctx, &self.state, &mut cmds, &mut typed);

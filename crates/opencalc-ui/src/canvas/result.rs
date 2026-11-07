@@ -43,9 +43,18 @@ pub fn beside<'a>(expr: &Expr, result: Option<&'a Result<Value, EvalError>>) -> 
 /// The name this region defines if another region defines it too (the last one in
 /// layout order wins, so every such region is flagged).
 pub fn redefined(warnings: &[Warning], id: RegionId) -> Option<&str> {
-    warnings.iter().find_map(|w| {
-        let Warning::Redefinition { name, regions } = w;
-        regions.contains(&id).then_some(name.as_str())
+    warnings.iter().find_map(|w| match w {
+        Warning::Redefinition { name, regions } => regions.contains(&id).then_some(name.as_str()),
+        Warning::UndefinedEvaluation { .. } => None,
+    })
+}
+
+/// The name this region evaluates with `=` although nothing defines it: `:=` was
+/// probably meant.
+pub fn undefined_evaluation(warnings: &[Warning], id: RegionId) -> Option<&str> {
+    warnings.iter().find_map(|w| match w {
+        Warning::UndefinedEvaluation { name, region } if *region == id => Some(name.as_str()),
+        _ => None,
     })
 }
 

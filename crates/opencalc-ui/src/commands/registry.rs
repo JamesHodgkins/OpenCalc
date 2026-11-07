@@ -51,7 +51,8 @@ impl Registry {
             | CommandId::PagePaper(_)
             | CommandId::PageLandscape(_)
             | CommandId::PageMarginMm(_)
-            | CommandId::OpenRecent(_) => true,
+            | CommandId::OpenRecent(_)
+            | CommandId::GoToFinding(_) => true,
             CommandId::InsertSymbol(_) => self.symbols,
             other => self.enabled.contains(&other),
         }
@@ -97,6 +98,9 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | EditUndo
             | EditRedo
             | RegionDelete
+            | CalcCheck
+            | WarnNext
+            | WarnPrev
     );
     (ctx.has_sheet || !needs_sheet)
         && (ctx.has_selection || !matches!(command, RegionDelete | ClipboardCut | ClipboardCopy))

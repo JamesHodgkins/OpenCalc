@@ -10,6 +10,7 @@ use std::collections::HashMap;
 mod graph;
 mod node;
 mod plot;
+mod undefined;
 
 pub use plot::{PlotData, PlotSeries};
 
@@ -101,6 +102,9 @@ pub enum Warning {
         name: String,
         regions: Vec<RegionId>,
     },
+    /// `name = value`, where nothing defines `name`: probably `:=` was meant. It
+    /// calculates the value and defines nothing.
+    UndefinedEvaluation { name: String, region: RegionId },
 }
 
 #[derive(Debug, Default)]
@@ -175,6 +179,11 @@ pub fn evaluate_all(
             }
         }
     }
+    out.warnings.extend(undefined::undefined_evaluations(
+        regions.iter().map(|(id, e)| (*id, e)),
+        &|n| var_definers.contains_key(n) || fn_definers.contains_key(n),
+        units,
+    ));
     let last = |definers: &HashMap<&str, Vec<RegionId>>| -> HashMap<String, RegionId> {
         definers
             .iter()
@@ -383,10 +392,17 @@ mod tests {
         assert_eq!(si(&out, 3), 2.0);
         assert_eq!(
             out.warnings,
-            vec![Warning::Redefinition {
-                name: "x".into(),
-                regions: vec![id(1), id(2)]
-            }]
+            vec![
+                Warning::Redefinition {
+                    name: "x".into(),
+                    regions: vec![id(1), id(2)]
+                },
+                // `r = x` evaluates, and nothing defines `r`.
+                Warning::UndefinedEvaluation {
+                    name: "r".into(),
+                    region: id(3)
+                }
+            ]
         );
     }
 

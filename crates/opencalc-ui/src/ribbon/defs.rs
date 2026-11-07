@@ -376,6 +376,7 @@ mod tests {
             CommandId::FindReplaceOne,     // the Find window
             CommandId::FindReplaceAll,     // the Find window
             CommandId::FindClose,          // the Find window
+            CommandId::CheckClose,         // the Check window
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog

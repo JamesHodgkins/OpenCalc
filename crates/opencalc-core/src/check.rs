@@ -95,6 +95,22 @@ pub fn check(ws: &Worksheet) -> Vec<Finding> {
                     });
                 }
             }
+            Warning::UndefinedEvaluation { name, region } => {
+                let source = match ws.region(*region).map(|r| &r.kind) {
+                    Some(RegionKind::Math(m)) => Some(m.source().to_owned()),
+                    _ => None,
+                };
+                findings.push(Finding {
+                    severity: Severity::Warning,
+                    region: *region,
+                    at: place(*region),
+                    message: format!(
+                        "'{name}' is not defined, so this only calculates the value; use := to define it"
+                    ),
+                    source,
+                    range: None,
+                });
+            }
         }
     }
     findings
@@ -122,6 +138,25 @@ mod tests {
     #[test]
     fn a_clean_worksheet_has_no_findings_and_blank_regions_are_fine() {
         assert!(check(&sheet(&["a := 1 m", "b := a * 2", "", "  "])).is_empty());
+    }
+
+    #[test]
+    fn an_equals_with_a_name_nothing_defines_is_flagged_but_ordinary_uses_are_not() {
+        let f = check(&sheet(&["b = 5 m"]));
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].severity, Severity::Warning);
+        assert!(f[0].message.contains("'b'") && f[0].message.contains(":="));
+        // Defined elsewhere, a unit, a constant, a bare `x =`, or no name: fine.
+        for ok in [
+            &["b := 1", "b = 2"][..],
+            &["m = 5"],
+            &["pi = 3"],
+            &["b := 1", "b ="],
+            &["2 + 3 ="],
+            &["f(x) := x", "f(2) ="],
+        ] {
+            assert!(check(&sheet(ok)).is_empty(), "{ok:?}");
+        }
     }
 
     #[test]
