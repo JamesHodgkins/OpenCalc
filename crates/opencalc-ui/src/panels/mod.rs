@@ -4,6 +4,7 @@
 pub mod about;
 pub mod dialogs;
 pub mod doc_tabs;
+pub mod find;
 pub mod functions;
 pub mod home;
 pub mod options;

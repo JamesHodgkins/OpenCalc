@@ -371,6 +371,11 @@ mod tests {
             CommandId::DialogDiscard,      // the unsaved-changes dialog
             CommandId::DialogCancel,       // the unsaved-changes dialog
             CommandId::UnitsClose,         // the Units window
+            CommandId::FindNext,           // the Find window, F3
+            CommandId::FindPrev,           // the Find window, Shift+F3
+            CommandId::FindReplaceOne,     // the Find window
+            CommandId::FindReplaceAll,     // the Find window
+            CommandId::FindClose,          // the Find window
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog

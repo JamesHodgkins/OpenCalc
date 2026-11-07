@@ -59,6 +59,8 @@ pub struct AppState {
     pub options_open: bool,
     /// The Units window (custom units).
     pub units_open: bool,
+    /// The Find and Replace window.
+    pub find: super::finding::FindState,
     /// The question or message in front of everything, if any.
     pub dialog: Option<Dialog>,
     /// Recently opened or saved files, newest first.
@@ -95,6 +97,7 @@ impl AppState {
             draft: false,
             options_open: false,
             units_open: false,
+            find: Default::default(),
             dialog: None,
             recent: Vec::new(),
             recoveries: Vec::new(),

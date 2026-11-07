@@ -57,6 +57,8 @@ pub enum Edit {
     SetCustomUnits(Vec<UnitDef>),
     /// Rename the worksheet.
     SetTitle(String),
+    /// Several edits as one: they apply in order, all or nothing, and undo as one.
+    Batch(Vec<Edit>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -90,6 +92,7 @@ pub struct Applied {
 fn touches_math(edit: &Edit) -> bool {
     match edit {
         Edit::SetMathSource { .. } | Edit::SetPlot { .. } | Edit::SetCustomUnits(_) => true,
+        Edit::Batch(edits) => edits.iter().any(touches_math),
         Edit::InsertRegions { regions } => regions
             .iter()
             .any(|(_, r)| matches!(r.kind, RegionKind::Math(_) | RegionKind::Plot(_))),
@@ -101,7 +104,13 @@ impl Worksheet {
     /// Apply an edit, all or nothing. On error the worksheet is unchanged.
     pub fn apply(&mut self, edit: Edit) -> Result<Applied, EditError> {
         let inverse = self.apply_inner(&edit)?;
-        let changed = inverse != edit;
+        let changed = match (&edit, &inverse) {
+            // A batch's inverse lists the inverses in reverse order.
+            (Edit::Batch(done), Edit::Batch(undo)) => {
+                done.iter().zip(undo.iter().rev()).any(|(a, b)| a != b)
+            }
+            _ => inverse != edit,
+        };
         if changed {
             self.revision += 1;
             // Insert and delete are inverses of each other, so checking both the
@@ -155,6 +164,23 @@ impl Worksheet {
                 &mut self.page,
                 page.sanitised(),
             ))),
+            Edit::Batch(edits) => {
+                let mut inverses = Vec::with_capacity(edits.len());
+                for edit in edits {
+                    match self.apply_inner(edit) {
+                        Ok(inverse) => inverses.push(inverse),
+                        Err(error) => {
+                            // Put back what was done, so a failure changes nothing.
+                            for inverse in inverses.iter().rev() {
+                                let _ = self.apply_inner(inverse);
+                            }
+                            return Err(error);
+                        }
+                    }
+                }
+                inverses.reverse();
+                Ok(Edit::Batch(inverses))
+            }
             Edit::SetTitle(title) => Ok(Edit::SetTitle(std::mem::replace(
                 &mut self.title,
                 title.clone(),

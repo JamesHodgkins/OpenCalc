@@ -49,6 +49,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
     if let Some(fx) = dispatch_file(state, command) {
         return Some(fx);
     }
+    if let Some(fx) = super::finding::dispatch_find(state, command) {
+        return Some(fx);
+    }
     let mut fx = Vec::new();
     match command {
         FileNew => {

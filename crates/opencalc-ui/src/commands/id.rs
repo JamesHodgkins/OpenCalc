@@ -114,6 +114,11 @@ commands! {
     EditRedo: "edit.redo", "Redo", icons::REDO;
     EditFind: "edit.find", "Find", icons::FIND;
     EditReplace: "edit.replace", "Replace", icons::REPLACE;
+    FindNext: "find.next", "Find next", icons::FIND;
+    FindPrev: "find.prev", "Find previous", icons::FIND;
+    FindReplaceOne: "find.replace_one", "Replace", icons::REPLACE;
+    FindReplaceAll: "find.replace_all", "Replace all", icons::REPLACE;
+    FindClose: "find.close", "Close Find", icons::CLOSE;
     // Regions.
     RegionDelete: "region.delete", "Delete", icons::DELETE;
     RegionLock: "region.lock", "Lock", icons::LOCK;
@@ -220,23 +225,24 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
-            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
-            | DialogDropRecovery | OpenRecent(_) | FileClose | FileExample | AppQuit | TabHome
-            | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea
-            | InsertPlot | InsertTable | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut
-            | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto | ViewFunctions
-            | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral | ThemeSlate
-            | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_)
-            | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_)
-            | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek
-            | InsertSymbol(_) => true,
-            ClipboardPaste | ClipboardCut | ClipboardCopy | EditFind | EditReplace | RegionLock
-            | RegionTag | FormatBold | FormatItalic | FormatDecimalsMore | FormatDecimalsLess
-            | FormatScientific | FormatEngineering | ArrangeAlignH | ArrangeAlignV
-            | ArrangeSeparate | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
-            | UnitsDisplayKn | UnitsDisplayReset | CalcCheck | WarnNext | WarnPrev
-            | InsertMatrix | InsertRange | HelpShortcuts | HelpGuide => false,
+            EditFind | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll
+            | FindClose | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen
+            | FileSave | FileSaveAs | DialogSave | DialogDiscard | DialogCancel | DialogOk
+            | DialogRestore | DialogDropRecovery | OpenRecent(_) | FileClose | FileExample
+            | AppQuit | TabHome | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText
+            | InsertArea | InsertPlot | InsertTable | InsertPicture | CalcAll | ViewZoomIn
+            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
+            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral
+            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
+            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
+            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
+            | InsertGreek | InsertSymbol(_) => true,
+            ClipboardPaste | ClipboardCut | ClipboardCopy | RegionLock | RegionTag | FormatBold
+            | FormatItalic | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
+            | FormatEngineering | ArrangeAlignH | ArrangeAlignV | ArrangeSeparate
+            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
+            | UnitsDisplayReset | CalcCheck | WarnNext | WarnPrev | InsertMatrix | InsertRange
+            | HelpShortcuts | HelpGuide => false,
         }
     }
 

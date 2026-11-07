@@ -8,6 +8,7 @@
 pub(crate) mod dispatch;
 mod files;
 pub(crate) mod filing;
+pub(crate) mod finding;
 mod frame;
 mod recovery;
 mod state;

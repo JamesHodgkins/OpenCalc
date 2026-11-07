@@ -98,6 +98,12 @@ impl App {
 
         panels::plot_window::show(ctx, &self.state, &mut panel_edits);
         panels::units::show(ctx, &self.state, &mut cmds, &mut panel_edits);
+        self.state.refresh_find();
+        let mut typed: Vec<super::finding::FindCmd> = Vec::new();
+        panels::find::show(ctx, &self.state, &mut cmds, &mut typed);
+        for cmd in typed {
+            self.state.apply_find(cmd);
+        }
         if let (Some(i), false) = (self.state.active, panel_edits.is_empty()) {
             let effects = super::dispatch::apply_canvas(&mut self.state, i, panel_edits);
             self.run_effects(ctx, effects);
@@ -122,6 +128,7 @@ impl App {
     }
 
     fn show_canvas(&mut self, ui: &mut egui::Ui, sheet: usize, ctx: &egui::Context) {
+        let found = self.state.found();
         let state = &mut self.state;
         let paper = crate::theme::Theme::paper();
         let env = canvas::Env {
@@ -134,6 +141,7 @@ impl App {
             snap: state.snap,
             text_box_focus: state.text_box_focus,
             draft: state.draft,
+            found: &found,
         };
         let open = &mut state.sheets[sheet];
         let out = canvas::show(

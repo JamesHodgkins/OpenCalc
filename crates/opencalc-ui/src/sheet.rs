@@ -166,6 +166,23 @@ impl OpenSheet {
         }
     }
 
+    /// Scroll so that region `id` is on screen, centring it if it is not already
+    /// wholly in view. `viewport` is the canvas size in screen pixels.
+    pub fn reveal(&mut self, id: RegionId, viewport: eframe::egui::Vec2) {
+        let Some(region) = self.doc.region(id) else {
+            return;
+        };
+        let rect = rect_of(region, &self.canvas.sizes);
+        let on_screen = Rect::from_min_size(Pos2::ZERO, viewport);
+        let shown = Rect::from_min_max(
+            (rect.min.to_vec2() * self.view.zoom + self.view.offset).to_pos2(),
+            (rect.max.to_vec2() * self.view.zoom + self.view.offset).to_pos2(),
+        );
+        if !on_screen.contains_rect(shown) {
+            self.view.offset = viewport / 2.0 - rect.center().to_vec2() * self.view.zoom;
+        }
+    }
+
     /// End the current gesture: the next edit starts a new undo step.
     pub fn seal(&mut self) {
         self.history.seal();

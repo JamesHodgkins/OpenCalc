@@ -44,6 +44,8 @@ pub struct Env<'a> {
     pub text_box_focus: bool,
     /// Draft View: one continuous sheet, no page edges or margin box.
     pub draft: bool,
+    /// Regions that hold matches for the open Find window.
+    pub found: &'a crate::app::finding::Found,
 }
 
 /// What the canvas asks the app to do after the frame.
@@ -193,6 +195,21 @@ pub fn show(
                 .rect_to_screen(rect_of(r, &st.sizes), origin)
                 .expand(2.0);
             painter.rect_stroke(screen, 2.0, outline, StrokeKind::Outside);
+        }
+    }
+
+    // Regions with a Find match: a light wash, stronger on the current one.
+    for r in regions.iter().filter(|r| env.found.regions.contains(&r.id)) {
+        let screen = view
+            .rect_to_screen(rect_of(r, &st.sizes), origin)
+            .expand(2.0);
+        let strong = env.found.current == Some(r.id);
+        let alpha = if strong { 90 } else { 45 };
+        let wash = eframe::egui::Color32::from_rgba_unmultiplied(255, 200, 0, alpha);
+        painter.rect_filled(screen, 2.0, wash);
+        if strong {
+            let edge = Stroke::new(1.5_f32, eframe::egui::Color32::from_rgb(230, 160, 0));
+            painter.rect_stroke(screen, 2.0, edge, StrokeKind::Outside);
         }
     }
 
