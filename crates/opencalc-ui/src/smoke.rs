@@ -20,9 +20,11 @@ use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
+mod arrange;
 mod export;
 mod files;
 mod find;
+mod text_edit;
 mod units;
 
 /// File dialogs that are never answered: a test must not open a real one.

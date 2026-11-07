@@ -1,7 +1,12 @@
 //! The in-place editor for the region being edited: the math editor for math
 //! regions, a text box for text regions.
 
-use eframe::egui::{Align2, FontId, Id, Key, Painter, Pos2, Rect, Stroke, TextEdit, Ui, Vec2};
+use eframe::egui::text::CCursor;
+use eframe::egui::text_edit::TextEditState;
+use eframe::egui::{
+    Align2, Event, FontId, Id, Key, Modifiers, Painter, Pos2, Rect, Stroke, TextEdit, Ui,
+    UiBuilder, Vec2,
+};
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::edit::Edit;
 
@@ -43,11 +48,62 @@ pub(super) fn edit_overlay(
                 screen.min,
                 Vec2::new(r.size.w * zoom, screen.height().max(40.0 * zoom)),
             );
-            let edit = TextEdit::multiline(&mut buf)
-                .id(widget_id)
-                .font(FontId::proportional(14.0 * zoom))
-                .desired_width(rect.width());
-            let resp = ui.put(rect, edit);
+            let focused = ui.memory(|m| m.has_focus(widget_id)) && !st.focus_edit;
+            // Ctrl+Enter ends the text and readies the next input, as Enter does in
+            // a math region (a plain Enter is a new line here).
+            if focused && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
+                next_input_below(st, r);
+                st.editing = None;
+                cmds.push(CanvasCmd::Seal);
+                return;
+            }
+            let before = TextEditState::load(ui.ctx(), widget_id)
+                .and_then(|s| s.cursor.char_range())
+                .filter(|range| range.primary == range.secondary)
+                .map(|range| range.primary.index);
+            let out = ui
+                .scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+                    TextEdit::multiline(&mut buf)
+                        .id(widget_id)
+                        .font(FontId::proportional(14.0 * zoom))
+                        .char_limit(opencalc_core::persist::MAX_TEXT_CHARS)
+                        .desired_width(rect.width())
+                        .show(ui)
+                })
+                .inner;
+            // An arrow that runs off the text leaves it for the crosshair, as in a
+            // math region. Only with no selection and no modifier held.
+            if let (true, Some(index)) = (focused, before) {
+                // The key event itself says which modifiers were held with it.
+                let pressed = |key| {
+                    ui.input(|i| {
+                        i.events.iter().any(|e| {
+                            matches!(e, Event::Key { key: k, pressed: true, modifiers, .. }
+                                if *k == key && modifiers.is_none())
+                        })
+                    })
+                };
+                let galley = &out.galley;
+                let row = galley.from_ccursor(CCursor::new(index)).rcursor.row;
+                let last_row = galley.rows.len().saturating_sub(1);
+                let len = buf.chars().count();
+                let leaving = [
+                    (Key::ArrowLeft, (-1, 0), index == 0),
+                    (Key::ArrowUp, (0, -1), row == 0),
+                    (Key::ArrowRight, (1, 0), index >= len),
+                    (Key::ArrowDown, (0, 1), row >= last_row),
+                ]
+                .into_iter()
+                .find(|(key, _, at_edge)| *at_edge && pressed(*key));
+                if let Some((_, dir, _)) = leaving {
+                    leave_toward(st, r, dir);
+                    ui.memory_mut(|m| m.surrender_focus(widget_id));
+                    st.editing = None;
+                    cmds.push(CanvasCmd::Seal);
+                    return;
+                }
+            }
+            let resp = out.response;
             let change = resp.changed().then_some(Edit::SetText { id, text: buf });
             (resp, change)
         }

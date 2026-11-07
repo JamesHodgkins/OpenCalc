@@ -13,7 +13,7 @@ use super::result::{self, Beside};
 use super::view::{CanvasView, GRID};
 use super::Env;
 use crate::format::format_value;
-use crate::layout::{Layout, Typesetter};
+use crate::layout::{Layout, Op, Typesetter};
 use crate::theme::{metrics, type_size, Theme};
 use opencalc_core::document::{MathRegion, Region, RegionKind};
 
@@ -75,6 +75,33 @@ fn plain(fonts: &eframe::egui::epaint::text::Fonts, s: &str, colour: Color32, si
     Typesetter::new(fonts, colour).layout(&Expr::Name(s.to_owned()), size)
 }
 
+/// Narrowest a wrapped message is made, in document units.
+const MIN_MESSAGE: f32 = 160.0;
+
+/// `s` on as many lines as it takes to fit `wrap` pixels. Long error messages
+/// would otherwise run off the page.
+fn wrapped(
+    fonts: &eframe::egui::epaint::text::Fonts,
+    s: &str,
+    colour: Color32,
+    size: f32,
+    wrap: f32,
+) -> Layout {
+    let galley = fonts.layout(s.to_owned(), FontId::proportional(size), colour, wrap);
+    let r = galley.rect;
+    let first = galley.rows.first().map_or(r.height(), |row| row.height());
+    Layout {
+        w: r.width(),
+        h: r.height(),
+        baseline: first * 0.78,
+        ops: vec![Op::Text {
+            at: Vec2::ZERO,
+            galley,
+        }],
+        marks: Vec::new(),
+    }
+}
+
 /// Paint one region with its top-left at `top_left` (screen). Returns the
 /// region's content size in document units, which the caller stores for
 /// auto-sized kinds. With `skip_content`, nothing is drawn but the size is still
@@ -129,14 +156,19 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
     let blank = source.trim().is_empty();
     let result = env.output.values.get(&r.id);
     let path = env.output.error_paths.get(&r.id).map(Vec::as_slice);
+    // How far a message beside the expression may reach: to the page's right margin.
+    let right = (env.page.size().0 - env.page.margin() - r.pos.x) * zoom;
+    let room =
+        |used: f32| (right - 2.0 * PAD * zoom - RESULT_GAP * zoom - used).max(MIN_MESSAGE * zoom);
     let (lay, res, bands) = ui.ctx().fonts(|f| {
         let t = Typesetter::new(f, theme.text);
-        let warn = |message: String| {
-            plain(
+        let warn = |message: String, used: f32| {
+            wrapped(
                 f,
                 &format!("{} {message}", crate::icons::WARNING),
                 theme.error,
                 size,
+                room(used),
             )
         };
         if blank {
@@ -160,7 +192,8 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
             } else {
                 typed
             };
-            return (typed, Some(warn(e.to_string())), bands);
+            let used = typed.w;
+            return (typed, Some(warn(e.to_string(), used)), bands);
         }
         // A definition or bare expression shows only what was typed; an
         // evaluation region (`x =`) also shows its answer. Errors always show.
@@ -173,7 +206,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 theme.text,
                 size,
             )),
-            Beside::Failed(e) => Some(warn(e.to_string())),
+            Beside::Failed(e) => Some(warn(e.to_string(), typed.w)),
         };
         // A name another region also defines: the last one wins, so say so here.
         let after = after.or_else(|| {

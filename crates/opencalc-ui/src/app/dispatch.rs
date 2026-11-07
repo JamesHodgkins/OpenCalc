@@ -106,6 +106,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             s.redo();
         }),
         CalcAll => fx.push(Effect::Recalculate),
+        ArrangeSeparate => separate_regions(state),
         FileExportPdf => fx.push(Effect::Export(crate::export::Kind::Pdf)),
         FileExportPng => fx.push(Effect::Export(crate::export::Kind::Png)),
         UnitsSi => set_unit_system(state, UnitSystem::Si),
@@ -252,6 +253,27 @@ fn set_page(state: &mut AppState, own_step: bool, change: impl FnOnce(&mut PageS
         }
         sheet.edit(Edit::SetPageSetup(page));
         if own_step {
+            sheet.seal();
+        }
+    }
+}
+
+/// Push overlapping regions apart (one undo step).
+fn separate_regions(state: &mut AppState) {
+    let Some(i) = state.active else { return };
+    let sheet = &mut state.sheets[i];
+    match crate::canvas::separate::separate(sheet.doc.regions(), &sheet.canvas.sizes) {
+        None => state.message(
+            "Separate regions",
+            format!(
+                "There are too many regions to separate (more than {}).",
+                crate::canvas::separate::MAX_REGIONS
+            ),
+        ),
+        Some(moves) if moves.is_empty() => {}
+        Some(moves) => {
+            sheet.seal();
+            sheet.edit(Edit::MoveRegions { moves });
             sheet.seal();
         }
     }

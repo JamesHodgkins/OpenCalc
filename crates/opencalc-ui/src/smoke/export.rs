@@ -129,6 +129,28 @@ fn results_and_errors_are_printed_as_on_screen() {
 }
 
 #[test]
+fn a_long_error_message_wraps_inside_the_margin_instead_of_running_off_the_page() {
+    let doc = sheet_with(&[("q := 1 kN + 1 m / (1 s^2)", 420.0, 100.0)]);
+    let p = pages(&doc, 1.0);
+    let img = &p[0];
+    // The right margin is at 794 - 76 = 718; a little slack for the last glyph.
+    assert_eq!(
+        dark_in(img, 730, 0, 794, 1123),
+        0,
+        "nothing past the margin"
+    );
+    // And it took more than one line to say it.
+    let rows: Vec<usize> = (90..400)
+        .filter(|y| dark_in(img, 420, *y, 720, *y + 1) > 0)
+        .collect();
+    let (first, last) = (rows[0], *rows.last().unwrap());
+    assert!(
+        last - first > 28,
+        "the message spans several lines: {first}..{last}"
+    );
+}
+
+#[test]
 fn png_files_decode_to_the_same_pixels() {
     let doc = sheet_with(&[("F := 10 kN", 100.0, 100.0)]);
     let img = &pages(&doc, 1.0)[0];

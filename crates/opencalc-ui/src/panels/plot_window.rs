@@ -55,7 +55,11 @@ fn field(
             .color(state.theme.text_weak),
     );
     let mut buffer = text.to_owned();
-    let response = ui.add(egui::TextEdit::singleline(&mut buffer).desired_width(f32::INFINITY));
+    let response = ui.add(
+        egui::TextEdit::singleline(&mut buffer)
+            .char_limit(opencalc_core::persist::MAX_TEXT_CHARS)
+            .desired_width(f32::INFINITY),
+    );
     if response.changed() {
         out.push(CanvasCmd::Edit(Edit::SetPlot {
             id,
