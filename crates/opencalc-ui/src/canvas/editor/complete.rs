@@ -47,10 +47,22 @@ pub fn word_before(field: &Field) -> Option<(usize, String)> {
     Some((start, chars[start..end].iter().collect()))
 }
 
-/// What to offer for `word`: defined names first, then functions, then units.
-/// A name that is already complete is not offered again, except a function, which
-/// still needs its bracket.
-pub fn candidates(word: &str, defined: &[String]) -> Vec<Candidate> {
+/// Whether the word comes straight after a number (`5 m`, `2.5kN`), where a unit
+/// is far more likely than a function.
+pub fn after_number(field: &Field, start: usize) -> bool {
+    let chars = field.chars();
+    let before = chars[..start.min(chars.len())]
+        .iter()
+        .rev()
+        .find(|c| **c != ' ');
+    before.is_some_and(|c| c.is_ascii_digit() || *c == '.')
+}
+
+/// What to offer for `word`. A name that is exactly what was typed comes first, so
+/// a variable you have already typed in full is still confirmed as defined (and `m`
+/// is offered before `mm`); then defined names, functions and units. A unit comes
+/// before the functions when `units_first` (the word follows a number).
+pub fn candidates(word: &str, defined: &[String], units_first: bool) -> Vec<Candidate> {
     let lower = word.to_lowercase();
     let matches = |name: &str| name.to_lowercase().starts_with(&lower);
     let mut out: Vec<Candidate> = Vec::new();
@@ -59,10 +71,7 @@ pub fn candidates(word: &str, defined: &[String]) -> Vec<Candidate> {
             out.push(c);
         }
     };
-    let mut names: Vec<&String> = defined
-        .iter()
-        .filter(|n| matches(n) && n.as_str() != word)
-        .collect();
+    let mut names: Vec<&String> = defined.iter().filter(|n| matches(n)).collect();
     names.sort_by_key(|n| (!n.starts_with(word), n.len(), (*n).clone()));
     for n in names {
         push(Candidate {
@@ -72,8 +81,9 @@ pub fn candidates(word: &str, defined: &[String]) -> Vec<Candidate> {
             kind: Kind::Variable,
         });
     }
+    let mut functions: Vec<Candidate> = Vec::new();
     for f in FUNCTIONS.iter().filter(|f| matches(f.name)) {
-        push(Candidate {
+        functions.push(Candidate {
             label: f.name.to_owned(),
             insert: format!("{}(", f.name),
             detail: format!("{}  \u{2014} {}", f.signature, f.summary),
@@ -81,25 +91,34 @@ pub fn candidates(word: &str, defined: &[String]) -> Vec<Candidate> {
         });
     }
     if matches("if") {
-        push(Candidate {
+        functions.push(Candidate {
             label: "if".to_owned(),
             insert: "if(".to_owned(),
             detail: "if(condition, then, otherwise)  \u{2014} one of two values".to_owned(),
             kind: Kind::Function,
         });
     }
-    let mut units: Vec<&str> = builtin_symbols()
-        .filter(|u| matches(u) && *u != word)
-        .collect();
+    let mut units: Vec<&str> = builtin_symbols().filter(|u| matches(u)).collect();
     units.sort_by_key(|u| (!u.starts_with(word), u.len(), (*u).to_owned()));
+    let mut unit_list: Vec<Candidate> = Vec::new();
     for u in units {
-        push(Candidate {
+        unit_list.push(Candidate {
             label: u.to_owned(),
             insert: u.to_owned(),
             detail: "unit".to_owned(),
             kind: Kind::Unit,
         });
     }
+    let (first, second) = if units_first {
+        (unit_list, functions)
+    } else {
+        (functions, unit_list)
+    };
+    for c in first.into_iter().chain(second) {
+        push(c);
+    }
+    // Stable, so the order above is kept within each group.
+    out.sort_by_key(|c| c.insert.trim_end_matches('(') != word);
     out.truncate(MAX_SHOWN);
     out
 }
@@ -117,7 +136,8 @@ pub fn for_field(field: &mut Field, defined: &[String]) -> (usize, Vec<Candidate
     if !field.typing || field.dismissed.is_some() || field.has_selection() {
         return (start, Vec::new());
     }
-    (start, candidates(&word, defined))
+    let units_first = after_number(field, start);
+    (start, candidates(&word, defined, units_first))
 }
 
 #[cfg(test)]
@@ -146,13 +166,11 @@ mod tests {
     #[test]
     fn functions_defined_names_and_units_are_offered_in_that_order() {
         let defined = vec!["sigma_y".to_owned(), "s1".to_owned()];
-        let got = candidates("s", &defined);
+        let got = candidates("s", &defined, false);
         let labels: Vec<&str> = got.iter().map(|c| c.label.as_str()).collect();
-        assert_eq!(
-            &labels[..2],
-            ["s1", "sigma_y"],
-            "defined names first, shortest first"
-        );
+        // `s` is itself a unit (seconds), so what was typed leads; then the
+        // defined names, shortest first.
+        assert_eq!(&labels[..3], ["s", "s1", "sigma_y"]);
         assert!(labels.contains(&"sin") || labels.contains(&"sqrt"));
         assert!(got.len() <= MAX_SHOWN);
         let kinds: Vec<Kind> = got.iter().map(|c| c.kind).collect();
@@ -165,18 +183,18 @@ mod tests {
 
     #[test]
     fn a_function_inserts_its_bracket_and_a_complete_name_is_not_offered_again() {
-        let got = candidates("sqr", &[]);
+        let got = candidates("sqr", &[], false);
         assert_eq!(got.first().map(|c| c.insert.as_str()), Some("sqrt("));
         assert!(got[0].detail.contains("sqrt"));
         // The exact name of a function still offers it (to add the bracket).
-        assert!(candidates("sqrt", &[]).iter().any(|c| c.insert == "sqrt("));
-        // A variable already typed in full is not offered.
-        assert!(candidates("F", &["F".to_owned()])
+        assert!(candidates("sqrt", &[], false)
             .iter()
-            .all(|c| c.insert != "F"));
+            .any(|c| c.insert == "sqrt("));
         // Matching ignores case, so `kn` finds `kN`.
-        assert!(candidates("kn", &[]).iter().any(|c| c.insert == "kN"));
-        assert!(candidates("zzzzz", &["a".to_owned()]).is_empty());
+        assert!(candidates("kn", &[], false)
+            .iter()
+            .any(|c| c.insert == "kN"));
+        assert!(candidates("zzzzz", &["a".to_owned()], false).is_empty());
     }
 
     #[test]
@@ -185,7 +203,7 @@ mod tests {
         let mut seen = 0;
         for first in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_\u{3c3}F".chars() {
             for second in ["", "a", "e", "i", "o", "m", "N", "_", "1"] {
-                for c in candidates(&format!("{first}{second}"), &defined) {
+                for c in candidates(&format!("{first}{second}"), &defined, false) {
                     seen += 1;
                     let name = c.insert.trim_end_matches('(');
                     assert!(
@@ -208,6 +226,42 @@ mod tests {
             }
         }
         assert!(seen > 100, "only {seen} candidates checked");
+    }
+
+    #[test]
+    fn what_was_typed_in_full_is_offered_first_so_a_defined_name_is_confirmed() {
+        // `b` is defined: it leads, ahead of units that merely start with b.
+        let got = candidates("b", &["b".to_owned(), "beam".to_owned()], false);
+        assert_eq!(got[0].insert, "b");
+        assert_eq!(got[0].kind, Kind::Variable);
+        assert!(got.iter().any(|c| c.insert == "beam"));
+        // `m` is a unit and leads `mm`, `min` and the functions starting with m.
+        let got = candidates("m", &[], false);
+        assert_eq!((got[0].insert.as_str(), got[0].kind), ("m", Kind::Unit));
+        assert!(got.iter().any(|c| c.insert == "mm"));
+        // A defined name is not shadowed by a unit of the same name.
+        let got = candidates("m", &["m".to_owned()], false);
+        assert_eq!(got[0].kind, Kind::Variable);
+        assert_eq!(got.iter().filter(|c| c.insert == "m").count(), 1);
+    }
+
+    #[test]
+    fn after_a_number_units_come_before_functions() {
+        let kinds = |units_first| -> Vec<Kind> {
+            candidates("m", &[], units_first)
+                .iter()
+                .skip(1)
+                .map(|c| c.kind)
+                .collect()
+        };
+        let plain = kinds(false);
+        let after = kinds(true);
+        assert_eq!(plain.first(), Some(&Kind::Function));
+        assert_eq!(after.first(), Some(&Kind::Unit));
+        assert!(after_number(&Field::new("5 m"), 2));
+        assert!(after_number(&Field::new("2.5m"), 3));
+        assert!(!after_number(&Field::new("a + m"), 4));
+        assert!(!after_number(&Field::new("m"), 0));
     }
 
     #[test]

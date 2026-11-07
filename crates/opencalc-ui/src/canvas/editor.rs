@@ -286,6 +286,11 @@ fn copy(ui: &Ui, field: &Field) {
     }
 }
 
+/// Whether the choice is exactly the word already typed.
+fn is_complete(field: &Field, c: &Candidate) -> bool {
+    complete::word_before(field).is_some_and(|(_, w)| c.insert == w)
+}
+
 /// Type the chosen entry in place of the word before the caret.
 fn accept(field: &mut Field, start: usize, c: &Candidate) {
     field.replace(start, field.caret, &c.insert);
@@ -307,6 +312,10 @@ fn key_down(
     let len = field.len();
     let listing = !list.is_empty();
     match key {
+        // A name typed in full that is the top choice: Enter is just "done".
+        Key::Enter if listing && is_complete(field, &list[field.pick.min(list.len() - 1)]) => {
+            return true;
+        }
         Key::Enter | Key::Tab if listing => {
             accept(field, start, &list[field.pick.min(list.len() - 1)]);
         }

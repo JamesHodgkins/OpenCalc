@@ -255,4 +255,4 @@ The specification must be internally consistent. Before saving it, perform a fin
 - contradictory acceptance criteria; and
 - unbalanced Markdown fences or malformed links.
 
-Write the completed specification to the derived path in `private_material/`. In the final response, report the saved path, the baseline scope, the principal deferred compatibility items, and any Mathcad behavior that remains undocumented. Do not implement the feature unless separately asked.
+Write the completed specification to the derived path in `private/`. In the final response, report the saved path, the baseline scope, the principal deferred compatibility items, and any Mathcad behavior that remains undocumented. Do not implement the feature unless separately asked.

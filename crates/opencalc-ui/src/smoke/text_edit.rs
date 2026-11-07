@@ -149,3 +149,19 @@ fn a_text_region_cannot_grow_past_what_a_file_can_hold() {
     // So the worksheet can still be saved.
     assert!(opencalc_core::persist::save_bytes(&h.sheet().doc).is_ok());
 }
+
+#[test]
+fn enter_after_a_name_typed_in_full_finishes_instead_of_taking_a_longer_suggestion() {
+    let mut h = Harness::new();
+    h.settle();
+    h.new_math();
+    h.type_text("b:=1");
+    h.press_key(Key::Enter, Modifiers::NONE);
+    // `b` is defined, and units such as `bar` start with it; Enter must not pick one.
+    h.new_math();
+    h.type_text("b");
+    h.press_key(Key::Enter, Modifiers::NONE);
+    assert!(h.sheet().canvas.editing.is_none(), "Enter ended the edit");
+    let last = h.sheet().doc.regions().last().unwrap();
+    assert!(matches!(&last.kind, RegionKind::Math(m) if m.source() == "b"));
+}
