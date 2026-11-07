@@ -297,10 +297,7 @@ fn apply(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
 
 /// Built-in named constants, used when no variable or unit has the name.
 fn constant(name: &str) -> Result<Value, ()> {
-    match name {
-        "i" => Ok(Value::complex(0.0, 1.0)),
-        _ => Err(()),
-    }
+    crate::constants::constant(name).ok_or(())
 }
 
 fn binary(op: BinaryOp, a: &Value, b: &Value) -> Result<Value, ValueError> {

@@ -2,6 +2,7 @@
 //! functions, the names defined in the worksheet and the units. Pure, so every rule
 //! is tested without a window.
 
+use opencalc_core::constants::CONSTANTS;
 use opencalc_core::functions::FUNCTIONS;
 use opencalc_core::units::builtin_symbols;
 
@@ -13,6 +14,7 @@ pub const MAX_SHOWN: usize = 8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Variable,
+    Constant,
     Function,
     Unit,
 }
@@ -79,6 +81,14 @@ pub fn candidates(word: &str, defined: &[String], units_first: bool) -> Vec<Cand
             insert: n.clone(),
             detail: "defined in this worksheet".to_owned(),
             kind: Kind::Variable,
+        });
+    }
+    for c in CONSTANTS.iter().filter(|c| matches(c.name)) {
+        push(Candidate {
+            label: c.name.to_owned(),
+            insert: c.name.to_owned(),
+            detail: format!("constant \u{2014} {}", c.summary),
+            kind: Kind::Constant,
         });
     }
     let mut functions: Vec<Candidate> = Vec::new();
@@ -267,6 +277,19 @@ mod tests {
         let got = candidates("m", &["m".to_owned()], false);
         assert_eq!(got[0].kind, Kind::Variable);
         assert_eq!(got.iter().filter(|c| c.insert == "m").count(), 1);
+    }
+
+    #[test]
+    fn constants_follow_defined_names_and_a_definition_takes_the_constants_place() {
+        let got = candidates("p", &["pressure".to_owned()], false);
+        let labels: Vec<&str> = got.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(&labels[..2], ["pressure", "pi"]);
+        assert_eq!(got[1].kind, Kind::Constant);
+        assert_eq!(candidates("g_", &[], false)[0].insert, "g_n");
+        assert_eq!(candidates("\u{3c0}", &[], false)[0].insert, "\u{3c0}");
+        let own = candidates("pi", &["pi".to_owned()], false);
+        assert_eq!(own.iter().filter(|c| c.insert == "pi").count(), 1);
+        assert_eq!(own[0].kind, Kind::Variable);
     }
 
     #[test]

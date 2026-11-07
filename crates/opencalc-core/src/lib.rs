@@ -4,6 +4,7 @@
 //! CLI both build on it, and it is the part tested most heavily.
 
 pub mod check;
+pub mod constants;
 pub mod document;
 pub mod edit;
 pub mod eval;

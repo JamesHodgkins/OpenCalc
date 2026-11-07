@@ -62,6 +62,8 @@ impl Dimension {
     pub const FORCE: Dimension = Dimension::new([1, 1, -2, 0, 0, 0, 0]);
     /// Force / length^2.
     pub const PRESSURE: Dimension = Dimension::new([-1, 1, -2, 0, 0, 0, 0]);
+    pub const VELOCITY: Dimension = Dimension::new([1, 0, -1, 0, 0, 0, 0]);
+    pub const ACCELERATION: Dimension = Dimension::new([1, 0, -2, 0, 0, 0, 0]);
     pub const AREA: Dimension = Dimension::new([2, 0, 0, 0, 0, 0, 0]);
 
     const fn new(e: [i8; 7]) -> Self {
