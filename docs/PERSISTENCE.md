@@ -1,8 +1,8 @@
 # Persistence design (Milestone 3A): save, open, check
 
-Status: **accepted** (decisions in section 8 settled: ZIP, `.ocx`, native dialogs via `rfd`, revision-based dirty).
+Status: **implemented** (decisions in section 8 settled: ZIP, `.ocx`, native dialogs via `rfd`, revision-based dirty).
 
-**Progress:** S1 to S5 done (S5: `opencalc-ui/src/app/recovery.rs`) (S4: `opencalc-cli check`, `opencalc-core/src/check.rs`) (S3: Save, Save As, Open, recent files, dirty dot, close and quit prompts, window-close guard, drag and drop, `opencalc FILE`; tests in `opencalc-ui/src/smoke/files.rs`). S1 done (`opencalc-core/src/persist*`, `tests/persist.rs`, fixtures in
+**Progress:** all steps S1 to S6 done (S6: `docs/FILE_FORMAT.md`, checked by `tests/file_format_doc.rs`) (S5: `opencalc-ui/src/app/recovery.rs`) (S4: `opencalc-cli check`, `opencalc-core/src/check.rs`) (S3: Save, Save As, Open, recent files, dirty dot, close and quit prompts, window-close guard, drag and drop, `opencalc FILE`; tests in `opencalc-ui/src/smoke/files.rs`). S1 done (`opencalc-core/src/persist*`, `tests/persist.rs`, fixtures in
 `tests/fixtures/v1/`). Measured on the reference machine: save of 500 regions 0.9 ms,
 load 2.1 ms (budget 20 ms each, in the benchmark gate).
 
