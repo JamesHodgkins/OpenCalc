@@ -1,6 +1,6 @@
 # Persistence design (Milestone 3A): save, open, check
 
-Status: **proposed**. Decisions in section 8 need an answer before step S1.
+Status: **accepted** (decisions in section 8 settled: ZIP, `.ocx`, native dialogs via `rfd`, revision-based dirty).
 
 ## 1. Where we are
 
@@ -29,7 +29,7 @@ Status: **proposed**. Decisions in section 8 need an answer before step S1.
 
 ## 3. The file
 
-Extension `.ocalc` (see decision 2). A ZIP (deflate) holding:
+Extension `.ocx` (see decision 2). A ZIP (deflate) holding:
 
 ```
 manifest.json    {"format_version":1,"app":"opencalc 0.0.1"}
@@ -92,7 +92,7 @@ cannot (bad unit, duplicate IDs) refuses the file with the reason.
 | Action | Behaviour |
 |---|---|
 | Save (Ctrl+S) | Untitled: asks for a path (Save As). Otherwise writes to the same path. The dirty mark clears only after the write succeeds. |
-| Save As (Ctrl+Shift+S) | Native dialog, `.ocalc` filter; adds the extension; asks before replacing. |
+| Save As (Ctrl+Shift+S) | Native dialog, `.ocx` filter; adds the extension; asks before replacing. |
 | Open (Ctrl+O) | Native dialog; a file already open just switches to its tab; the sheet opens fitted, clean history. A failure shows a message with the path and the reason. |
 | Dirty mark | A dot before the tab title and in the window title. |
 | Close tab / Quit with unsaved changes | In-app dialog: Save, Don't save, Cancel (naming the worksheet). Quit asks once per modified sheet. Cancel keeps everything. |
@@ -122,7 +122,7 @@ the app data folder for an untitled sheet, using the same atomic write. The main
 changes only on an explicit save. At startup, a recovery file newer than its
 worksheet (or one with no worksheet) prompts Restore or Discard; a clean save and a
 clean close delete it. `*.oc.recovery` is already ignored by git; the pattern will be
-updated to `*.ocalc.recovery`.
+updated to `*.ocx.recovery`.
 
 ## 8. Decisions needed
 
@@ -131,8 +131,7 @@ updated to `*.ocalc.recovery`.
    the first asset arrives, as a version bump). *Recommendation: ZIP now.* The
    migration chain exists either way, and pictures and CSV import are both in this
    milestone, so a later switch would cost a migration for little saving.
-2. **Extension.** `.ocalc` (recommended: short, specific, no known clash), `.opencalc`,
-   or `.oc` (SPEC's folder name, but it is also used by other tools).
+2. **Extension.** `.ocx` (chosen; matches `.odx` in OpenDraft). Rejected: `.ocalc`, `.opencalc`, `.oc`.
 3. **File dialogs.** `rfd` for native dialogs (recommended), or an in-app file
    browser (more work, looks the same on every platform, no new dependency).
 4. **Dirty tracking.** Revision-based (recommended, simple, errs towards "modified"),
