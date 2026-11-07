@@ -61,6 +61,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
     if let Some(fx) = super::formatting::dispatch_format(state, command) {
         return Some(fx);
     }
+    if let Some(fx) = super::arranging::dispatch_arrange(state, command) {
+        return Some(fx);
+    }
     if let Some(fx) = super::checking::dispatch_check(state, command) {
         return Some(fx);
     }

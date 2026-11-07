@@ -132,6 +132,7 @@ impl AppState {
             has_sheet: sheet.is_some(),
             has_selection: sheet.is_some_and(|s| !s.canvas.selection.is_empty()),
             selects_math: !super::formatting::selected_formats(self).is_empty(),
+            selects_several: sheet.is_some_and(|s| s.canvas.selection.len() > 1),
             selects_text: !super::formatting::selected_styles(self).is_empty(),
             can_undo: sheet.is_some_and(OpenSheet::can_undo),
             can_redo: sheet.is_some_and(OpenSheet::can_redo),

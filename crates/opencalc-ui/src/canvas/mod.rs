@@ -8,6 +8,7 @@
 
 mod abandon;
 pub mod adapt;
+pub mod align;
 mod editor;
 mod errors;
 pub mod hit;

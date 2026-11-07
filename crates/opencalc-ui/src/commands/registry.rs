@@ -16,6 +16,8 @@ pub struct CommandContext {
     pub selects_math: bool,
     /// The selection includes a text region (bold and italic apply to those).
     pub selects_text: bool,
+    /// Two or more regions are selected (aligning needs a pair).
+    pub selects_several: bool,
     pub can_undo: bool,
     pub can_redo: bool,
     /// A math region is open for editing (symbols can be inserted into it).
@@ -123,6 +125,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
                     | UnitsDisplayKn
                     | UnitsDisplayReset
             ))
+        && (ctx.selects_several || !matches!(command, ArrangeAlignH | ArrangeAlignV))
         && (ctx.selects_text || !matches!(command, FormatBold | FormatItalic))
         && (ctx.can_undo || command != EditUndo)
         && (ctx.can_redo || command != EditRedo)
@@ -153,6 +156,7 @@ mod tests {
             has_selection,
             selects_math: has_selection,
             selects_text: has_selection,
+            selects_several: has_selection,
             can_undo,
             can_redo,
             editing_math: has_sheet,

@@ -82,3 +82,66 @@ fn separating_a_tidy_worksheet_changes_nothing_and_records_nothing() {
     assert!(!h.app.state.sheets[0].can_undo());
     assert!(h.app.state.dialog.is_none());
 }
+
+fn three(h: &mut Harness) -> [opencalc_core::document::RegionId; 3] {
+    let s = &mut h.app.state.sheets[0];
+    let a = s.add(RegionKind::math("a := 1"), Point::new(60.0, 700.0));
+    let b = s.add(RegionKind::math("b := 2"), Point::new(300.0, 660.0));
+    let c = s.add(RegionKind::math("c := 3"), Point::new(180.0, 760.0));
+    [a, b, c]
+}
+
+fn select(h: &mut Harness, ids: &[opencalc_core::document::RegionId]) {
+    h.app.state.sheets[0].canvas.selection = ids.to_vec();
+    h.frame();
+}
+
+#[test]
+fn align_horizontally_lines_the_selection_up_in_a_row_as_one_undo_step() {
+    let mut h = Harness::new();
+    h.settle();
+    let [a, b, c] = three(&mut h);
+    select(&mut h, &[a, b, c]);
+    h.command(CommandId::ArrangeAlignH);
+    for id in [a, b, c] {
+        assert_eq!(h.region_pos(id).y, 660.0, "the highest top");
+    }
+    assert_eq!(
+        (h.region_pos(a).x, h.region_pos(b).x, h.region_pos(c).x),
+        (60.0, 300.0, 180.0),
+        "x is untouched"
+    );
+    h.command(CommandId::EditUndo);
+    assert_eq!(
+        (h.region_pos(a).y, h.region_pos(b).y, h.region_pos(c).y),
+        (700.0, 660.0, 760.0)
+    );
+}
+
+#[test]
+fn align_vertically_lines_the_selection_up_in_a_column() {
+    let mut h = Harness::new();
+    h.settle();
+    let [a, b, c] = three(&mut h);
+    select(&mut h, &[a, b, c]);
+    h.command(CommandId::ArrangeAlignV);
+    for id in [a, b, c] {
+        assert_eq!(h.region_pos(id).x, 60.0, "the leftmost edge");
+    }
+    assert_eq!(h.region_pos(c).y, 760.0, "y is untouched");
+}
+
+#[test]
+fn aligning_needs_two_regions_and_leaves_the_unselected_alone() {
+    let mut h = Harness::new();
+    h.settle();
+    let [a, b, c] = three(&mut h);
+    select(&mut h, &[a]);
+    assert!(!h.app.registry().allows(CommandId::ArrangeAlignH));
+    assert!(!h.app.registry().allows(CommandId::ArrangeAlignV));
+    select(&mut h, &[a, c]);
+    assert!(h.app.registry().allows(CommandId::ArrangeAlignH));
+    h.command(CommandId::ArrangeAlignH);
+    assert_eq!(h.region_pos(c).y, 700.0);
+    assert_eq!(h.region_pos(b).y, 660.0, "not selected, not moved");
+}
