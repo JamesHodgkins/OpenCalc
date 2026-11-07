@@ -140,6 +140,30 @@ pub fn for_field(field: &mut Field, defined: &[String]) -> (usize, Vec<Candidate
     (start, candidates(&word, defined, units_first))
 }
 
+/// Whether an `=` typed now should be `:=`: the region holds nothing but one name,
+/// the caret is after it, and nothing in the worksheet, the units or the constants
+/// has that name. Evaluating a name that means nothing is only ever an error, so
+/// the person almost certainly meant to define it. Anything else stays as typed.
+pub fn defines_by_equals(field: &Field, defined: &[String]) -> bool {
+    let chars = field.chars();
+    if field.has_selection() || field.caret != chars.len() || chars.is_empty() {
+        return false;
+    }
+    let name: String = chars.iter().collect();
+    let is_name = (chars[0].is_alphabetic() || chars[0] == '_')
+        && chars.iter().all(|c| c.is_alphanumeric() || *c == '_');
+    if !is_name || defined.contains(&name) {
+        return false;
+    }
+    // Units and constants are known to the evaluator; ask it.
+    let id = opencalc_core::eval::RegionId(0);
+    let known = opencalc_core::eval::evaluate(&[(id, opencalc_core::parser::parse(&name))]);
+    matches!(
+        known.values.get(&id),
+        Some(Err(opencalc_core::eval::EvalError::Undefined(_)))
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

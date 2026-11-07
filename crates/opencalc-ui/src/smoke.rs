@@ -1387,12 +1387,12 @@ fn typing_after_a_click_on_blank_page_starts_a_math_region_there() {
 }
 
 #[test]
-fn typing_without_a_blank_click_creates_nothing() {
+fn typing_on_a_fresh_worksheet_starts_a_region_at_the_insertion_point() {
     let mut h = Harness::new();
     h.settle();
     let count = h.sheet().doc.regions().len();
     h.frame_with(vec![Event::Text("x".into())]);
-    assert_eq!(h.sheet().doc.regions().len(), count);
+    assert_eq!(h.sheet().doc.regions().len(), count + 1);
 }
 
 #[test]
@@ -1408,7 +1408,6 @@ fn deleting_the_region_being_edited_closes_the_editor() {
         h.sheet().canvas.editing.is_none(),
         "no editor on a gone region"
     );
-    h.type_text("zzz");
     h.press_key(Key::ArrowLeft, Modifiers::NONE);
     h.command(CommandId::EditUndo);
     h.settle();
