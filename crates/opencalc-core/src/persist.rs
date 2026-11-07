@@ -10,6 +10,7 @@
 //! panics, hangs or allocates without bound.
 
 mod container;
+mod file;
 mod migrate;
 mod validate;
 
@@ -20,6 +21,7 @@ use crate::registry::RegistryError;
 use crate::FORMAT_VERSION;
 
 pub use container::{MAX_ENTRIES, MAX_FILE_BYTES, MAX_MANIFEST_BYTES, MAX_WORKSHEET_BYTES};
+pub use file::{read_limited, write_atomic};
 pub use migrate::{run as run_migrations, Step};
 pub use validate::{Repair, MAX_COORD, MAX_CUSTOM_UNITS, MAX_EXTENT, MAX_REGIONS, MAX_TEXT_CHARS};
 
