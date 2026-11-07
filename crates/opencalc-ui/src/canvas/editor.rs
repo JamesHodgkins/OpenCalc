@@ -7,6 +7,7 @@
 //! goes, and draws.
 
 mod complete;
+mod greek;
 mod popup;
 mod text;
 
@@ -334,6 +335,7 @@ fn key_down(
         Key::Backspace => field.backspace(),
         Key::Delete => field.delete(),
         Key::A if mods.command => field.select_all(),
+        Key::G if mods.command => _ = field.swap_greek(),
         Key::Space if mods.command => grow(field, lay),
         Key::Home => field.set_caret(0, shift),
         Key::End => field.set_caret(len, shift),

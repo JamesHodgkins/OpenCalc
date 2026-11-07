@@ -198,3 +198,22 @@ fn an_equals_after_a_lone_undefined_name_becomes_a_definition() {
     assert_eq!(typed(&mut h, "x:=2"), "x:=2", "already a definition");
     assert_eq!(typed(&mut h, "f(x)=x"), "f(x)=x", "left alone");
 }
+
+#[test]
+fn ctrl_g_turns_the_letter_before_the_caret_into_its_greek_letter_and_back() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("A:=2p");
+    h.press_key(Key::G, Modifiers::COMMAND);
+    assert_eq!(h.source_of(id), "A:=2\u{3c0}");
+    h.press_key(Key::G, Modifiers::COMMAND);
+    assert_eq!(h.source_of(id), "A:=2p");
+    h.press_key(Key::G, Modifiers::COMMAND);
+    h.type_text("*r");
+    h.press_key(Key::G, Modifiers::COMMAND);
+    assert_eq!(h.source_of(id), "A:=2\u{3c0}*\u{3c1}");
+    // Typing continues normally after it.
+    h.type_text("^2");
+    assert_eq!(h.source_of(id), "A:=2\u{3c0}*\u{3c1}^2");
+}
