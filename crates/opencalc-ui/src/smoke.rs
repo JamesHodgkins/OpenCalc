@@ -1393,3 +1393,30 @@ fn enter_readies_the_next_input_below_and_typing_starts_it() {
     assert_eq!(h.source_of(id), "b");
     assert_eq!(h.source_of(first), "a := 1", "the first input is untouched");
 }
+
+#[test]
+fn ctrl_space_grows_the_selection_through_the_expression_and_typing_replaces_it() {
+    let mut h = Harness::new();
+    h.settle();
+    let id = h.new_math();
+    h.type_text("1 + a / b");
+    h.press_key(Key::ArrowLeft, Modifiers::NONE);
+    h.press_key(Key::Space, Modifiers::COMMAND);
+    let sel = |h: &Harness| {
+        h.sheet()
+            .canvas
+            .field
+            .as_ref()
+            .expect("editing")
+            .selection()
+    };
+    assert_eq!(sel(&h), (8, 9), "the denominator");
+    h.press_key(Key::Space, Modifiers::COMMAND);
+    assert_eq!(sel(&h), (4, 9), "the whole fraction");
+    h.press_key(Key::Space, Modifiers::COMMAND);
+    assert_eq!(sel(&h), (0, 9), "the whole sum");
+    h.press_key(Key::Space, Modifiers::COMMAND);
+    assert_eq!(sel(&h), (0, 9), "nothing larger");
+    h.press_key(Key::Backspace, Modifiers::NONE);
+    assert_eq!(h.source_of(id), "");
+}

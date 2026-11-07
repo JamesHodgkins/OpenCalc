@@ -192,6 +192,34 @@ impl SourceLayout {
         }
     }
 
+    /// The next larger piece of the expression around the selection `a..b`: the
+    /// smallest node range (with or without its brackets) that contains it and is
+    /// bigger. With nothing selected, the node under the caret. Repeating it climbs
+    /// the expression tree; at the top it returns `(a, b)` unchanged.
+    pub fn grow(&self, a: usize, b: usize) -> (usize, usize) {
+        if a == b {
+            let (s, e) = self.enclosing(a);
+            if s < e && s <= a && a <= e {
+                return (s, e);
+            }
+        }
+        fn walk(n: &SpanNode, a: usize, b: usize, best: &mut Option<(usize, usize)>) {
+            for s in [n.inner, n.outer] {
+                let bigger = s.start <= a && b <= s.end && (s.start, s.end) != (a, b);
+                let smaller = best.is_none_or(|(x, y)| s.end - s.start < y - x);
+                if bigger && smaller {
+                    *best = Some((s.start, s.end));
+                }
+            }
+            for k in &n.kids {
+                walk(k, a, b, best);
+            }
+        }
+        let mut best = None;
+        walk(&self.spans, a, b, &mut best);
+        best.unwrap_or((a, b))
+    }
+
     /// The offset whose caret is nearest `point` (relative to the layout's top left).
     /// When several offsets share a place, the first one.
     pub fn offset_at(&self, point: Pos2) -> usize {
@@ -557,6 +585,40 @@ mod tests {
                 "between the operands: the whole sum"
             );
             assert_eq!(l.enclosing(15), (0, 15), "the end of the source");
+        });
+    }
+
+    #[test]
+    fn grow_climbs_the_expression_one_level_at_a_time_and_stops_at_the_top() {
+        with_fonts(|fonts| {
+            let l = lay(fonts, "alpha + (b * c)");
+            assert_eq!(l.grow(11, 11), (9, 14), "from the caret, the node under it");
+            assert_eq!(l.grow(9, 14), (8, 15), "then the node with its brackets");
+            assert_eq!(l.grow(8, 15), (0, 15), "then the whole sum");
+            assert_eq!(l.grow(0, 15), (0, 15), "nothing above the top");
+            assert_eq!(lay(fonts, "").grow(0, 0), (0, 0), "an empty source");
+        });
+    }
+
+    #[test]
+    fn grow_always_returns_a_range_that_contains_the_selection() {
+        with_fonts(|fonts| {
+            for src in [
+                "a / b",
+                "x ^ (2 + 1)",
+                "sqrt(a + b) * [1, 2]",
+                "f(x, y) +",
+                "(1 +",
+            ] {
+                let l = lay(fonts, src);
+                let n = src.chars().count();
+                for a in 0..=n {
+                    for b in a..=n {
+                        let (s, e) = l.grow(a, b);
+                        assert!(s <= a && b <= e && e <= n, "{src}: {a}..{b} -> {s}..{e}");
+                    }
+                }
+            }
         });
     }
 

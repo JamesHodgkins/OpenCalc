@@ -183,10 +183,13 @@ The cursor specification is implemented as follows. The caret is transient UI st
 - Click-and-type: after a click on blank page, the first printable text creates a math
   region at the crosshair and opens it (not while another box, such as Functions
   search, has the keyboard).
+- Ctrl+Space grows the selection one level of the expression at a time (name, then
+  its brackets, then the enclosing operand, and so on up to the whole source). Space
+  alone stays an ordinary space. Deleting the selection is the structural delete.
 - Up/Down keep a goal x across repeated presses (`Field::goal_x`).
 - An insertion cut short by the 8,192-character limit shows a notice under the region.
 - Sources over the limit are never truncated; editing is refused with a message.
 
-Deferred, as in the specification: structural term selection and operator-aware
-deletion, cross-region keyboard traversal, placeholder traversal, text-region caret,
+Deferred, as in the specification: shrinking a selection, paired-bracket deletion,
+operator-aware deletion, cross-region keyboard traversal, placeholder traversal, text-region caret,
 IME verification, and validation against a named Mathcad Prime release.

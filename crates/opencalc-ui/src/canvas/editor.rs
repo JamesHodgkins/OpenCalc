@@ -306,6 +306,11 @@ fn key_down(
         Key::Backspace => field.backspace(),
         Key::Delete => field.delete(),
         Key::A if mods.command => field.select_all(),
+        Key::Space if mods.command => {
+            let (a, b) = field.selection();
+            let (s, e) = lay.grow(a, b);
+            field.select(s, e);
+        }
         Key::Home => field.set_caret(0, shift),
         Key::End => field.set_caret(len, shift),
         Key::ArrowLeft | Key::ArrowRight => {
