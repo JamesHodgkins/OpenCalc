@@ -13,6 +13,7 @@ pub mod matrix;
 pub mod options;
 pub mod page_setup;
 pub mod plot_window;
+pub mod shortcuts;
 pub mod status;
 pub mod title;
 pub mod units;

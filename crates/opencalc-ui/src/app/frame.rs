@@ -116,6 +116,7 @@ impl App {
         }
 
         panels::about::show(ctx, &self.state, &mut cmds);
+        panels::shortcuts::show(ctx, &self.state, &mut cmds);
         panels::options::show(ctx, &self.state, &mut cmds);
         panels::page_setup::show(ctx, &self.state, &mut cmds);
         panels::dialogs::show(ctx, &self.state, &mut cmds);

@@ -2,7 +2,7 @@
 //! available right now. Every user action goes through here (rule R5).
 
 mod id;
-mod keys;
+pub mod keys;
 mod registry;
 
 pub use id::{greek_by_name, greek_symbols, CommandId};

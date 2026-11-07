@@ -191,6 +191,7 @@ commands! {
     ViewResetLayout: "view.reset_layout", "Reset layout", icons::RESET;
     // Help.
     HelpShortcuts: "help.shortcuts", "Shortcuts", icons::KEYBOARD;
+    HelpShortcutsClose: "help.shortcuts_close", "Close Shortcuts", icons::CLOSE;
     HelpGuide: "help.guide", "User guide", icons::BOOK;
     HelpAbout: "help.about", "About", icons::INFO;
     HelpAboutClose: "help.about_close", "Close About", icons::CLOSE;
@@ -240,14 +241,15 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            RegionTag | LabelClose | RegionLock | ArrangeAlignH | ArrangeAlignV | FormatBold
-            | FormatItalic | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
-            | UnitsDisplayKn | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess
-            | FormatScientific | FormatEngineering | ClipboardPaste | ClipboardCut
-            | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind
-            | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose
-            | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave
-            | FileSaveAs | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
+            HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
+            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | UnitsDisplayM
+            | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
+            | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
+            | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
+            | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace
+            | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
+            | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
+            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
             | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..)
             | MatrixClose | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext
             | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
@@ -260,7 +262,7 @@ impl CommandId {
             | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
                 true
             }
-            HelpShortcuts | HelpGuide => false,
+            HelpGuide => false,
         }
     }
 

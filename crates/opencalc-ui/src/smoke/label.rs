@@ -105,3 +105,21 @@ fn a_finding_carries_the_label_and_the_label_is_saved() {
     let loaded = load_bytes(&save_bytes(&h.sheet().doc).unwrap()).unwrap();
     assert_eq!(loaded.worksheet.region(b).unwrap().label, "Column load");
 }
+
+#[test]
+fn the_shortcuts_window_opens_draws_and_closes() {
+    let mut h = Harness::new();
+    h.settle();
+    assert!(h.app.registry().allows(CommandId::HelpShortcuts));
+    h.command(CommandId::HelpShortcuts);
+    assert!(h.app.state.shortcuts_open);
+    h.frame();
+    h.frame();
+    h.command(CommandId::HelpShortcutsClose);
+    assert!(!h.app.state.shortcuts_open);
+    // It also opens from the Home page, where there is no worksheet.
+    h.command(CommandId::TabHome);
+    h.command(CommandId::HelpShortcuts);
+    h.frame();
+    assert!(h.app.state.shortcuts_open);
+}

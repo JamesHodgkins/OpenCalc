@@ -61,6 +61,8 @@ pub struct AppState {
     pub units_open: bool,
     /// The region whose Label window is open.
     pub label_for: Option<opencalc_core::document::RegionId>,
+    /// The Keyboard shortcuts window.
+    pub shortcuts_open: bool,
     /// The Insert Matrix window.
     pub matrix_open: bool,
     /// The Check Worksheet window and the problems it lists.
@@ -106,6 +108,7 @@ impl AppState {
             options_open: false,
             units_open: false,
             label_for: None,
+            shortcuts_open: false,
             matrix_open: false,
             check: Default::default(),
             find: Default::default(),

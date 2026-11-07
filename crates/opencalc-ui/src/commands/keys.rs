@@ -70,7 +70,30 @@ pub const BINDINGS: &[Binding] = &[
 
 /// The first binding for a command, as tooltip text such as `Ctrl+Shift+A`.
 pub fn shortcut_text(command: CommandId) -> Option<String> {
-    let b = BINDINGS.iter().find(|b| b.command == command)?;
+    BINDINGS
+        .iter()
+        .find(|b| b.command == command)
+        .map(binding_text)
+}
+
+/// Every command that has a shortcut, in binding order, with all of its shortcuts
+/// (`Ctrl+Shift+Z / Ctrl+Y`), for the Shortcuts window.
+pub fn listed() -> Vec<(CommandId, String)> {
+    let mut out: Vec<(CommandId, String)> = Vec::new();
+    for b in BINDINGS {
+        let text = binding_text(b);
+        match out.iter_mut().find(|(c, _)| *c == b.command) {
+            Some((_, all)) => {
+                all.push_str(" / ");
+                all.push_str(&text);
+            }
+            None => out.push((b.command, text)),
+        }
+    }
+    out
+}
+
+fn binding_text(b: &Binding) -> String {
     let mut text = String::new();
     if b.mods.command || b.mods.ctrl {
         text.push_str("Ctrl+");
@@ -82,7 +105,7 @@ pub fn shortcut_text(command: CommandId) -> Option<String> {
         text.push_str("Alt+");
     }
     text.push_str(&key_label(b.key));
-    Some(text)
+    text
 }
 
 fn key_label(key: Key) -> String {
@@ -98,6 +121,26 @@ fn key_label(key: Key) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_listing_has_every_bound_command_once_with_all_its_keys() {
+        let list = listed();
+        for b in BINDINGS {
+            assert!(list.iter().any(|(c, _)| *c == b.command), "{:?}", b.command);
+        }
+        let commands: Vec<CommandId> = list.iter().map(|(c, _)| *c).collect();
+        for (k, c) in commands.iter().enumerate() {
+            assert!(!commands[..k].contains(c), "{c:?} listed twice");
+        }
+        let redo = list
+            .iter()
+            .find(|(c, _)| *c == CommandId::EditRedo)
+            .unwrap();
+        assert_eq!(redo.1, "Ctrl+Shift+Z / Ctrl+Y");
+        for (c, text) in &list {
+            assert!(text.starts_with(&shortcut_text(*c).unwrap()), "{c:?}");
+        }
+    }
 
     #[test]
     fn shortcut_text_is_derived_from_the_binding() {

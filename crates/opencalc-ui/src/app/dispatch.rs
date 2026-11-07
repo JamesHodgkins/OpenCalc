@@ -180,6 +180,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         }
         // The large button on the Symbols panel opens its flyout (the ribbon does that).
         InsertGreek => {}
+        HelpShortcuts => state.shortcuts_open = true,
+        HelpShortcutsClose => state.shortcuts_open = false,
         HelpAbout => state.about_open = true,
         HelpAboutClose => state.about_open = false,
 
