@@ -101,7 +101,7 @@ the decisions in `DATA_IO.md` section 7.
 - [ ] Headers and footers (first page and following pages), with page-number fields; in PDF export.
 - [ ] Page background styles.
 - [ ] Rich text in text regions (needs bold/italic font files, TD-24).
-- [ ] Region borders.
+- [x] Region borders: `Region.border`, `Edit::SetBorder`, Math Formatting > Region > Border toggle; drawn on the page and in exports.
 - [ ] Content protection: password-protected regions and hidden content (needs a security design before code).
 - [ ] Templates (`.ocxt`, mirroring the worksheet format).
 - [ ] Global definitions `≡` (needs worksheet-qualified region IDs, TD-23).
@@ -134,6 +134,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-08 | Phase 5: region borders. |
 | 2026-11-08 | Phase 4: Picture region (PNG import with limits, embedded, drawn on the page and in exports, undoable). |
 | 2026-11-08 | Phase 4: CSV import and export for tables (file dialogs behind the `Files` trait; bad files change nothing). |
 | 2026-11-08 | Phase 4: Table region (format 2, placeholder migration, evaluation as a matrix definition, painting, table window); CSV decimal-mark option. |
