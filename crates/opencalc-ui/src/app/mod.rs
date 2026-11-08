@@ -47,6 +47,8 @@ pub struct App {
     files: Box<dyn Files>,
     /// Whether `.ocx` files open in this program (a setting of the system).
     pub(crate) file_type: Box<dyn association::FileType>,
+    /// Files that other copies of the program were asked to open.
+    incoming: Option<std::sync::mpsc::Receiver<Vec<PathBuf>>>,
     /// The system clipboard.
     pub(crate) clipboard: Box<dyn Clipboard>,
     /// Set once quitting has been decided, so closing the window is let through.
@@ -90,6 +92,7 @@ impl App {
             ribbon_state: RibbonState::default(),
             queue: Vec::new(),
             files,
+            incoming: None,
             clipboard: Box::new(MemoryClipboard::default()),
             file_type: Box::new(association::MemoryFileType::default()),
             allow_close: false,
@@ -103,6 +106,28 @@ impl App {
         };
         app.recalculate();
         app
+    }
+
+    /// Open, as tabs, the files that later copies of the program send here.
+    pub fn listen_for_files(&mut self, receiver: std::sync::mpsc::Receiver<Vec<PathBuf>>) {
+        self.incoming = Some(receiver);
+    }
+
+    /// Open what other copies have sent, and bring the window forward for each.
+    pub(crate) fn poll_incoming(&mut self, ctx: &egui::Context) {
+        let mut batches = Vec::new();
+        if let Some(receiver) = &self.incoming {
+            while let Ok(paths) = receiver.try_recv() {
+                batches.push(paths);
+            }
+        }
+        for paths in batches {
+            for path in paths {
+                self.open_path(&path);
+            }
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        }
     }
 
     /// Read from the system whether `.ocx` files open here, for the Options window.

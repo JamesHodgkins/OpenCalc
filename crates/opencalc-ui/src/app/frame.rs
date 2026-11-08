@@ -14,6 +14,7 @@ impl App {
     /// window or an `eframe::Frame`.
     pub fn frame(&mut self, ctx: &egui::Context) {
         self.poll_worker();
+        self.poll_incoming(ctx);
         self.queue_shortcuts(ctx);
         self.window_events(ctx);
         let theme = self.state.theme;
