@@ -56,4 +56,32 @@ pub(super) const CALCULUS: &[FunctionDef] = &[
         AtLeast(3),
         evaluated_elsewhere
     ),
+    function!(
+        "find",
+        "find(x, y, ..., c1, c2, ...)",
+        "Solve constraints for the unknowns x, y, ... starting from their worksheet values; constraints use ==, <, <=, > or >=; an error if they cannot all be met",
+        AtLeast(2),
+        evaluated_elsewhere
+    ),
+    function!(
+        "minerr",
+        "minerr(x, y, ..., c1, c2, ...)",
+        "Like find, but returns the best point reached even if the constraints are not all met (check the result)",
+        AtLeast(2),
+        evaluated_elsewhere
+    ),
+    function!(
+        "minimize",
+        "minimize(f, x, y, ..., c1, ...)",
+        "A local minimum of f in the unknowns x, y, ... near their worksheet values, subject to optional constraints",
+        AtLeast(2),
+        evaluated_elsewhere
+    ),
+    function!(
+        "maximize",
+        "maximize(f, x, y, ..., c1, ...)",
+        "A local maximum of f in the unknowns x, y, ... near their worksheet values, subject to optional constraints",
+        AtLeast(2),
+        evaluated_elsewhere
+    ),
 ];

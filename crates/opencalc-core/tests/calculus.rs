@@ -83,14 +83,14 @@ fn a_form_inside_a_function_uses_the_functions_parameters() {
 #[test]
 fn the_step_budget_stops_a_runaway_sum() {
     let out = run(&["sum_over(1, k, 1, 5000000)"], None);
-    assert!(matches!(error(&out, 1), EvalError::Invalid(m) if m.contains("repeated evaluations")));
+    assert!(matches!(error(&out, 1), EvalError::OutOfBudget(_)));
 }
 
 #[test]
 fn nested_forms_share_one_budget() {
     // 2000 x 2000 inner evaluations is far over the budget.
     let out = run(&["sum_over(sum_over(1, j, 1, 2000), k, 1, 2000)"], None);
-    assert!(matches!(error(&out, 1), EvalError::Invalid(m) if m.contains("repeated evaluations")));
+    assert!(matches!(error(&out, 1), EvalError::OutOfBudget(_)));
 }
 
 #[test]

@@ -1,6 +1,9 @@
 # Solve blocks: design (Phase 2.2)
 
-Status: **proposal, nothing built.** Needs the decisions in section 7 before code.
+Status: **Stage 1 built (2026-11-08); Stage 2 not started.** The decisions in section 7 were
+settled as recommended (staged approach, the syntax below, strict tolerance, `find` is an
+error on failure, mixed-dimension unknowns refused for now). Section 9 records where the
+build differs from, or adds to, the proposal.
 Roadmap context: `ROADMAP.md` Phase 2.2. Written 2026-11-08.
 
 Labels: **[PTC]** documented by PTC, **[inferred]** inferred from PTC or community
@@ -166,3 +169,34 @@ Complex unknowns; symbolic solving; `odesolve`/`pdesolve`; MultiStart; user-chos
 algorithms; the nonlinear "KNITRO" class of constrained solvers; matrix unknowns;
 parameterised solutions (`f(a) := find(x, ...)` works as an ordinary user function
 only if a function body may use forms, which it may).
+
+## 9. Stage 1 as built
+
+Code: `eval/calculus/solve.rs` (arguments, constraints, the four forms), `solve/lm.rs`
+(Levenberg-Marquardt and a small dense solver), `solve/bfgs.rs` (BFGS and the
+augmented-Lagrangian penalty), `expr/forms.rs` (the form tables and how a solver call's
+arguments divide into unknowns, objective and constraints; shared with dependency
+analysis). Tests: unit tests in each numerical file, `tests/solve.rs`, corpus
+`tests/corpus/solve.calc`.
+
+Differences from, and additions to, the proposal:
+
+- **Signed residuals.** Levenberg-Marquardt drives the *signed* difference of an equation
+  to zero (clamped at zero only for an inequality). The first version used the absolute
+  value, whose kink at the solution made the finite-difference Jacobian useless once a
+  step was smaller than the distance to it; it stalled about 1e-7 short. A regression test
+  (`ln(a) == 1`, `sqrt(a - 1) == 2`, `a^2 == c`) guards it.
+- **Tolerance.** `find` and `minerr` hold constraints to `1e-9` relative to their sides,
+  with a floor of `1e-14` of their starting size. `minimize` and `maximize` reach
+  constraints through a penalty method and are held to `1e-7`. Both are fixed.
+- **Out of budget** is its own error kind (`EvalError::OutOfBudget`), so a solver can tell a
+  rejected trial point (any ordinary error, even a domain error) from an order to stop
+  (out of budget, cancelled: `EvalError::is_stop`).
+- **The guess matters.** A local method from the wrong side of a constraint can stall
+  between pulls (`find(a, a^2 == 4, a < 0)` from `a := 1`). `find` then reports an error
+  and never a wrong point; `minerr` returns the best point; a better guess fixes it. A
+  test records this. MultiStart is not built.
+- **The constraint limit of 64 is a backstop:** a region holds at most 128 symbols, so a call
+  that long does not parse.
+- **Optimising forms** return the unknowns only (not the objective's value); a function
+  unbounded below is the error "did not converge".

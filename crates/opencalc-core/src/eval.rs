@@ -55,6 +55,9 @@ pub enum EvalError {
     /// returned as a number: a silent NaN or infinity is a wrong answer.
     #[error("result is not a finite number")]
     NotFinite,
+    /// One region needed more repeated evaluations than the budget allows.
+    #[error("the calculation needs more than {0} repeated evaluations")]
+    OutOfBudget(u64),
     /// The calculation was stopped because a newer edit made it stale. The result
     /// is never shown: it is replaced by the newer calculation's.
     #[error("calculation cancelled")]
@@ -62,6 +65,14 @@ pub enum EvalError {
     /// A bug in the evaluator was caught. The worker survives and reports this.
     #[error("internal error: {0}")]
     Internal(String),
+}
+
+impl EvalError {
+    /// The calculation must stop altogether (budget spent or cancelled), unlike an
+    /// ordinary error, which a solver may treat as a rejected trial point.
+    pub fn is_stop(&self) -> bool {
+        matches!(self, EvalError::OutOfBudget(_) | EvalError::Cancelled)
+    }
 }
 
 impl From<ValueError> for EvalError {

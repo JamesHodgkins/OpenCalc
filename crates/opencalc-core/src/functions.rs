@@ -242,7 +242,7 @@ pub fn category(name: &str) -> &'static str {
         }
         "factorial" | "combin" | "permut" | "isprime" => "Number theory",
         "sum_over" | "product_over" | "integrate" | "derivative" | "limit" => "Calculus",
-        "root" | "polyroots" => "Solving",
+        "root" | "polyroots" | "find" | "minerr" | "minimize" | "maximize" => "Solving",
         _ => "Other",
     }
 }

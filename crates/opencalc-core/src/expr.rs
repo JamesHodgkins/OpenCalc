@@ -2,7 +2,12 @@
 //! quantities, operators, calls and assignment. Layout nodes (fraction, root)
 //! are included because the typesetting prototype needs them.
 
+mod forms;
 mod print;
+
+pub use forms::{
+    is_binding_form, is_solver_form, solver_parts, SolverParts, BINDING_FORMS, SOLVER_FORMS,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -33,22 +38,6 @@ pub enum AssignKind {
     Define,
     /// `=`
     Evaluate,
-}
-
-/// Functions whose second argument names a variable that exists only inside the
-/// call (`integrate(x ^ 2, x, 0, 1)`). The evaluator treats them specially, and
-/// that variable is not a name the worksheet has to define.
-pub const BINDING_FORMS: &[&str] = &[
-    "sum_over",
-    "product_over",
-    "integrate",
-    "derivative",
-    "limit",
-    "root",
-];
-
-pub fn is_binding_form(name: &str) -> bool {
-    BINDING_FORMS.contains(&name)
 }
 
 /// The name of the variable that sets where indexing starts, as in Mathcad.
@@ -275,6 +264,31 @@ impl Expr {
             Expr::Binary { lhs, rhs, .. } => {
                 lhs.collect_names(out);
                 rhs.collect_names(out);
+            }
+            Expr::Call { name, args } if is_solver_form(name) => {
+                // The unknowns are read from the worksheet as starting values; inside
+                // the objective and constraints they are the call's own variables.
+                let Ok(parts) = solver_parts(name, args) else {
+                    return args.iter().for_each(|a| a.collect_names(out));
+                };
+                let own: Vec<&str> = parts.unknowns.iter().map(|(_, n)| *n).collect();
+                for n in &own {
+                    if !out.iter().any(|o| o == n) {
+                        out.push((*n).to_owned());
+                    }
+                }
+                let mut inner = Vec::new();
+                if let Some(f) = parts.objective {
+                    f.collect_names(&mut inner);
+                }
+                for (_, c) in &parts.constraints {
+                    c.collect_names(&mut inner);
+                }
+                for n in inner {
+                    if !own.contains(&n.as_str()) && !out.contains(&n) {
+                        out.push(n);
+                    }
+                }
             }
             Expr::Call { name, args } if is_binding_form(name) => {
                 // The bound variable is local: the body does not read it from the

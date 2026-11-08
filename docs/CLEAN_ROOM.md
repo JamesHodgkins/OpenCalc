@@ -24,6 +24,7 @@ clean-room rules in `SPEC.md` section 9.1.
 | 2026-11-06 | OpenDraft desktop app (the owner's own project, GPL-3.0-or-later): `crates/od-ui` theme, ribbon, menus, document tabs; `ui_plan.md`; `CLAUDE.md` | Visual style tokens, ribbon structure and sizes, window layout, engineering conventions | Read for design only. No code copied (decided: SPEC section 4.11, option 1). |
 | 2026-11-08 | SMath Studio forum threads and bug tracker on temperature units (search-result summaries; pages not opened) | The idea of separate delta units for temperature differences, and the trap that `-5 degC` reads as `-(5 degC)` | Behaviour only, from public forum posts of 2012 to 2019; nothing copied. The owner states Mathcad also stores temperature in kelvin (not verified from PTC documentation) |
 | 2026-11-08 | PTC Community forum threads on angle units in Mathcad Prime (search-result summaries; pages not opened) | That a bare number is radians, that `deg` is an alias for pi/180, and that inverse functions give radians | User-reported behaviour from public forum posts, not PTC documentation; nothing copied |
+| 2026-11-08 | PTC Mathcad help: system of equations functions (find, minerr), https://support.ptc.com/help/mathcad/r11.0/en/PTC_Mathcad_Help/system_of_equations_functions.html; PTC Community posts on solve-block tolerances (search-result summaries) | Solve-block rules: a guess for each unknown, scalar or vector result, Levenberg-Marquardt, minerr returning the best point reached | Public documentation and user-reported behaviour; nothing copied. Which inequality operators are allowed and what find returns on failure are not stated there, so those are repository decisions (`SOLVE_BLOCKS.md`) |
 
 ## Code provenance
 No source code has been taken from any other project yet. Two third-party font
@@ -43,6 +44,8 @@ Algorithms (Tarjan SCC, Pratt parsing) are standard textbook techniques written
 from scratch. The same holds for the Phase 2.1 numerical methods, written from
 their published descriptions: adaptive Gauss-Kronrod quadrature (the G7/K15
 nodes and weights are the standard published constants), Ridders' extrapolated
-central differences, Richardson extrapolation, Brent's root-finding method and
-Aberth-Ehrlich simultaneous root iteration. No code from QUADPACK,
+central differences, Richardson extrapolation, Brent's root-finding method,
+Aberth-Ehrlich simultaneous root iteration, Levenberg-Marquardt least squares,
+BFGS quasi-Newton minimisation with a backtracking line search, and the
+augmented-Lagrangian method for constraints. No code from QUADPACK,
 Numerical Recipes or any other library was copied.

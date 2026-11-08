@@ -155,6 +155,7 @@ fn kind_of(e: &EvalError) -> &'static str {
         EvalError::Arity(..) => "arity",
         EvalError::Invalid(_) => "invalid",
         EvalError::Cancelled => "cancelled",
+        EvalError::OutOfBudget(_) => "budget",
         EvalError::Internal(_) => "internal",
         // An error inside a function is judged by what went wrong inside it.
         EvalError::InFunction { error, .. } | EvalError::InPlot { error, .. } => kind_of(error),
@@ -589,6 +590,7 @@ fn kinds_documented_in_the_readme_are_all_produced_by_some_error() {
         ("arity", EvalError::Arity("f".into(), 1)),
         ("invalid", EvalError::Invalid("x".into())),
         ("cancelled", EvalError::Cancelled),
+        ("budget", EvalError::OutOfBudget(1)),
         ("internal", EvalError::Internal("x".into())),
     ]);
     for kind in documented {

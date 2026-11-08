@@ -36,9 +36,7 @@ impl<'a> Meter<'a> {
             return Err(EvalError::Cancelled);
         }
         if steps > MAX_STEPS {
-            return Err(EvalError::Invalid(format!(
-                "the calculation needs more than {MAX_STEPS} repeated evaluations"
-            )));
+            return Err(EvalError::OutOfBudget(MAX_STEPS));
         }
         Ok(())
     }
@@ -59,7 +57,7 @@ mod tests {
         for _ in 0..MAX_STEPS {
             m.charge().unwrap();
         }
-        assert!(matches!(m.charge(), Err(EvalError::Invalid(_))));
+        assert_eq!(m.charge(), Err(EvalError::OutOfBudget(MAX_STEPS)));
         assert_eq!(m.steps(), MAX_STEPS + 1);
     }
 

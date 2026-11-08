@@ -21,6 +21,7 @@ use crate::value::{Scalar, Value};
 mod quadrature;
 mod ridders;
 mod roots;
+mod solve;
 
 /// Most terms a sum or product may have.
 const MAX_BOUND: f64 = 1e9;
@@ -33,6 +34,7 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
         "derivative" => derivative(args, cx),
         "limit" => limit(args, cx),
         "root" => root(args, cx),
+        "find" | "minerr" | "minimize" | "maximize" => solve::evaluate(name, args, cx),
         _ => Err(Located::here(EvalError::UnknownFunction(name.to_owned()))),
     }
 }
