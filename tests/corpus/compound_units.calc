@@ -1,0 +1,23 @@
+# source: original; compound units worked by hand (60 mi = 96560.64 m, 1 hr = 3600 s, 1 kWh = 3.6e6 J)
+highway := 60 mi / hr
+city := 100 km / hr
+work := 5 kN * 2 m
+power := 5 kN * 2 m / 4 s
+energy_bill := 2 kW * 3 hr
+spring := 6 kN / 2 m
+flow := 90 L / min
+density := 1000 kg / m ^ 3
+stiffness_in_lbf := 10 lbf / in
+accel_in_g := 9.80665 m / s ^ 2
+cancels := (12 m / s) * (3 s) / (6 m)
+=> highway = 26.8224 m / s
+=> city = 250 m / (9 s)
+=> work = 10000 N * m
+=> power = 2500 W
+=> energy_bill = 21600000 J
+=> spring = 3000 N / m
+=> flow = 0.0015 m ^ 3 / s
+=> density = 1000 kg / m ^ 3
+=> stiffness_in_lbf = 1751.26835246476 N / m
+=> accel_in_g = 9.80665 m / s ^ 2
+=> cancels = 6

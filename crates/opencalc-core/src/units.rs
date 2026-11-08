@@ -69,6 +69,10 @@ impl Dimension {
     pub const VELOCITY: Dimension = Dimension::new([1, 0, -1, 0, 0, 0, 0]);
     pub const ACCELERATION: Dimension = Dimension::new([1, 0, -2, 0, 0, 0, 0]);
     pub const AREA: Dimension = Dimension::new([2, 0, 0, 0, 0, 0, 0]);
+    /// Mass / length^3.
+    pub const DENSITY: Dimension = Dimension::new([-3, 1, 0, 0, 0, 0, 0]);
+    /// Force / length, such as a spring stiffness.
+    pub const FORCE_PER_LENGTH: Dimension = Dimension::new([0, 1, -2, 0, 0, 0, 0]);
     pub const VOLUME: Dimension = Dimension::new([3, 0, 0, 0, 0, 0, 0]);
     pub const CURRENT: Dimension = Dimension::new([0, 0, 0, 1, 0, 0, 0]);
     pub const TEMPERATURE: Dimension = Dimension::new([0, 0, 0, 0, 1, 0, 0]);

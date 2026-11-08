@@ -40,6 +40,10 @@ const SI: &[(&str, Dimension, f64)] = &[
     ("kV", Dimension::VOLTAGE, 1e3),
     ("ohm", Dimension::RESISTANCE, 1.0),
     ("kohm", Dimension::RESISTANCE, 1e3),
+    ("m/s", Dimension::VELOCITY, 1.0),
+    ("m/s\u{00b2}", Dimension::ACCELERATION, 1.0),
+    ("kg/m\u{00b3}", Dimension::DENSITY, 1.0),
+    ("N/m", Dimension::FORCE_PER_LENGTH, 1.0),
 ];
 
 const USCS: &[(&str, Dimension, f64)] = &[
@@ -55,6 +59,18 @@ const USCS: &[(&str, Dimension, f64)] = &[
     ("ksi", Dimension::PRESSURE, 6_894_757.293_168_36),
     ("in\u{00b3}", Dimension::VOLUME, 0.0254 * 0.0254 * 0.0254),
     ("ft\u{00b3}", Dimension::VOLUME, 0.3048 * 0.3048 * 0.3048),
+    ("ft/s", Dimension::VELOCITY, 0.3048),
+    ("ft/s\u{00b2}", Dimension::ACCELERATION, 0.3048),
+    (
+        "lb/ft\u{00b3}",
+        Dimension::DENSITY,
+        0.453_592_37 / (0.3048 * 0.3048 * 0.3048),
+    ),
+    (
+        "lbf/in",
+        Dimension::FORCE_PER_LENGTH,
+        4.448_221_615_260_5 / 0.0254,
+    ),
 ];
 
 const CGS: &[(&str, Dimension, f64)] = &[
@@ -65,6 +81,10 @@ const CGS: &[(&str, Dimension, f64)] = &[
     ("dyn", Dimension::FORCE, 1e-5),
     ("Ba", Dimension::PRESSURE, 0.1),
     ("cm\u{00b3}", Dimension::VOLUME, 1e-6),
+    ("cm/s", Dimension::VELOCITY, 1e-2),
+    ("cm/s\u{00b2}", Dimension::ACCELERATION, 1e-2),
+    ("g/cm\u{00b3}", Dimension::DENSITY, 1e3),
+    ("dyn/cm", Dimension::FORCE_PER_LENGTH, 1e-3),
 ];
 
 /// A system's display units for a dimension. A dimension the system has no unit
@@ -108,7 +128,7 @@ fn display_unit(system: UnitSystem, dim: Dimension, magnitude: f64) -> (String, 
         .or_else(|| options.iter().min_by(|a, b| a.1.total_cmp(&b.1)));
     match chosen {
         Some((label, scale)) => ((*label).to_owned(), *scale),
-        None => (si_base(dim), 1.0),
+        None => compound_unit(system, dim),
     }
 }
 
@@ -267,29 +287,63 @@ pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) ->
     }
 }
 
-/// A dimension as SI base units, such as `kg*m^-1*s^-2`.
-fn si_base(d: Dimension) -> String {
-    let parts = [
-        ("m", d.length),
-        ("kg", d.mass),
-        ("s", d.time),
-        ("A", d.current),
-        ("K", d.temperature),
-        ("mol", d.amount),
-        ("cd", d.luminosity),
+/// The units a system writes mass, length and time in, with their scale to SI;
+/// the other four base dimensions use SI units in every system.
+fn base_units(system: UnitSystem) -> [(&'static str, f64); 7] {
+    let (length, mass) = match system {
+        UnitSystem::Si => (("m", 1.0), ("kg", 1.0)),
+        UnitSystem::Uscs => (("ft", 0.3048), ("lb", 0.453_592_37)),
+        UnitSystem::Cgs => (("cm", 1e-2), ("g", 1e-3)),
+    };
+    [
+        mass,
+        length,
+        ("s", 1.0),
+        ("A", 1.0),
+        ("K", 1.0),
+        ("mol", 1.0),
+        ("cd", 1.0),
+    ]
+}
+
+/// A dimension with no named display unit, written out in the system's base
+/// units as numerator over denominator: `lb*ft/s`, `kg/(m*s)`, `1/s^2`. Returns
+/// the label and the scale to divide SI values by.
+fn compound_unit(system: UnitSystem, d: Dimension) -> (String, f64) {
+    let exps = [
+        d.mass,
+        d.length,
+        d.time,
+        d.current,
+        d.temperature,
+        d.amount,
+        d.luminosity,
     ];
-    let shown: Vec<String> = parts
-        .iter()
-        .filter(|(_, e)| *e != 0)
-        .map(|(u, e)| {
-            if *e == 1 {
-                (*u).to_owned()
-            } else {
-                format!("{u}^{e}")
-            }
-        })
-        .collect();
-    shown.join("*")
+    let units = base_units(system);
+    let (mut top, mut bottom) = (Vec::new(), Vec::new());
+    let mut scale = 1.0;
+    for ((symbol, unit_scale), e) in units.iter().zip(exps) {
+        if e == 0 {
+            continue;
+        }
+        scale *= unit_scale.powi(i32::from(e));
+        let power = match e.unsigned_abs() {
+            1 => (*symbol).to_owned(),
+            n => format!("{symbol}^{n}"),
+        };
+        if e > 0 { &mut top } else { &mut bottom }.push(power);
+    }
+    let numerator = if top.is_empty() {
+        "1".to_owned()
+    } else {
+        top.join("*")
+    };
+    let label = match bottom.len() {
+        0 => numerator,
+        1 => format!("{numerator}/{}", bottom[0]),
+        _ => format!("{numerator}/({})", bottom.join("*")),
+    };
+    (label, scale)
 }
 
 #[cfg(test)]
@@ -342,16 +396,16 @@ mod tests {
     }
 
     #[test]
-    fn a_dimension_with_no_unit_in_the_system_falls_back_to_si() {
-        // Time has "s" everywhere; an unlisted dimension shows SI base units.
-        // Volume has a display unit in each system, so use length^4.
+    fn a_dimension_with_no_named_unit_is_written_in_the_systems_own_base_units() {
+        // Length^4 has no named unit, so it is composed from the system's units.
         let quartic = Quantity::from_unit(2.0, "m")
             .unwrap()
             .pow(Quantity::dimensionless(4.0))
             .unwrap();
-        for system in UnitSystem::ALL {
-            assert_eq!(format_quantity(quartic, system), "16 m^4");
-        }
+        let shown = |s| format_quantity(quartic, s);
+        assert_eq!(shown(UnitSystem::Si), "16 m^4");
+        assert!(shown(UnitSystem::Uscs).ends_with(" ft^4"));
+        assert!(shown(UnitSystem::Cgs).ends_with(" cm^4"));
     }
 
     #[test]
@@ -516,12 +570,32 @@ mod tests {
     }
 
     #[test]
-    fn unknown_dimensions_show_si_base_units_not_a_debug_dump() {
-        // 6 kN / 2 m = 3000 N/m has no display entry.
-        let q = Quantity::from_unit(6.0, "kN")
-            .unwrap()
-            .over(Quantity::from_unit(2.0, "m").unwrap())
-            .unwrap();
-        assert_eq!(format_quantity(q, UnitSystem::Si), "3000 kg*s^-2");
+    fn common_compound_quantities_have_named_display_units() {
+        assert_eq!(shown("3 m / 1 s"), "3 m/s");
+        assert_eq!(shown("9.80665 m / s ^ 2"), "9.807 m/s\u{b2}");
+        assert_eq!(shown("1000 kg / m ^ 3"), "1000 kg/m\u{b3}");
+        // A spring stiffness: 6 kN / 2 m.
+        assert_eq!(shown("6 kN / 2 m"), "3000 N/m");
+    }
+
+    #[test]
+    fn other_compound_quantities_are_numerator_over_denominator() {
+        assert_eq!(shown("2 kg * 3 m / 1 s"), "6 kg*m/s");
+        assert_eq!(shown("5 / (1 s ^ 2)"), "5 1/s^2");
+        // Dynamic viscosity (Pa s) has two things in the denominator.
+        assert_eq!(shown("1 Pa * 1 s"), "1 kg/(m*s)");
+        assert_eq!(shown("2 m * 3 s"), "6 m*s");
+    }
+
+    #[test]
+    fn compound_quantities_use_the_chosen_systems_units() {
+        let one = |u: &str| Quantity::from_unit(1.0, u).unwrap();
+        let momentum = one("kg").times(one("m")).unwrap().over(one("s")).unwrap();
+        assert_eq!(format_quantity(momentum, UnitSystem::Si), "1 kg*m/s");
+        assert!(format_quantity(momentum, UnitSystem::Uscs).ends_with(" lb*ft/s"));
+        assert!(format_quantity(momentum, UnitSystem::Cgs).ends_with(" g*cm/s"));
+        let speed = one("m").over(one("s")).unwrap();
+        assert_eq!(format_quantity(speed, UnitSystem::Uscs), "3.281 ft/s");
+        assert_eq!(format_quantity(speed, UnitSystem::Cgs), "100 cm/s");
     }
 }
