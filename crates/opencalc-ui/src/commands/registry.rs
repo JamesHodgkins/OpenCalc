@@ -113,12 +113,13 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | InsertRange
             | WarnNext
             | WarnPrev
+            | FormatBorder
     );
     (ctx.has_sheet || !needs_sheet)
         && (ctx.has_selection
             || !matches!(
                 command,
-                RegionDelete | ClipboardCut | ClipboardCopy | RegionLock | RegionTag
+                RegionDelete | ClipboardCut | ClipboardCopy | RegionLock | RegionTag | FormatBorder
             ))
         && (ctx.selects_math
             || !matches!(

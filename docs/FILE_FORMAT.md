@@ -70,6 +70,8 @@ both in **document units of 1/96 inch**, and a `kind`. A text region may also ha
 a `style`, `{ "bold": true, "italic": false }` (both default to false; omitted
 when plain). Any region may be `"locked": true` (default false, omitted when
 unlocked): it cannot be moved, edited or deleted until unlocked. Any region may
+have `"border": true` (default false, omitted when off): a thin line is drawn round
+it on the page and in exports. Any region may
 also have a `"label"`, a short name to find it by (the program sets at most 60
 characters; omitted when empty):
 

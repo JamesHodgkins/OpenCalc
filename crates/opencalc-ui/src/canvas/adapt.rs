@@ -61,6 +61,7 @@ mod tests {
             kind,
             style: Default::default(),
             locked: false,
+            border: false,
             label: String::new(),
         }
     }

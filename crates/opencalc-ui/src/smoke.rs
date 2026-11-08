@@ -21,6 +21,7 @@ use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
 mod arrange;
+mod borders;
 mod check;
 mod clipboard;
 mod export;

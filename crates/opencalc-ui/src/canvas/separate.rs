@@ -62,6 +62,7 @@ mod tests {
             kind: RegionKind::table(),
             style: Default::default(),
             locked: false,
+            border: false,
             label: String::new(),
         }
     }

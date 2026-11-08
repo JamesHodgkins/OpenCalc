@@ -192,6 +192,9 @@ pub struct Region {
     /// change one by mistake.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub locked: bool,
+    /// Draw a line round the region (on the page and in exports).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub border: bool,
     /// A short name for finding the region again (empty: none). Shown beside the
     /// region while editing, never on the printed page.
     #[serde(default, skip_serializing_if = "String::is_empty")]

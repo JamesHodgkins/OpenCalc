@@ -157,6 +157,7 @@ commands! {
     InsertRange: "insert.range", "Range", icons::LIST;
     MatrixClose: "insert.matrix_close", "Close Matrix", icons::CLOSE;
     // Format.
+    FormatBorder: "format.border", "Border", icons::AREA;
     FormatBold: "format.bold", "Bold", icons::BOLD;
     FormatItalic: "format.italic", "Italic", icons::ITALIC;
     FormatDecimalsMore: "format.decimals_more", "More decimals", icons::PLUS;
@@ -255,8 +256,8 @@ impl CommandId {
         match self {
             ViewLabels | LabelsClose | GoToLabel(_) | FileTypeRegister | FileTypeRemove
             | HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
-            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | UnitsDisplayM
-            | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
+            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | FormatBorder
+            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
             | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
             | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
             | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace

@@ -59,6 +59,9 @@ pub fn style_commands(state: &AppState) -> Vec<CommandId> {
     if all_styled(state, |s| s.italic) {
         on.push(CommandId::FormatItalic);
     }
+    if all_bordered(state) {
+        on.push(CommandId::FormatBorder);
+    }
     on
 }
 
@@ -117,9 +120,48 @@ pub fn units_in_use(state: &AppState) -> Vec<CommandId> {
     }
 }
 
+/// The selected regions that are not locked, with whether each has a border.
+fn selected_borders(state: &AppState) -> Vec<(RegionId, bool)> {
+    let Some(sheet) = state.active_sheet() else {
+        return Vec::new();
+    };
+    sheet
+        .doc
+        .regions()
+        .iter()
+        .filter(|r| sheet.canvas.selection.contains(&r.id) && !r.locked)
+        .map(|r| (r.id, r.border))
+        .collect()
+}
+
+/// Whether every selected region has a border (and there is one).
+pub fn all_bordered(state: &AppState) -> bool {
+    let b = selected_borders(state);
+    !b.is_empty() && b.iter().all(|(_, on)| *on)
+}
+
+/// Border on for every selected region, or off if all had it on.
+fn toggle_border(state: &mut AppState) {
+    let on = !all_bordered(state);
+    let edits: Vec<Edit> = selected_borders(state)
+        .into_iter()
+        .map(|(id, _)| Edit::SetBorder { id, border: on })
+        .collect();
+    if let (Some(i), false) = (state.active, edits.is_empty()) {
+        let sheet = &mut state.sheets[i];
+        sheet.seal();
+        sheet.edit(Edit::Batch(edits));
+        sheet.seal();
+    }
+}
+
 /// Run a Format command. `None` if `command` is not one of them.
 pub fn dispatch_format(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>> {
     use CommandId::*;
+    if command == FormatBorder {
+        toggle_border(state);
+        return Some(Vec::new());
+    }
     if matches!(command, FormatBold | FormatItalic) {
         toggle_style(state, command == FormatBold);
         return Some(Vec::new());

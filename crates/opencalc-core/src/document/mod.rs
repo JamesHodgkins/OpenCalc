@@ -145,6 +145,7 @@ impl Worksheet {
             kind,
             style: FontStyle::default(),
             locked: false,
+            border: false,
             label: String::new(),
         }
     }

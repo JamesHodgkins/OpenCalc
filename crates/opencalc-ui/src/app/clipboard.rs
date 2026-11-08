@@ -185,6 +185,7 @@ impl App {
                     kind: RegionKind::Text { text: region_text },
                     style: Default::default(),
                     locked: false,
+                    border: false,
                     label: String::new(),
                 }],
                 None => return,

@@ -57,6 +57,11 @@ pub enum Edit {
         id: RegionId,
         style: FontStyle,
     },
+    /// Whether a region has a border. Display only.
+    SetBorder {
+        id: RegionId,
+        border: bool,
+    },
     /// How a math region shows its result. Display only; no value changes.
     SetResultFormat {
         id: RegionId,
@@ -205,6 +210,15 @@ impl Worksheet {
                 Ok(Edit::SetFontStyle {
                     id: *id,
                     style: old,
+                })
+            }
+            Edit::SetBorder { id, border } => {
+                self.unlocked(*id)?;
+                let region = self.region_mut(*id)?;
+                let old = std::mem::replace(&mut region.border, *border);
+                Ok(Edit::SetBorder {
+                    id: *id,
+                    border: old,
                 })
             }
             Edit::SetResultFormat { id, format } => {

@@ -172,6 +172,7 @@ fn math_formatting() -> Tab {
                     Cell::Icon(it(CommandId::FormatItalic)),
                 ]])],
             ),
+            panel("Region", vec![Column::Large(it(CommandId::FormatBorder))]),
         ],
     }
 }
@@ -327,7 +328,10 @@ mod tests {
         assert_eq!(panel_titles("Functions"), ["Insert"]);
         assert_eq!(panel_titles("Matrices/Tables"), ["Matrix", "Table"]);
         assert_eq!(panel_titles("Plots"), ["Insert"]);
-        assert_eq!(panel_titles("Math Formatting"), ["Result", "Font"]);
+        assert_eq!(
+            panel_titles("Math Formatting"),
+            ["Result", "Font", "Region"]
+        );
         assert_eq!(
             panel_titles("Calculation"),
             ["Calculate", "Check", "Errors"]

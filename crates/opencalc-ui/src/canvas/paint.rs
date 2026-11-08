@@ -115,6 +115,31 @@ pub fn region(
     zoom: f32,
     skip_content: bool,
 ) -> Vec2 {
+    let size = content(ui, painter, env, r, top_left, zoom, skip_content);
+    if r.border && !skip_content {
+        let rect = Rect::from_min_size(top_left, size * zoom).expand(BORDER_GAP * zoom);
+        painter.rect_stroke(
+            rect,
+            0.0,
+            Stroke::new((1.0 * zoom).max(0.75), env.paper.text),
+            StrokeKind::Middle,
+        );
+    }
+    size
+}
+
+/// Space between a region's content and its border, in document units.
+const BORDER_GAP: f32 = 3.0;
+
+fn content(
+    ui: &Ui,
+    painter: &Painter,
+    env: &Env,
+    r: &Region,
+    top_left: Pos2,
+    zoom: f32,
+    skip_content: bool,
+) -> Vec2 {
     let place = Place {
         top_left,
         zoom,

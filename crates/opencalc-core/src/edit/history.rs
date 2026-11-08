@@ -47,6 +47,7 @@ impl RunKey {
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetPicture { .. }
+            | Edit::SetBorder { .. }
             | Edit::SetFontStyle { .. }
             | Edit::SetLocked { .. }
             | Edit::SetUnitSystem(_)

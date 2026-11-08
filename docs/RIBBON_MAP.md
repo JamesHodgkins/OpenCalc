@@ -25,6 +25,7 @@ reasonable grouping, not a copy. See `UI_ALIGNMENT.md` and `CLEAN_ROOM.md`.
 | **Plots** | Insert | X-Y plot (large) |
 | **Math Formatting** | Result | More decimals, Fewer decimals, Scientific, Engineering *(dimmed, as today)* |
 | | Font | Bold, Italic *(dimmed, as today)* |
+| | Region | Border (toggle: a line round each selected region) |
 | **Calculation** | Calculate | Calculate worksheet (large), Automatic calculation (toggle, moved from the status bar and View) |
 | | Check | Run checks *(dimmed until `opencalc check`)* |
 | | Errors | Next, Previous *(dimmed until errors are navigable)* |

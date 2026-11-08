@@ -113,3 +113,35 @@ fn a_table_survives_saving() {
     assert_eq!(back, w);
     assert!(run(&back).values[&table].is_ok());
 }
+
+#[test]
+fn a_border_is_an_undoable_display_edit_that_is_saved() {
+    let (mut w, table, _) = sheet();
+    let e = w.eval_revision();
+    let mut h = History::default();
+    h.apply(
+        &mut w,
+        Edit::SetBorder {
+            id: table,
+            border: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(w.eval_revision(), e, "a border changes no result");
+    let back = load_bytes(&save_bytes(&w).unwrap()).unwrap().worksheet;
+    assert!(back.region(table).unwrap().border);
+    assert!(h.undo(&mut w).unwrap());
+    assert!(!w.region(table).unwrap().border);
+    // a locked region refuses
+    w.apply(Edit::SetLocked {
+        id: table,
+        locked: true,
+    })
+    .unwrap();
+    assert!(w
+        .apply(Edit::SetBorder {
+            id: table,
+            border: true
+        })
+        .is_err());
+}
