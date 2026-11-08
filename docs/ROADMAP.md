@@ -29,7 +29,7 @@ Extends `functions.rs`, `functions/stats.rs`, `units.rs`. No format change unles
 - [x] More US customary and length/mass/time units (`yd`, `mi`, `oz`, `gal`, `psf`, `um`, `nm`, `mg`, `tonne`, `ms`). `ton` (short or metric?) left out on purpose; `tonne` is the metric one. Done 2026-11-08.
 - [ ] Note: new unit symbols (`A`, `C`, `K`, `L`, `V`, `W`, `J`) take over `5 A`-style implicit multiplication from variables of those names, and a saved custom unit with one of these names would now be rejected. No released files exist yet; revisit if that changes.
 - [ ] Compound unit symbols in the parser (`kN*m`, `m/s`) (TD-09).
-- [ ] Temperature units `degC`, `degF` with a decided offset policy (TD-09). Needs a written decision first.
+- [x] Temperature units (decided 2026-11-08, TD-09). Everything is calculated in kelvin. `degC` and `degF` are offset units accepted only directly after a number (`20 degC`); `-5 degC` means minus five degrees Celsius (268.15 K); a bare, powered or compound use (`degC`, `degC ^ 2`, `W / degC`) is refused with a message pointing to `deltaC` / `deltaF`. `deltaC`, `deltaF` and `degR` are ordinary scale-only units for differences and rates. Results show in K; `20 degC + 10 degC` is not refused (plain kelvin arithmetic). Not done: showing results in degC or degF (needs new display-unit choices, a file-format and ribbon change).
 - [ ] Per-element dimensions in vectors and matrices, so `(1 m, 2 s)` works (TD-28). Larger (M), may need a format bump.
 
 **1.2 Functions**
@@ -128,6 +128,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 1.1: temperature units (`degC`, `degF`, `deltaC`, `deltaF`, `degR`), corpus `temperatures.calc`. |
 | 2026-11-08 | Phase 1.2 part 2: matrix inverse/powers/`identity`/`tr`/`rank`/`cross`/`augment`/`stack`, element-wise functions on matrices, `median`/`mode`/`var`/`sort`/`cumsum`/`cvar`/`corr`, `factorial`/`combin`/`permut`/`isprime`; corpus `matrices_and_lists.calc`. |
 | 2026-11-08 | Phase 1.2 part: inverse and hyperbolic trig, `log`, rounding, `mod`, `sign`, `gcd`, `lcm` (new `functions/elementary.rs`, `functions::all()`), corpus worksheet `elementary_functions.calc`. |
 | 2026-11-08 | Phase 1.1 part: about 45 built-in units added with display tables for energy, power, voltage, resistance, frequency and volume. |

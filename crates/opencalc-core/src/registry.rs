@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::units::{builtin_unit, Quantity, UnitDef, UnitError};
+use crate::units::{builtin_unit, offset_unit, Quantity, UnitDef, UnitError};
 
 /// Which units results are shown in. Values are always stored in SI; this only
 /// changes display (spec 2.3), so switching it never changes a calculation.
@@ -77,7 +77,7 @@ impl UnitRegistry {
             if !valid_symbol(s) {
                 return Err(RegistryError::BadSymbol(s.to_owned()));
             }
-            if builtin_unit(s).is_some() || reserved(s) {
+            if builtin_unit(s).is_some() || offset_unit(s).is_some() || reserved(s) {
                 return Err(RegistryError::Reserved(s.to_owned()));
             }
             if custom[..k].iter().any(|d| d.symbol == def.symbol) {
@@ -100,6 +100,9 @@ impl UnitRegistry {
 
     /// `value` expressed in the unit `symbol`, as an SI quantity.
     pub fn quantity(&self, value: f64, symbol: &str) -> Result<Quantity, UnitError> {
+        if offset_unit(symbol).is_some() {
+            return Quantity::from_unit(value, symbol);
+        }
         let u = self
             .lookup(symbol)
             .ok_or_else(|| UnitError::UnknownUnit(symbol.to_owned()))?;

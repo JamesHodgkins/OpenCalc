@@ -5,7 +5,7 @@
 use super::lexer::Tok;
 use super::Parser;
 use crate::expr::{BinaryOp, Expr};
-use crate::units::builtin_unit;
+use crate::units::{builtin_unit, offset_unit};
 
 /// `name(args)`: `if` with three arguments and `sqrt` with one become their own
 /// nodes; their children are still the arguments.
@@ -174,7 +174,7 @@ impl Parser {
         match self.peek().cloned() {
             Some(Tok::Ident(name)) => {
                 let is_call = self.toks.get(self.pos + 1) == Some(&Tok::LParen);
-                if builtin_unit(&name).is_some() && !is_call {
+                if (builtin_unit(&name).is_some() || offset_unit(&name).is_some()) && !is_call {
                     self.pos += 1;
                     if self.eat(&Tok::Caret) {
                         // `5 m^2`: the number times the power of the unit's name.

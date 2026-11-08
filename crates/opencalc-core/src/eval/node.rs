@@ -4,6 +4,7 @@
 use super::{Cx, EvalError, UserFn, MAX_CALL_DEPTH};
 use crate::expr::{BinaryOp, Expr, UnaryOp, ORIGIN};
 use crate::functions;
+use crate::units::offset_unit;
 use crate::value::{Comparison, Matrix, Series, Value, ValueError};
 
 /// An evaluation error and where in the expression it happened. The path is
@@ -252,6 +253,7 @@ fn name(n: &str, cx: &Cx) -> Evaluated {
     }
     match cx.env.get(n) {
         Some(r) => r.clone().map_err(Located::here),
+        None if offset_unit(n).is_some() => Err(offset_unit_alone(n)),
         None => cx
             .units
             .quantity(1.0, n)
@@ -261,8 +263,30 @@ fn name(n: &str, cx: &Cx) -> Evaluated {
     }
 }
 
+/// A bare offset unit such as `degC` is not a quantity (kept out of line so the
+/// frames of the hot functions stay small).
+#[cold]
+#[inline(never)]
+fn offset_unit_alone(n: &str) -> Located {
+    Located::here(EvalError::Invalid(format!(
+        "'{n}' is an offset unit: write it right after a number, as in 20 {n},          and use deltaC or deltaF for a temperature difference"
+    )))
+}
+
+/// `-5 degC` is minus five degrees Celsius (268.15 K), not minus the
+/// temperature 5 degC (-278.15 K).
+#[inline(never)]
+fn negative_offset_quantity(value: f64, unit: &str, cx: &Cx) -> Evaluated {
+    Ok(cx.units.quantity(-value, unit)?.into())
+}
+
 #[inline(never)]
 fn negate(arg: &Expr, cx: &Cx) -> Evaluated {
+    if let Expr::Quantity { value, unit } = arg {
+        if offset_unit(unit).is_some() {
+            return negative_offset_quantity(*value, unit, cx);
+        }
+    }
     Ok(child(arg, 0, cx)?.negated())
 }
 

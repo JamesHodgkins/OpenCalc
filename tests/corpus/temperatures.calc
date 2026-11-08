@@ -1,0 +1,29 @@
+# source: original; temperatures converted by hand (0 degC = 273.15 K, 32 degF = 273.15 K, one degF step = 5/9 K)
+freezing := 0 degC
+boiling := 100 degC
+body := 98.6 degF
+cold := -40 degF
+rise := 30 degC - 10 degC
+rise_f := 212 degF - 32 degF
+step_c := 5 deltaC
+step_f := 9 deltaF
+total := 300 K + 5 deltaC
+negative := -5 degC
+heat_rate := 100 W / (2 m * 4 deltaC)
+bare_name := degC
+squared := 3 degC ^ 2
+quotient := 100 W / degC
+=> freezing = 273.15 K
+=> boiling = 373.15 K
+=> body = 310.15 K
+=> cold = 233.15 K
+=> rise = 20 K
+=> rise_f = 100 K
+=> step_c = 5 K
+=> step_f = 5 K
+=> total = 305 K
+=> negative = 268.15 K
+=> heat_rate = 12.5 W / (m * K)
+!> bare_name : invalid
+!> squared : invalid
+!> quotient : invalid

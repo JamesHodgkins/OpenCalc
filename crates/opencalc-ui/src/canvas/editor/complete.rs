@@ -6,7 +6,7 @@ use opencalc_core::constants::CONSTANTS;
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::expr::{AssignKind, Expr};
 use opencalc_core::functions::all as all_functions;
-use opencalc_core::units::builtin_symbols;
+use opencalc_core::units::{builtin_symbols, offset_symbols};
 
 use super::Field;
 
@@ -110,7 +110,10 @@ pub fn candidates(word: &str, defined: &[String], units_first: bool) -> Vec<Cand
             kind: Kind::Function,
         });
     }
-    let mut units: Vec<&str> = builtin_symbols().filter(|u| matches(u)).collect();
+    let mut units: Vec<&str> = builtin_symbols()
+        .chain(offset_symbols())
+        .filter(|u| matches(u))
+        .collect();
     units.sort_by_key(|u| (!u.starts_with(word), u.len(), (*u).to_owned()));
     let mut unit_list: Vec<Candidate> = Vec::new();
     for u in units {

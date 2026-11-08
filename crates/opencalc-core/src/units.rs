@@ -230,10 +230,38 @@ const BUILTIN: &[(&str, Dimension, f64)] = &[
     ("bar", Dimension::PRESSURE, 1e5),
     ("atm", Dimension::PRESSURE, 101_325.0),
     ("psf", Dimension::PRESSURE, 47.880_258_980_335_84),
+    // Temperature steps with no offset: kelvin and the delta units (a rise of
+    // one degree Celsius is one kelvin; one Fahrenheit or Rankine degree is 5/9).
+    ("deltaC", Dimension::TEMPERATURE, 1.0),
+    ("deltaF", Dimension::TEMPERATURE, 5.0 / 9.0),
+    ("degR", Dimension::TEMPERATURE, 5.0 / 9.0),
     ("L", Dimension::VOLUME, 1e-3),
     ("mL", Dimension::VOLUME, 1e-6),
     ("gal", Dimension::VOLUME, 0.003_785_411_784),
 ];
+
+/// Units whose zero is not kelvin's: `kelvin = value * scale + offset`. They name
+/// a point on a scale, not a step, so they are accepted only directly after a
+/// number (`20 degC`) and never in a product, quotient or power. Use `deltaC` or
+/// `deltaF` for a temperature difference or a rate such as `W / (m * deltaC)`.
+/// Everything is calculated in kelvin, so `20 degC + 10 degC` is not refused.
+const OFFSET: &[(&str, f64, f64)] = &[
+    ("degC", 1.0, 273.15),
+    ("degF", 5.0 / 9.0, 459.67 * 5.0 / 9.0),
+];
+
+/// `(scale, offset)` of an offset unit such as `degC`.
+pub fn offset_unit(symbol: &str) -> Option<(f64, f64)> {
+    OFFSET
+        .iter()
+        .find(|(s, _, _)| *s == symbol)
+        .map(|(_, scale, offset)| (*scale, *offset))
+}
+
+/// The offset unit symbols, for listing and completion.
+pub fn offset_symbols() -> impl Iterator<Item = &'static str> {
+    OFFSET.iter().map(|(s, _, _)| *s)
+}
 
 /// Look up a built-in unit by symbol.
 pub fn builtin_unit(symbol: &str) -> Option<UnitDef> {
@@ -283,6 +311,12 @@ impl Quantity {
 
     /// Build from a value expressed in the unit named `symbol`.
     pub fn from_unit(value: f64, symbol: &str) -> Result<Self, UnitError> {
+        if let Some((scale, offset)) = offset_unit(symbol) {
+            return Ok(Quantity {
+                si: value * scale + offset,
+                dim: Dimension::TEMPERATURE,
+            });
+        }
         let u = builtin_unit(symbol).ok_or_else(|| UnitError::UnknownUnit(symbol.to_owned()))?;
         Ok(Quantity {
             si: value * u.to_si_scale,
@@ -292,6 +326,12 @@ impl Quantity {
 
     /// The value expressed in the unit named `symbol`, if dimensions match.
     pub fn in_unit(self, symbol: &str) -> Result<f64, UnitError> {
+        if let Some((scale, offset)) = offset_unit(symbol) {
+            if self.dim != Dimension::TEMPERATURE {
+                return Err(UnitError::Mismatch(self.dim, Dimension::TEMPERATURE));
+            }
+            return Ok((self.si - offset) / scale);
+        }
         let u = builtin_unit(symbol).ok_or_else(|| UnitError::UnknownUnit(symbol.to_owned()))?;
         if u.dimension != self.dim {
             return Err(UnitError::Mismatch(self.dim, u.dimension));
@@ -544,6 +584,41 @@ mod tests {
             "1 hp = 550 ft lbf/s"
         );
         assert_eq!(si(1.0, "atm"), 101_325.0);
+    }
+
+    #[test]
+    fn celsius_and_fahrenheit_convert_through_kelvin() {
+        let k = |v: f64, u: &str| Quantity::from_unit(v, u).unwrap().si;
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
+        assert!(close(k(0.0, "degC"), 273.15), "freezing point of water");
+        assert!(close(k(100.0, "degC"), 373.15), "boiling point of water");
+        assert!(close(k(32.0, "degF"), 273.15));
+        assert!(close(k(212.0, "degF"), 373.15));
+        assert!(
+            close(k(-40.0, "degF"), k(-40.0, "degC")),
+            "-40 is the same on both"
+        );
+        assert!(close(k(-273.15, "degC"), 0.0), "absolute zero");
+        assert!(close(k(0.0, "degR"), 0.0) && close(k(491.67, "degR"), 273.15));
+    }
+
+    #[test]
+    fn temperature_units_convert_back_and_refuse_other_dimensions() {
+        let q = Quantity::from_unit(25.0, "degC").unwrap();
+        assert!((q.in_unit("degC").unwrap() - 25.0).abs() < 1e-12);
+        assert!((q.in_unit("degF").unwrap() - 77.0).abs() < 1e-9);
+        assert!((q.in_unit("K").unwrap() - 298.15).abs() < 1e-12);
+        let length = Quantity::from_unit(1.0, "m").unwrap();
+        assert!(length.in_unit("degC").is_err());
+    }
+
+    #[test]
+    fn delta_units_are_steps_without_an_offset() {
+        let k = |v: f64, u: &str| Quantity::from_unit(v, u).unwrap().si;
+        assert_eq!(k(10.0, "deltaC"), 10.0);
+        assert!((k(9.0, "deltaF") - 5.0).abs() < 1e-12);
+        assert!((k(9.0, "degR") - 5.0).abs() < 1e-12);
+        assert!(offset_unit("deltaC").is_none() && offset_unit("K").is_none());
     }
 
     /// Derived units must be the products and quotients of base units.
