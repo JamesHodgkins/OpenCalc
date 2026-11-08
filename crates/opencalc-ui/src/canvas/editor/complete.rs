@@ -5,7 +5,7 @@
 use opencalc_core::constants::CONSTANTS;
 use opencalc_core::document::{Region, RegionKind};
 use opencalc_core::expr::{AssignKind, Expr};
-use opencalc_core::functions::FUNCTIONS;
+use opencalc_core::functions::all as all_functions;
 use opencalc_core::units::builtin_symbols;
 
 use super::Field;
@@ -94,7 +94,7 @@ pub fn candidates(word: &str, defined: &[String], units_first: bool) -> Vec<Cand
         });
     }
     let mut functions: Vec<Candidate> = Vec::new();
-    for f in FUNCTIONS.iter().filter(|f| matches(f.name)) {
+    for f in all_functions().filter(|f| matches(f.name)) {
         functions.push(Candidate {
             label: f.name.to_owned(),
             insert: format!("{}(", f.name),

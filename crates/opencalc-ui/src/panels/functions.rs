@@ -4,16 +4,17 @@
 use eframe::egui::{self, RichText, Ui};
 use opencalc_core::document::RegionKind;
 use opencalc_core::edit::Edit;
-use opencalc_core::functions::{category, FunctionDef, FUNCTIONS};
+use opencalc_core::functions::{all, category, FunctionDef};
 
 use crate::app::AppState;
 use crate::canvas::CanvasCmd;
 use crate::theme::type_size;
 
 /// Group order in the window.
-const GROUPS: [&str; 5] = [
+const GROUPS: [&str; 6] = [
     "Powers and logarithms",
     "Trigonometry",
+    "Rounding and integers",
     "Complex numbers",
     "Vectors and matrices",
     "Statistics",
@@ -73,8 +74,7 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Vec<CanvasCmd>) {
     egui::ScrollArea::vertical().show(ui, |ui| {
         let mut any = false;
         for group in GROUPS {
-            let items: Vec<&FunctionDef> = FUNCTIONS
-                .iter()
+            let items: Vec<&FunctionDef> = all()
                 .filter(|f| category(f.name) == group && matches(f, &query))
                 .collect();
             if items.is_empty() {
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn every_function_is_in_a_listed_group_and_findable_by_its_name() {
-        for def in FUNCTIONS {
+        for def in all() {
             assert!(GROUPS.contains(&category(def.name)), "{}", def.name);
             assert!(matches(def, def.name), "{}", def.name);
         }

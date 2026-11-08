@@ -33,8 +33,8 @@ Extends `functions.rs`, `functions/stats.rs`, `units.rs`. No format change unles
 - [ ] Per-element dimensions in vectors and matrices, so `(1 m, 2 s)` works (TD-28). Larger (M), may need a format bump.
 
 **1.2 Functions**
-- [ ] Inverse and hyperbolic trig: `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`, `tanh` and inverses.
-- [ ] Logs and rounding: `log`, `log10`, `log2`, `floor`, `ceil`, `round`, `trunc`, `sign`, `mod`, `gcd`, `lcm`.
+- [x] Inverse and hyperbolic trig: `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`. Real inside the real domain, complex outside. Open points: `atan2(x, y)` argument order follows Mathcad as I recall it and should be checked against PTC's help; the sign of the imaginary part on a branch cut (`asin(2)`) is whatever `num-complex` gives and is not asserted by any test.
+- [x] Logs and rounding: `log(x)` (base 10), `log(x, b)`, `floor`, `ceil`, `round(x[, n])`, `trunc`, `sign`, `mod` (sign of the divisor), `gcd`, `lcm`. No separate `log10`/`log2`. Rounding needs a dimensionless argument (rounding a length would depend on the display unit). `ln` was already there.
 - [ ] Element-wise functions on matrices (TD-08).
 - [ ] Matrix: inverse, integer powers, `identity`, `trace`, `rank`, `cross`, `augment`/`stack`, `rows`/`cols`, `submatrix`.
 - [ ] Stats: `median`, `var`, `mode`, `range`, `sort`, `reverse`, `cumsum`, `corr`, `cov`.
@@ -127,4 +127,5 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 1.2 part: inverse and hyperbolic trig, `log`, rounding, `mod`, `sign`, `gcd`, `lcm` (new `functions/elementary.rs`, `functions::all()`), corpus worksheet `elementary_functions.calc`. |
 | 2026-11-08 | Phase 1.1 part: about 45 built-in units added with display tables for energy, power, voltage, resistance, frequency and volume. |

@@ -1,0 +1,53 @@
+# source: original; inverse and hyperbolic functions, logarithms, rounding, remainders and gcd/lcm, worked by hand
+quarter_turn := asin(1)
+eighth_turn := atan(1)
+straight_angle := acos(0 - 1)
+angle_of_point := atan2(1, 1)
+angle_left := atan2(0 - 1, 0)
+cosh_zero := cosh(0)
+sinh_zero := sinh(0)
+tanh_zero := tanh(0)
+asinh_zero := asinh(0)
+acosh_one := acosh(1)
+atanh_zero := atanh(0)
+thousand_log := log(1000)
+eight_log2 := log(8, 2)
+log_of_one := log(1)
+floor_neg := floor(0 - 2.5)
+ceil_neg := ceil(0 - 2.5)
+trunc_neg := trunc(0 - 2.5)
+round_half := round(2.5)
+round_hundreds := round(1250, 0 - 2)
+mod_positive := mod(7, 3)
+mod_negative_dividend := mod(0 - 7, 3)
+mod_negative_divisor := mod(7, 0 - 3)
+mod_length := mod(7 m, 3 m)
+sign_of_force := sign(-5 N)
+gcd_three := gcd(12, 18, 8)
+lcm_three := lcm(4, 6, 10)
+=> quarter_turn = 3.141592653589793 / 2
+=> eighth_turn = 3.141592653589793 / 4
+=> straight_angle = 3.141592653589793
+=> angle_of_point = 3.141592653589793 / 4
+=> angle_left = 3.141592653589793
+=> cosh_zero = 1
+=> sinh_zero = 0
+=> tanh_zero = 0
+=> asinh_zero = 0
+=> acosh_one = 0
+=> atanh_zero = 0
+=> thousand_log = 3
+=> eight_log2 = 3
+=> log_of_one = 0
+=> floor_neg = 0 - 3
+=> ceil_neg = 0 - 2
+=> trunc_neg = 0 - 2
+=> round_half = 3
+=> round_hundreds = 1300
+=> mod_positive = 1
+=> mod_negative_dividend = 2
+=> mod_negative_divisor = 0 - 2
+=> mod_length = 1 m
+=> sign_of_force = 0 - 1
+=> gcd_three = 2
+=> lcm_three = 60

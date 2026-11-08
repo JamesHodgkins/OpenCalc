@@ -41,6 +41,8 @@ macro_rules! function {
 
 use Arity::{AtLeast, Exactly};
 
+mod elementary;
+
 pub const FUNCTIONS: &[FunctionDef] = &[
     function!(
         "sqrt",
@@ -220,8 +222,12 @@ pub const FUNCTIONS: &[FunctionDef] = &[
 /// The group a function is listed under (the Functions window and its search).
 pub fn category(name: &str) -> &'static str {
     match name {
-        "sin" | "cos" | "tan" => "Trigonometry",
-        "ln" | "exp" | "sqrt" => "Powers and logarithms",
+        "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "atan2" | "sinh" | "cosh" | "tanh"
+        | "asinh" | "acosh" | "atanh" => "Trigonometry",
+        "ln" | "exp" | "sqrt" | "log" => "Powers and logarithms",
+        "floor" | "ceil" | "trunc" | "round" | "sign" | "mod" | "gcd" | "lcm" => {
+            "Rounding and integers"
+        }
         "abs" | "re" | "im" | "conj" | "arg" => "Complex numbers",
         "vec" | "mat" | "transpose" | "det" | "norm" | "dot" | "rows" | "cols" => {
             "Vectors and matrices"
@@ -231,8 +237,13 @@ pub fn category(name: &str) -> &'static str {
     }
 }
 
+/// Every built-in function: the core table, then the elementary functions.
+pub fn all() -> impl Iterator<Item = &'static FunctionDef> + Clone {
+    FUNCTIONS.iter().chain(elementary::ELEMENTARY)
+}
+
 pub fn lookup(name: &str) -> Option<&'static FunctionDef> {
-    FUNCTIONS.iter().find(|f| f.name == name)
+    all().find(|f| f.name == name)
 }
 
 pub fn call(name: &str, args: &[Value]) -> Result<Value> {
@@ -256,7 +267,8 @@ pub fn call(name: &str, args: &[Value]) -> Result<Value> {
 
 /// Functions of one number that apply to each element of a list.
 const MAPS_OVER_LISTS: &[&str] = &[
-    "sqrt", "abs", "re", "im", "conj", "arg", "sin", "cos", "tan", "ln", "exp",
+    "sqrt", "abs", "re", "im", "conj", "arg", "sin", "cos", "tan", "ln", "exp", "asin", "acos",
+    "atan", "sinh", "cosh", "tanh", "asinh", "acosh", "atanh", "floor", "ceil", "trunc", "sign",
 ];
 
 fn over_list(f: &FunctionDef, list: &Series) -> Result<Value> {
@@ -365,19 +377,16 @@ mod tests {
 
     #[test]
     fn every_function_has_a_real_category() {
-        for f in FUNCTIONS {
+        for f in all() {
             assert_ne!(category(f.name), "Other", "{} has no category", f.name);
         }
     }
 
     #[test]
     fn names_are_unique_and_every_entry_is_documented() {
-        for (k, f) in FUNCTIONS.iter().enumerate() {
-            assert!(
-                FUNCTIONS[..k].iter().all(|g| g.name != f.name),
-                "{}",
-                f.name
-            );
+        let every: Vec<&FunctionDef> = all().collect();
+        for (k, f) in every.iter().enumerate() {
+            assert!(every[..k].iter().all(|g| g.name != f.name), "{}", f.name);
             assert!(f.signature.starts_with(f.name), "{}", f.name);
             assert!(!f.summary.is_empty(), "{}", f.name);
         }
