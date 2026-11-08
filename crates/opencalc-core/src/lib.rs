@@ -5,6 +5,7 @@
 
 pub mod check;
 pub mod constants;
+pub mod csv;
 pub mod document;
 pub mod edit;
 pub mod eval;

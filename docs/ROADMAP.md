@@ -84,10 +84,13 @@ Extends `PlotSpec` (format bump with migration). TD-31 records the current plot 
 
 ## Phase 4: Data I/O (M to L)
 
-Fills the Table and Picture placeholder regions.
+Fills the Table and Picture placeholder regions. Design and open decisions:
+`DATA_IO.md`. Started: the CSV module (`opencalc-core::csv`) is built; the rest waits for
+the decisions in `DATA_IO.md` section 7.
 
+- [x] CSV reader and writer module (own parser, bounded, tested; no UI yet).
 - [ ] Table region (editable grid, evaluates to a matrix).
-- [ ] CSV/text read and write functions (`READPRN`, `WRITEPRN`-style, names to be chosen clean-room).
+- [ ] ~~CSV/text read and write functions~~ proposed to be replaced by import and export commands (`DATA_IO.md` section 2); awaiting decision.
 - [ ] Picture region (PNG/JPG import, embedded in the `.ocx`).
 - [ ] CSV import and export in the Input/Output tab.
 - [ ] Excel (`.xlsx`) read and write; evaluate a crate against the dependency policy first.
@@ -131,6 +134,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-08 | Phase 4 started: design note `DATA_IO.md`; `opencalc-core::csv` (reader, writer, delimiter detection, number reading, header split, formula-safe output). |
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
 | 2026-11-08 | Phase 3.4: polar plots; the plot window and the legend split into smaller modules. |
