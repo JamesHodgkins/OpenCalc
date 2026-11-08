@@ -23,6 +23,7 @@ clean-room rules in `SPEC.md` section 9.1.
 | 2026-11-06 | PTC Mathcad Prime help: About the Workspace, About Worksheets and Regions, To Use KeyTips; PTC Mathcad Prime guide tables of contents (tab names) | Window parts and ribbon tab names, for `docs/UI_ALIGNMENT.md` | Public documentation only; behaviours noted, nothing copied. Panel contents of each tab were not confirmed and are marked inferred |
 | 2026-11-06 | OpenDraft desktop app (the owner's own project, GPL-3.0-or-later): `crates/od-ui` theme, ribbon, menus, document tabs; `ui_plan.md`; `CLAUDE.md` | Visual style tokens, ribbon structure and sizes, window layout, engineering conventions | Read for design only. No code copied (decided: SPEC section 4.11, option 1). |
 | 2026-11-08 | SMath Studio forum threads and bug tracker on temperature units (search-result summaries; pages not opened) | The idea of separate delta units for temperature differences, and the trap that `-5 degC` reads as `-(5 degC)` | Behaviour only, from public forum posts of 2012 to 2019; nothing copied. The owner states Mathcad also stores temperature in kelvin (not verified from PTC documentation) |
+| 2026-11-08 | PTC Community forum threads on angle units in Mathcad Prime (search-result summaries; pages not opened) | That a bare number is radians, that `deg` is an alias for pi/180, and that inverse functions give radians | User-reported behaviour from public forum posts, not PTC documentation; nothing copied |
 
 ## Code provenance
 No source code has been taken from any other project yet. Two third-party font

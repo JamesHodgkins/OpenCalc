@@ -415,7 +415,11 @@ mod tests {
         for s in symbols {
             let u = builtin_unit(s).expect(s);
             assert!(u.to_si_scale.is_finite() && u.to_si_scale > 0.0, "{s}");
-            assert!(!u.dimension.is_dimensionless(), "{s} has no dimension");
+            // Angles are the only built-in units that are plain numbers.
+            assert!(
+                !u.dimension.is_dimensionless() || ["rad", "deg"].contains(&s),
+                "{s} has no dimension"
+            );
         }
         assert!(builtin_unit("furlong").is_none());
     }
@@ -504,6 +508,19 @@ mod tests {
         assert!((k(9.0, "deltaF") - 5.0).abs() < 1e-12);
         assert!((k(9.0, "degR") - 5.0).abs() < 1e-12);
         assert!(offset_unit("deltaC").is_none() && offset_unit("K").is_none());
+    }
+
+    #[test]
+    fn angles_are_plain_numbers_in_radians() {
+        let pi = std::f64::consts::PI;
+        let q = |v: f64, u: &str| Quantity::from_unit(v, u).unwrap();
+        assert_eq!(q(1.0, "rad"), Quantity::dimensionless(1.0));
+        assert!((q(180.0, "deg").si - pi).abs() < 1e-15);
+        assert!(q(90.0, "deg").dim.is_dimensionless());
+        assert!((q(pi, "rad").in_unit("deg").unwrap() - 180.0).abs() < 1e-12);
+        // A length is not an angle, and an angle is not a length.
+        assert!(q(1.0, "m").in_unit("deg").is_err());
+        assert!(q(1.0, "deg").in_unit("m").is_err());
     }
 
     /// Derived units must be the products and quotients of base units.

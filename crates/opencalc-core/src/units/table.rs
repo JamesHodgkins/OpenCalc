@@ -75,6 +75,11 @@ const BUILTIN: &[(&str, Dimension, f64)] = &[
     ("deltaC", Dimension::TEMPERATURE, 1.0),
     ("deltaF", Dimension::TEMPERATURE, 5.0 / 9.0),
     ("degR", Dimension::TEMPERATURE, 5.0 / 9.0),
+    // Angles are plain numbers (radians), so `sin(30 deg)` works and an inverse
+    // function gives radians: divide by `deg` to read the answer in degrees. A
+    // value in `deg` is stored as its radian number and displays without a unit.
+    ("rad", Dimension::NONE, 1.0),
+    ("deg", Dimension::NONE, std::f64::consts::PI / 180.0),
     ("L", Dimension::VOLUME, 1e-3),
     ("mL", Dimension::VOLUME, 1e-6),
     ("gal", Dimension::VOLUME, 0.003_785_411_784),

@@ -25,7 +25,7 @@ Extends `functions.rs`, `functions/stats.rs`, `units.rs`. No format change unles
 
 **1.1 Units**
 - [x] Remaining SI base units (`A`, `K`, `mol`, `cd`) and derived units (`J`, `kJ`, `MJ`, `kWh`, `cal`, `BTU`, `W`, `kW`, `MW`, `hp`, `C`, `V`, `ohm`, `Hz`, `bar`, `atm`, `L`, `mL`, `min`, `hr`, `day`, ...). Ohm is spelt `ohm`. Done 2026-11-08.
-- [ ] Angle units `deg` and `rad`: built-in units may not be dimensionless today (a unit-table test enforces it), so this needs a design decision first.
+- [x] Angle units (decided 2026-11-08): `rad` is 1 and `deg` is pi/180, both plain numbers, the only dimensionless built-in units. `sin(30 deg)` works; an inverse function gives radians, and `asin(0.5) / deg` reads in degrees. Values display without a unit (`30 deg` shows as 0.524), so `30 deg + 3` is allowed. A variable named `rad` or `deg` shadows the unit; a number written directly before the name (`2 rad`) is still the unit. Not done: showing a result in degrees (needs a display-unit choice) and `grad`, arc minutes and arc seconds.
 - [x] More US customary and length/mass/time units (`yd`, `mi`, `oz`, `gal`, `psf`, `um`, `nm`, `mg`, `tonne`, `ms`). `ton` (short or metric?) left out on purpose; `tonne` is the metric one. Done 2026-11-08.
 - [ ] Note: new unit symbols (`A`, `C`, `K`, `L`, `V`, `W`, `J`) take over `5 A`-style implicit multiplication from variables of those names, and a saved custom unit with one of these names would now be rejected. No released files exist yet; revisit if that changes.
 - [ ] Compound unit symbols in the parser (`kN*m`, `m/s`) (TD-09).
@@ -128,6 +128,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 1.1: angle units `rad` and `deg`, corpus `angles.calc`. |
 | 2026-11-08 | Phase 1.1: temperature units (`degC`, `degF`, `deltaC`, `deltaF`, `degR`), corpus `temperatures.calc`. |
 | 2026-11-08 | Phase 1.2 part 2: matrix inverse/powers/`identity`/`tr`/`rank`/`cross`/`augment`/`stack`, element-wise functions on matrices, `median`/`mode`/`var`/`sort`/`cumsum`/`cvar`/`corr`, `factorial`/`combin`/`permut`/`isprime`; corpus `matrices_and_lists.calc`. |
 | 2026-11-08 | Phase 1.2 part: inverse and hyperbolic trig, `log`, rounding, `mod`, `sign`, `gcd`, `lcm` (new `functions/elementary.rs`, `functions::all()`), corpus worksheet `elementary_functions.calc`. |
