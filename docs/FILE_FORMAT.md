@@ -64,6 +64,7 @@ suit version control. A reader must not rely on that.
 | `unit_system` | `"Si"` (default), `"Uscs"` or `"Cgs"`. Which units results are shown in. Display only: values are always computed in SI. |
 | `custom_units` | Units the worksheet defines (default none). See section 5. |
 | `page` | Paper, orientation and margin (default A4, portrait, 20 mm). See section 6. |
+| `headers` | Text for the top and bottom margins (default none; omitted when blank). See section 6a. |
 
 A region has an `id` (unique whole number), a `pos` (top-left corner) and a `size`,
 both in **document units of 1/96 inch**, and a `kind`. A text region may also have
@@ -209,6 +210,16 @@ and the message names the unit. At most 1,000 units.
 `paper` is `"A4"` or `"Letter"`; `landscape` is true or false; `margin_mm` is the
 same margin on all four sides, from 0 to 60. Each may be omitted. A margin outside
 the range is clamped on reading.
+
+
+### 6a. Headers and footers
+
+`headers` holds `header` and `footer`, each with `left`, `centre` and `right` text
+(any may be omitted), and `different_first` (default false) with `first_header` and
+`first_footer` for page 1. Text may hold the fields `{page}`, `{pages}` and `{title}`,
+filled in when a page is drawn or exported; other braces stay as typed. Each piece is
+at most 120 characters. They are printed in the margins, so a margin under about
+7 mm shows none. There is deliberately no date field.
 
 ## 7. Limits and repairs
 

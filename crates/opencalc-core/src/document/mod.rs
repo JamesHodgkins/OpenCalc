@@ -4,6 +4,7 @@
 //! autosave and the file format share one choke point (rule R3).
 
 mod geometry;
+mod header;
 mod page;
 mod picture;
 mod plot;
@@ -15,6 +16,7 @@ mod table;
 use serde::{Deserialize, Serialize};
 
 pub use geometry::{Point, Size};
+pub use header::{expand as expand_page_text, HeaderFooter, PageText, MAX_HEADER_CHARS};
 pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
 pub use picture::{
     PictureSpec, MAX_PICTURES, MAX_PICTURE_BYTES, MAX_PICTURE_PIXELS, MAX_PICTURE_SIDE,
@@ -52,6 +54,9 @@ pub struct Worksheet {
     /// Paper size, orientation and margins the regions are laid out on.
     #[serde(default)]
     pub(crate) page: PageSetup,
+    /// Text printed in the top and bottom margins of each page.
+    #[serde(default, skip_serializing_if = "HeaderFooter::is_default")]
+    pub(crate) headers: HeaderFooter,
     /// Bumped by every applied edit. Not saved; lets caches notice change.
     #[serde(skip)]
     pub(crate) revision: u64,
@@ -69,6 +74,7 @@ impl PartialEq for Worksheet {
             && self.regions == other.regions
             && self.unit_system == other.unit_system
             && self.page == other.page
+            && self.headers == other.headers
             && self.custom_units == other.custom_units
     }
 }
@@ -82,6 +88,7 @@ impl Worksheet {
             unit_system: UnitSystem::default(),
             custom_units: Vec::new(),
             page: PageSetup::default(),
+            headers: HeaderFooter::default(),
             revision: 0,
             eval_revision: 0,
         }
@@ -93,6 +100,10 @@ impl Worksheet {
 
     pub fn page(&self) -> PageSetup {
         self.page
+    }
+
+    pub fn headers(&self) -> &HeaderFooter {
+        &self.headers
     }
 
     pub fn unit_system(&self) -> UnitSystem {

@@ -120,6 +120,8 @@ pub fn render_pages(
         theme: source.theme,
         paper: &paper,
         page: setup,
+        headers: doc.headers(),
+        title: doc.title(),
         output: source.output,
         units: doc.unit_system(),
         show_grid: false,
@@ -156,6 +158,7 @@ pub fn render_pages(
             let painter = ui.painter().clone();
             let whole = Rect::from_min_size(pos2(0.0, 0.0), vec2(w, h));
             painter.rect_filled(whole, 0.0, paper.base);
+            page::header_footer(&painter, whole, 1.0, &setup, &env, k, count);
             for r in doc.regions() {
                 if !rect_of(r, &sizes).intersects(page_rect) {
                     continue;

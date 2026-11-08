@@ -42,6 +42,9 @@ pub struct Env<'a> {
     /// The palette of what is drawn on a page (see `Theme::paper`).
     pub paper: &'a Theme,
     pub page: PageSetup,
+    /// Header and footer text, and the title its `{title}` field shows.
+    pub headers: &'a opencalc_core::document::HeaderFooter,
+    pub title: &'a str,
     pub output: &'a Output,
     pub units: UnitSystem,
     pub show_grid: bool,

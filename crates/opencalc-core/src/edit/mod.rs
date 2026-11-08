@@ -11,8 +11,8 @@
 mod history;
 
 use crate::document::{
-    clean_label, FontStyle, PageSetup, PictureSpec, PlotSpec, Point, Region, RegionId, RegionKind,
-    ResultFormat, Size, TableSpec, Worksheet,
+    clean_label, FontStyle, HeaderFooter, PageSetup, PictureSpec, PlotSpec, Point, Region,
+    RegionId, RegionKind, ResultFormat, Size, TableSpec, Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -92,6 +92,8 @@ pub enum Edit {
     /// Change the paper size, orientation or margins. Moves nothing; it only
     /// changes where page edges fall.
     SetPageSetup(PageSetup),
+    /// Replace the header and footer text. Display only.
+    SetHeaders(Box<HeaderFooter>),
     /// Replace the worksheet's own unit definitions.
     SetCustomUnits(Vec<UnitDef>),
     /// Rename the worksheet.
@@ -276,6 +278,10 @@ impl Worksheet {
                 let old = std::mem::replace(&mut region.size, *size);
                 Ok(Edit::SetRegionSize { id: *id, size: old })
             }
+            Edit::SetHeaders(h) => Ok(Edit::SetHeaders(Box::new(std::mem::replace(
+                &mut self.headers,
+                h.sanitised(),
+            )))),
             Edit::SetPageSetup(page) => Ok(Edit::SetPageSetup(std::mem::replace(
                 &mut self.page,
                 page.sanitised(),

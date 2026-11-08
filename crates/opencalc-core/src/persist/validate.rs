@@ -191,6 +191,16 @@ pub fn check(ws: &mut Worksheet) -> Result<Vec<Repair>, LoadError> {
         });
     }
     too_long("the title", &ws.title)?;
+    for t in [
+        &ws.headers.header,
+        &ws.headers.footer,
+        &ws.headers.first_header,
+        &ws.headers.first_footer,
+    ] {
+        for s in [&t.left, &t.centre, &t.right] {
+            too_long("header or footer text", s)?;
+        }
+    }
     let mut ids = HashSet::with_capacity(ws.regions.len());
     let mut highest = 0;
     for r in &ws.regions {

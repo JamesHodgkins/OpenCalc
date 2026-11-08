@@ -102,6 +102,7 @@ impl App {
         panels::table_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         panels::plot_view::show(ctx, &self.state);
         panels::units::show(ctx, &self.state, &mut cmds, &mut panel_edits);
+        panels::page_setup::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         if self.state.check.open {
             self.state.refresh_findings();
         }
@@ -123,7 +124,6 @@ impl App {
         panels::about::show(ctx, &self.state, &mut cmds);
         panels::shortcuts::show(ctx, &self.state, &mut cmds);
         panels::options::show(ctx, &self.state, &mut cmds);
-        panels::page_setup::show(ctx, &self.state, &mut cmds);
         panels::dialogs::show(ctx, &self.state, &mut cmds);
 
         // Seen by the canvas next frame: egui reports IME output only while a text
@@ -143,10 +143,14 @@ impl App {
         let found = self.state.found();
         let state = &mut self.state;
         let paper = crate::theme::Theme::paper();
+        let headers = state.sheets[sheet].doc.headers().clone();
+        let title = state.sheets[sheet].doc.title().to_owned();
         let env = canvas::Env {
             theme: &state.theme,
             paper: &paper,
             page: state.sheets[sheet].doc.page(),
+            headers: &headers,
+            title: &title,
             output: &state.output,
             units: state.sheets[sheet].doc.unit_system(),
             show_grid: state.show_grid,

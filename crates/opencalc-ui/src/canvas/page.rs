@@ -5,7 +5,9 @@
 //! at `k * (height + GAP)`, so there is a gap between pages that regions may cross.
 //! Pure geometry is separate from painting so it is tested without a window.
 
-use eframe::egui::{epaint::Shadow, Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
+use eframe::egui::{
+    epaint::Shadow, Align2, Color32, FontId, Painter, Pos2, Rect, Shape, Stroke, Vec2,
+};
 use opencalc_core::document::{PageSetup, Region};
 
 use super::adapt::{rect_of, Sizes};
@@ -73,6 +75,63 @@ pub fn fit_width(setup: &PageSetup, viewport: Vec2) -> CanvasView {
     }
 }
 
+/// Margins narrower than this (document units) have no room for header text.
+const MIN_BAND: f32 = 28.0;
+/// Header and footer text size, in document units.
+const BAND_TEXT: f32 = 10.0;
+
+/// Print the header and footer of page `k` (of `pages`) in the margins of `page`,
+/// which is the page's rectangle on the screen drawn at `zoom`.
+pub fn header_footer(
+    painter: &Painter,
+    page: Rect,
+    zoom: f32,
+    setup: &PageSetup,
+    env: &Env,
+    k: usize,
+    pages: usize,
+) {
+    let margin = setup.margin();
+    if margin < MIN_BAND {
+        return;
+    }
+    let (header, footer) = env.headers.for_page(k);
+    let m = margin * zoom;
+    let third = (page.width() - 2.0 * m) / 3.0;
+    let font = FontId::proportional(BAND_TEXT * zoom);
+    for (band, y) in [
+        (header, page.top() + m * 0.5),
+        (footer, page.bottom() - m * 0.5),
+    ] {
+        if band.is_blank() {
+            continue;
+        }
+        let pieces = band.expanded(k + 1, pages, env.title);
+        for (n, text) in pieces.iter().enumerate() {
+            if text.is_empty() {
+                continue;
+            }
+            let x0 = page.left() + m + third * n as f32;
+            let cell = Rect::from_min_max(
+                Pos2::new(x0, y - m * 0.5),
+                Pos2::new(x0 + third, y + m * 0.5),
+            );
+            let (anchor, x) = match n {
+                0 => (Align2::LEFT_CENTER, cell.left()),
+                1 => (Align2::CENTER_CENTER, cell.center().x),
+                _ => (Align2::RIGHT_CENTER, cell.right()),
+            };
+            painter.with_clip_rect(cell).text(
+                Pos2::new(x, y),
+                anchor,
+                text,
+                font.clone(),
+                env.paper.text_weak,
+            );
+        }
+    }
+}
+
 /// The text area of a page: the page inset by the margin on every side.
 pub fn margin_box(page: Rect, margin: f32) -> Rect {
     page.shrink(margin.min(page.width().min(page.height()) / 2.0))
@@ -115,6 +174,7 @@ pub fn paint(
         };
         painter.add(shadow.as_shape(screen, 0.0));
         painter.rect_filled(screen, 0.0, paper.base);
+        header_footer(painter, screen, view.zoom, setup, env, k, count);
         // The margin box, dashed, so the text area is plain to see.
         let inner = view.rect_to_screen(margin_box(page_rect(setup, k), setup.margin()), origin);
         let corners = [
