@@ -590,6 +590,13 @@ mod tests {
     }
 
     #[test]
+    fn the_global_definition_sign_is_the_same_as_define() {
+        assert_eq!(parse("x \u{2261} 1 + 2"), parse("x := 1 + 2"));
+        assert_eq!(parse("f(x) \u{2261} x^2"), parse("f(x) := x^2"));
+        assert!(matches!(parse("x \u{2261}"), Expr::Error(_)));
+    }
+
+    #[test]
     fn error_ranges_count_characters_not_bytes() {
         // Greek letters are two bytes each; the range must still land on the `$`.
         let (_, text) = error_at("\u{3b1} + \u{3b2} $ 2");

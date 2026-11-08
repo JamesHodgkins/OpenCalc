@@ -83,6 +83,12 @@ pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usiz
                 }
                 toks.push(Tok::Ident(chars[start..i].iter().collect()));
             }
+            // The global definition sign. Every definition here is global already
+            // (see docs/DOCUMENT_FEATURES.md), so it means the same as `:=`.
+            '\u{2261}' => {
+                toks.push(Tok::Define);
+                i += 1;
+            }
             ':' if chars.get(i + 1) == Some(&'=') => {
                 toks.push(Tok::Define);
                 i += 2;
