@@ -48,6 +48,18 @@ impl crate::app::Files for NoFiles {
         None
     }
 
+    fn pick_data_open(&mut self, _: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
+        None
+    }
+
+    fn pick_data_save(
+        &mut self,
+        _: &str,
+        _: Option<&std::path::Path>,
+    ) -> Option<std::path::PathBuf> {
+        None
+    }
+
     fn pick_export(
         &mut self,
         _: &str,

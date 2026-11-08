@@ -143,3 +143,101 @@ fn a_table_is_drawn_and_a_bad_cell_shows_an_error() {
     let bad = pixels_for(loads().with_cell(1, 1, "oops"));
     assert!(red(&bad) > 20, "the error is drawn in red");
 }
+
+mod csv_files {
+    use opencalc_core::document::{RegionKind, TableSpec};
+
+    use super::super::files::{setup, Rig};
+    use crate::app::filing::Dialog;
+    use crate::commands::CommandId;
+    use crate::theme::PaletteKey;
+
+    /// A rig with one table, named `data`, selected.
+    fn rig(name: &str) -> Rig {
+        let mut t = setup(name, crate::app::AppState::new(PaletteKey::Neutral));
+        let i = t.state().active.unwrap();
+        let id = t.h.app.state.sheets[i].insert(RegionKind::table());
+        t.h.app.state.sheets[i].edit(opencalc_core::edit::Edit::SetTable {
+            id,
+            spec: Box::new(TableSpec::default().with_name("data")),
+        });
+        t.h.app.state.sheets[i].canvas.selection = vec![id];
+        t.h.frame();
+        t
+    }
+
+    fn table(t: &Rig) -> TableSpec {
+        t.state().sheets[0]
+            .doc
+            .regions()
+            .iter()
+            .find_map(|r| match &r.kind {
+                RegionKind::Table(s) => Some((**s).clone()),
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    fn message(t: &Rig) -> String {
+        match &t.state().dialog {
+            Some(Dialog::Message { title, text }) => format!("{title}: {text}"),
+            other => panic!("expected a message, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn importing_fills_the_table_keeps_its_name_and_undoes_as_one_step() {
+        let mut t = rig("csv_in");
+        let file = t.dir.join("loads.csv");
+        std::fs::write(&file, "x [m];F [kN]\n1,5;10\n2;20\n").unwrap();
+        t.answer_data_open(Some(file));
+        t.run(CommandId::TableImportCsv);
+        let spec = table(&t);
+        assert_eq!(spec.name, "data");
+        assert_eq!(spec.columns[1].unit, "kN");
+        assert_eq!(spec.rows, vec![vec!["1.5", "10"], vec!["2", "20"]]);
+        t.h.settle();
+        let id = t.state().sheets[0].doc.regions()[0].id;
+        assert!(t.state().output.values[&id].is_ok());
+        t.run(CommandId::EditUndo);
+        assert_eq!(table(&t).rows.len(), 3, "one undo restores the blank table");
+    }
+
+    #[test]
+    fn a_bad_file_changes_nothing_and_says_why() {
+        let mut t = rig("csv_bad");
+        let before = table(&t);
+        for (name, bytes) in [
+            ("text.csv", b"1,2\n3,x\n".to_vec()),
+            ("binary.csv", vec![0xff, 0xfe, 0x00, 0x80]),
+        ] {
+            let file = t.dir.join(name);
+            std::fs::write(&file, bytes).unwrap();
+            t.answer_data_open(Some(file));
+            t.run(CommandId::TableImportCsv);
+            assert!(message(&t).contains("Could not import"), "{name}");
+            t.run(CommandId::DialogOk);
+            assert_eq!(table(&t), before, "{name}");
+        }
+        // cancelled: nothing at all
+        t.answer_data_open(None);
+        t.run(CommandId::TableImportCsv);
+        assert!(t.state().dialog.is_none());
+        assert_eq!(table(&t), before);
+    }
+
+    #[test]
+    fn exporting_writes_the_numbers_and_leaves_the_worksheet_alone() {
+        let mut t = rig("csv_out");
+        let file = t.dir.join("in.csv");
+        std::fs::write(&file, "x [m],F [kN]\n1,10\n2,20\n").unwrap();
+        t.answer_data_open(Some(file));
+        t.run(CommandId::TableImportCsv);
+        let revision = t.state().sheets[0].doc.revision();
+        t.answer_data_save(Some(t.dir.join("out")));
+        t.run(CommandId::TableExportCsv);
+        let text = std::fs::read_to_string(t.dir.join("out.csv")).unwrap();
+        assert_eq!(text, "x [m],F [kN]\r\n1,10\r\n2,20\r\n");
+        assert_eq!(t.state().sheets[0].doc.revision(), revision);
+    }
+}

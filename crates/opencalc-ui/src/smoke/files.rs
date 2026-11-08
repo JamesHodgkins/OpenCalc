@@ -23,6 +23,8 @@ struct Script {
     open: VecDeque<Option<PathBuf>>,
     save: VecDeque<Option<PathBuf>>,
     export: VecDeque<Option<PathBuf>>,
+    data_open: VecDeque<Option<PathBuf>>,
+    data_save: VecDeque<Option<PathBuf>>,
     /// The file names suggested by Save dialogs.
     suggested: Vec<String>,
 }
@@ -32,6 +34,14 @@ struct Fake(Rc<RefCell<Script>>);
 impl Files for Fake {
     fn pick_open(&mut self) -> Option<PathBuf> {
         self.0.borrow_mut().open.pop_front().flatten()
+    }
+
+    fn pick_data_open(&mut self, _folder: Option<&Path>) -> Option<PathBuf> {
+        self.0.borrow_mut().data_open.pop_front().flatten()
+    }
+
+    fn pick_data_save(&mut self, _name: &str, _folder: Option<&Path>) -> Option<PathBuf> {
+        self.0.borrow_mut().data_save.pop_front().flatten()
     }
 
     fn pick_save(&mut self, name: &str, _folder: Option<&Path>) -> Option<PathBuf> {
@@ -91,6 +101,14 @@ impl Rig {
 
     fn answer_save(&mut self, path: Option<PathBuf>) {
         self.script.borrow_mut().save.push_back(path);
+    }
+
+    pub fn answer_data_open(&mut self, path: Option<PathBuf>) {
+        self.script.borrow_mut().data_open.push_back(path);
+    }
+
+    pub fn answer_data_save(&mut self, path: Option<PathBuf>) {
+        self.script.borrow_mut().data_save.push_back(path);
     }
 
     pub fn answer_export(&mut self, path: Option<PathBuf>) {

@@ -9,6 +9,7 @@ use opencalc_core::edit::Edit;
 
 use crate::app::AppState;
 use crate::canvas::CanvasCmd;
+use crate::commands::CommandId;
 use crate::theme::type_size;
 
 /// The single selected table region, if that is what is selected.
@@ -24,7 +25,7 @@ pub fn selected_table(state: &AppState) -> Option<(RegionId, &TableSpec)> {
 }
 
 /// Show the window for the selected table, if there is one.
-pub fn show(ctx: &Context, state: &AppState, out: &mut Vec<CanvasCmd>) {
+pub fn show(ctx: &Context, state: &AppState, cmds: &mut Vec<CommandId>, out: &mut Vec<CanvasCmd>) {
     let Some((id, spec)) = selected_table(state) else {
         return;
     };
@@ -39,7 +40,7 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Vec<CanvasCmd>) {
             egui::ScrollArea::both()
                 .max_height(tallest)
                 .max_width(340.0)
-                .show(ui, |ui| editor(ui, state, id, spec, out));
+                .show(ui, |ui| editor(ui, state, id, spec, cmds, out));
         });
 }
 
@@ -81,7 +82,14 @@ fn entry(
     }
 }
 
-fn editor(ui: &mut Ui, state: &AppState, id: RegionId, spec: &TableSpec, out: &mut Vec<CanvasCmd>) {
+fn editor(
+    ui: &mut Ui,
+    state: &AppState,
+    id: RegionId,
+    spec: &TableSpec,
+    cmds: &mut Vec<CommandId>,
+    out: &mut Vec<CanvasCmd>,
+) {
     let weak = |ui: &mut Ui, text: &str| {
         ui.label(
             RichText::new(text)
@@ -147,6 +155,14 @@ fn editor(ui: &mut Ui, state: &AppState, id: RegionId, spec: &TableSpec, out: &m
             .clicked()
         {
             send(out, id, spec.clone().with_column_removed(spec.cols() - 1));
+        }
+    });
+    ui.horizontal(|ui| {
+        if ui.button("Import CSV...").clicked() {
+            cmds.push(CommandId::TableImportCsv);
+        }
+        if ui.button("Export CSV...").clicked() {
+            cmds.push(CommandId::TableExportCsv);
         }
     });
 }

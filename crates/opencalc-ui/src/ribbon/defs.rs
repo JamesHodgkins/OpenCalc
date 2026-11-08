@@ -390,6 +390,8 @@ mod tests {
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog
+            CommandId::TableImportCsv,     // the Table window
+            CommandId::TableExportCsv,     // the Table window
         ]);
         for command in CommandId::ALL {
             assert!(reachable.contains(command), "{command:?} cannot be reached");

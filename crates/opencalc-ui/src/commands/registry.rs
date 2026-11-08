@@ -93,6 +93,8 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | InsertArea
             | InsertPlot
             | InsertTable
+            | TableImportCsv
+            | TableExportCsv
             | InsertPicture
             | ViewZoomIn
             | ViewZoomOut

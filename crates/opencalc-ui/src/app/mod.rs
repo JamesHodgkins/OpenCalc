@@ -9,6 +9,7 @@ mod arranging;
 pub mod association;
 mod checking;
 mod clipboard;
+mod data;
 pub(crate) mod dispatch;
 mod exporting;
 mod files;
@@ -201,6 +202,8 @@ impl App {
                 Effect::Cut => self.cut(),
                 Effect::Paste => self.paste(),
                 Effect::Export(kind) => self.export_active(kind),
+                Effect::ImportCsv => self.import_csv(),
+                Effect::ExportCsv => self.export_csv(),
                 Effect::Restore(r) => self.restore(r),
                 Effect::DeleteFile(path) => {
                     let _ = std::fs::remove_file(path);

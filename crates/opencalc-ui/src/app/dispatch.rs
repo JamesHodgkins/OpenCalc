@@ -35,6 +35,9 @@ pub enum Effect {
     ChooseOpen,
     /// Export the active worksheet.
     Export(crate::export::Kind),
+    /// Fill the selected table from a CSV file, or write it to one.
+    ImportCsv,
+    ExportCsv,
     /// Clipboard work, which needs the system clipboard.
     Copy,
     Cut,
@@ -135,6 +138,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         ArrangeSeparate => separate_regions(state),
         FileExportPdf => fx.push(Effect::Export(crate::export::Kind::Pdf)),
         FileExportPng => fx.push(Effect::Export(crate::export::Kind::Png)),
+        TableImportCsv => fx.push(Effect::ImportCsv),
+        TableExportCsv => fx.push(Effect::ExportCsv),
         UnitsSi => set_unit_system(state, UnitSystem::Si),
         UnitsUscs => set_unit_system(state, UnitSystem::Uscs),
         UnitsCgs => set_unit_system(state, UnitSystem::Cgs),

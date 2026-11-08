@@ -20,6 +20,10 @@ pub trait Files {
     fn pick_open(&mut self) -> Option<PathBuf>;
     /// `name` is the suggested file name.
     fn pick_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf>;
+    /// A CSV or text file to read numbers from.
+    fn pick_data_open(&mut self, folder: Option<&Path>) -> Option<PathBuf>;
+    /// Where to write a CSV file; `name` is suggested.
+    fn pick_data_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf>;
     /// Where to export to: `name` is suggested, `kind` decides the file type.
     fn pick_export(
         &mut self,
@@ -41,6 +45,27 @@ impl Files for NativeFiles {
         filter(rfd::FileDialog::new())
             .set_title("Open worksheet")
             .pick_file()
+    }
+
+    fn pick_data_open(&mut self, folder: Option<&Path>) -> Option<PathBuf> {
+        let mut dialog = rfd::FileDialog::new()
+            .add_filter("CSV or text", &["csv", "txt", "tsv"])
+            .set_title("Import numbers");
+        if let Some(folder) = folder {
+            dialog = dialog.set_directory(folder);
+        }
+        dialog.pick_file()
+    }
+
+    fn pick_data_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf> {
+        let mut dialog = rfd::FileDialog::new()
+            .add_filter("CSV", &["csv"])
+            .set_title("Export table")
+            .set_file_name(name);
+        if let Some(folder) = folder {
+            dialog = dialog.set_directory(folder);
+        }
+        dialog.save_file()
     }
 
     fn pick_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf> {
