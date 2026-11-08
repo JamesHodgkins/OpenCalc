@@ -68,7 +68,7 @@ fn write(kind: Kind, source: &Source, path: &Path, shrink: f32) -> Result<Vec<Pa
             // leaves no half an export. One page goes to the chosen name; more are
             // numbered from it.
             let mut pages: Vec<(usize, Vec<u8>)> = Vec::new();
-            export::render_pages(source, export::PNG_SCALE * shrink, |k, image| {
+            export::render_pages(source, export::PNG_SCALE * shrink, |k, image, _| {
                 pages.push((k, export::png_bytes(&image)?));
                 Ok(())
             })?;

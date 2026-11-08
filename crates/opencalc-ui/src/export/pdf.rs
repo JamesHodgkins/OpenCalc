@@ -1,20 +1,25 @@
-//! A small PDF writer: one page per picture, each page a single image the size
-//! of the page. The text is therefore not selectable, but it prints and zooms
-//! like any other page at the resolution it was drawn.
+//! A small PDF writer: one page per picture, each page an image the size of the
+//! page, with the page's text laid over it invisibly. The picture is what prints
+//! and zooms; the text on top is what can be selected, copied and searched. (The
+//! letters are not real glyphs in the file, so zooming in shows the picture's
+//! pixels, as it always did.)
 
 use std::io::Write;
 
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 
-/// One page: its size in points (1/72 inch) and its pixels, already compressed
-/// so that a long worksheet does not hold every page uncompressed at once.
+use super::runs::TextRun;
+
+/// One page: its size in points (1/72 inch), its pixels (already compressed, so a
+/// long worksheet does not hold every page uncompressed at once) and its text.
 pub struct PdfPage {
     width_pt: f32,
     height_pt: f32,
     px_width: usize,
     px_height: usize,
     deflated: Vec<u8>,
+    text: Vec<TextRun>,
 }
 
 impl PdfPage {
@@ -35,7 +40,14 @@ impl PdfPage {
             px_width,
             px_height,
             deflated: z.finish().unwrap_or_default(),
+            text: Vec::new(),
         }
+    }
+
+    /// The text on the page, in page units (1/96 inch) from its top left.
+    pub fn with_text(mut self, runs: Vec<TextRun>) -> PdfPage {
+        self.text = runs;
+        self
     }
 }
 
@@ -49,14 +61,119 @@ fn hex_string(text: &str) -> String {
     out
 }
 
+/// Document units (1/96 inch) to points.
+const PT: f32 = 0.75;
+/// Every code is drawn 0.5 em wide by the viewer, and the run is stretched to the
+/// width it really had.
+const NOMINAL_WIDTH: f32 = 0.5;
+
+/// Which one-byte code stands for each character of the text. Printable ASCII is
+/// its own code, so even a viewer that ignores the font's mapping reads it right;
+/// any other character gets the next free code from 128 (a `ToUnicode` map says
+/// what it is). Past 255 characters in all, the rest become `?`.
+struct Codes {
+    others: Vec<char>,
+}
+
+impl Codes {
+    fn new(pages: &[PdfPage]) -> Codes {
+        let mut others: Vec<char> = Vec::new();
+        for c in pages
+            .iter()
+            .flat_map(|p| &p.text)
+            .flat_map(|r| r.text.chars())
+        {
+            if !(' '..='~').contains(&c) && !others.contains(&c) && others.len() < 128 {
+                others.push(c);
+            }
+        }
+        Codes { others }
+    }
+
+    fn code(&self, c: char) -> u8 {
+        if (' '..='~').contains(&c) {
+            c as u8
+        } else {
+            self.others
+                .iter()
+                .position(|o| *o == c)
+                .map_or(b'?', |i| 128 + i as u8)
+        }
+    }
+
+    /// The `ToUnicode` CMap: what each code means.
+    fn to_unicode(&self) -> String {
+        let mut pairs: Vec<(u8, char)> = (b' '..=b'~').map(|b| (b, b as char)).collect();
+        pairs.extend(
+            self.others
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (128 + i as u8, *c)),
+        );
+        let mut cmap = String::from(
+            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n\
+             /CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n\
+             /CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n\
+             1 begincodespacerange\n<00> <FF>\nendcodespacerange\n",
+        );
+        for block in pairs.chunks(100) {
+            cmap.push_str(&format!("{} beginbfchar\n", block.len()));
+            for (code, c) in block {
+                let mut units = [0u16; 2];
+                let hex: String = c
+                    .encode_utf16(&mut units)
+                    .iter()
+                    .map(|u| format!("{u:04X}"))
+                    .collect();
+                cmap.push_str(&format!("<{code:02X}> <{hex}>\n"));
+            }
+            cmap.push_str("endbfchar\n");
+        }
+        cmap.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend");
+        cmap
+    }
+}
+
+/// The page's drawing: the picture, then each run as invisible text (render mode
+/// 3) placed where it was painted and stretched to its painted width.
+fn content(page: &PdfPage, codes: &Codes) -> String {
+    let mut out = format!(
+        "q {:.2} 0 0 {:.2} 0 0 cm /Im0 Do Q\n",
+        page.width_pt, page.height_pt
+    );
+    for run in &page.text {
+        let (size, chars) = (run.size * PT, run.text.chars().count());
+        let placed = [run.x, run.baseline, run.width]
+            .iter()
+            .all(|v| v.is_finite());
+        if chars == 0 || size <= 0.0 || !placed || run.width <= 0.0 {
+            continue;
+        }
+        let stretch =
+            (run.width * PT / (chars as f32 * NOMINAL_WIDTH * size) * 100.0).clamp(1.0, 1000.0);
+        let hex: String = run
+            .text
+            .chars()
+            .map(|c| format!("{:02X}", codes.code(c)))
+            .collect();
+        out.push_str(&format!(
+            "BT 3 Tr /F1 {size:.2} Tf {stretch:.1} Tz {:.2} {:.2} Td <{hex}> Tj ET\n",
+            run.x * PT,
+            page.height_pt - run.baseline * PT,
+        ));
+    }
+    out
+}
+
 /// The bytes of a PDF with `pages`, titled `title`.
 pub fn write_pdf(title: &str, pages: &[PdfPage]) -> Vec<u8> {
     let mut out: Vec<u8> = Vec::new();
     let mut offsets: Vec<usize> = Vec::new(); // of objects 1, 2, 3, ...
     out.extend(b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
 
-    // Object numbers: 1 catalog, 2 page tree, 3 info; then three per page.
-    let first_page = |i: usize| 4 + 3 * i;
+    // Object numbers: 1 catalog, 2 page tree, 3 info, 4 the text font, 5 its
+    // character map; then three per page.
+    let first_page = |i: usize| 6 + 3 * i;
     let mut object = |out: &mut Vec<u8>, body: &[u8]| {
         offsets.push(out.len());
         let n = offsets.len();
@@ -87,13 +204,31 @@ pub fn write_pdf(title: &str, pages: &[PdfPage]) -> Vec<u8> {
         )
         .as_bytes(),
     );
+    // The font is never drawn (the text is invisible); it is here so a viewer has
+    // the character widths and the map from codes to characters.
+    let widths = vec!["500"; 224].join(" ");
+    object(
+        &mut out,
+        format!(
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding \
+             /FirstChar 32 /LastChar 255 /Widths [{widths}] /ToUnicode 5 0 R >>"
+        )
+        .as_bytes(),
+    );
+    let codes = Codes::new(pages);
+    let map = codes.to_unicode();
+    object(
+        &mut out,
+        format!("<< /Length {} >>\nstream\n{map}\nendstream", map.len()).as_bytes(),
+    );
     for (i, page) in pages.iter().enumerate() {
         let n = first_page(i);
         object(
             &mut out,
             format!(
                 "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {:.2} {:.2}] \
-                 /Resources << /XObject << /Im0 {} 0 R >> >> /Contents {} 0 R >>",
+                 /Resources << /XObject << /Im0 {} 0 R >> /Font << /F1 4 0 R >> >> \
+                 /Contents {} 0 R >>",
                 page.width_pt,
                 page.height_pt,
                 n + 2,
@@ -101,10 +236,7 @@ pub fn write_pdf(title: &str, pages: &[PdfPage]) -> Vec<u8> {
             )
             .as_bytes(),
         );
-        let content = format!(
-            "q {:.2} 0 0 {:.2} 0 0 cm /Im0 Do Q",
-            page.width_pt, page.height_pt
-        );
+        let content = content(page, &codes);
         object(
             &mut out,
             format!(
@@ -156,6 +288,16 @@ mod tests {
         hay.windows(needle.len()).position(|w| w == needle)
     }
 
+    fn run(x: f32, baseline: f32, text: &str) -> TextRun {
+        TextRun {
+            x,
+            baseline,
+            size: 16.0,
+            width: 8.0 * text.chars().count() as f32,
+            text: text.to_owned(),
+        }
+    }
+
     #[test]
     fn the_file_has_the_right_shape_and_every_xref_entry_points_at_its_object() {
         let pdf = write_pdf(
@@ -173,11 +315,11 @@ mod tests {
             .parse()
             .unwrap();
         assert!(
-            pdf[xref..].starts_with(b"xref\n0 10\n"),
-            "3 + 2 * 3 objects, and the free one"
+            pdf[xref..].starts_with(b"xref\n0 12\n"),
+            "5 + 2 * 3 objects, and the free one"
         );
-        let table = &pdf[xref + "xref\n0 10\n".len()..];
-        for n in 1..10 {
+        let table = &pdf[xref + "xref\n0 12\n".len()..];
+        for n in 1..12 {
             let line = &table[n * 20..n * 20 + 20];
             let offset: usize = std::str::from_utf8(&line[..10]).unwrap().parse().unwrap();
             let want = format!("{n} 0 obj\n");
@@ -213,5 +355,47 @@ mod tests {
         let pdf = write_pdf("t", &[]);
         assert!(find(&pdf, b"/Count 0").is_some());
         assert!(pdf.ends_with(b"%%EOF\n"));
+    }
+
+    #[test]
+    fn text_is_placed_invisibly_where_it_was_painted_and_stretched_to_its_width() {
+        let p = page(2, 2, [255, 255, 255]).with_text(vec![run(96.0, 192.0, "ab")]);
+        let codes = Codes::new(std::slice::from_ref(&p));
+        let c = content(&p, &codes);
+        // 96 units are 72 pt across; the baseline 192 units (144 pt) from the top.
+        assert!(c.contains("BT 3 Tr /F1 12.00 Tf"), "{c}");
+        assert!(c.contains("72.00 697.89 Td <6162> Tj ET"), "{c}");
+        // Two letters 0.5 em each are 12 pt; they were 16 units (12 pt) wide: 100%.
+        assert!(c.contains(" 100.0 Tz "), "{c}");
+    }
+
+    #[test]
+    fn letters_outside_ascii_get_codes_and_the_map_says_what_they_are() {
+        let p = page(2, 2, [0, 0, 0]).with_text(vec![run(0.0, 20.0, "\u{3c3} = 1\u{b2}")]);
+        let codes = Codes::new(std::slice::from_ref(&p));
+        assert_eq!(codes.code('A'), b'A');
+        assert_eq!(codes.code('\u{3c3}'), 128);
+        assert_eq!(codes.code('\u{b2}'), 129);
+        assert_eq!(
+            codes.code('\u{4e16}'),
+            b'?',
+            "not in the document: a question mark"
+        );
+        let map = codes.to_unicode();
+        assert!(map.contains("<80> <03C3>") && map.contains("<81> <00B2>"));
+        assert!(map.contains("<41> <0041>"));
+        // The document carries it.
+        let pdf = write_pdf("t", &[p]);
+        assert!(find(&pdf, b"<80> <03C3>").is_some());
+    }
+
+    #[test]
+    fn nothing_odd_in_a_run_can_break_the_file() {
+        let mut bad = run(f32::NAN, 5.0, "x");
+        bad.width = f32::INFINITY;
+        let p = page(1, 1, [0, 0, 0]).with_text(vec![bad, run(1.0, 2.0, ""), run(1.0, 2.0, "ok")]);
+        let pdf = write_pdf("t", &[p]);
+        assert!(pdf.ends_with(b"%%EOF\n"));
+        assert!(find(&pdf, b"<6F6B> Tj").is_some(), "the good run is kept");
     }
 }

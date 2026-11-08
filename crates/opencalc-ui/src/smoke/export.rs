@@ -25,7 +25,7 @@ fn pages(doc: &opencalc_core::document::Worksheet, scale: f32) -> Vec<Image> {
         theme: &theme,
     };
     let mut out = Vec::new();
-    render_pages(&source, scale, |_, image| {
+    render_pages(&source, scale, |_, image, _| {
         out.push(image);
         Ok(())
     })
@@ -199,7 +199,7 @@ fn a_worksheet_too_long_to_export_says_so() {
         output: &output,
         theme: &theme,
     };
-    let err = render_pages(&source, 0.1, |_, _| Ok(())).unwrap_err();
+    let err = render_pages(&source, 0.1, |_, _, _| Ok(())).unwrap_err();
     assert!(err.contains("at most 200"), "{err}");
 }
 
@@ -301,7 +301,7 @@ fn write_the_example_export() {
         output: &output,
         theme: &theme,
     };
-    render_pages(&source, 2.0, |k, image| {
+    render_pages(&source, 2.0, |k, image, _| {
         std::fs::write(
             format!("{dir}/example-{}.png", k + 1),
             png_bytes(&image).unwrap(),
@@ -314,4 +314,37 @@ fn write_the_example_export() {
         pdf_bytes(&source, 2.0).unwrap(),
     )
     .unwrap();
+}
+
+#[test]
+fn the_text_of_the_worksheet_is_in_the_pdf_for_selecting_and_searching() {
+    let doc = sheet_with(&[("F := 10 kN", 100.0, 100.0), ("x := 2 m", 100.0, 200.0)]);
+    let output = evaluate_with(&doc.math_regions(), &doc.units().unwrap());
+    let theme = Theme::palette(PaletteKey::Neutral);
+    let source = Source {
+        doc: &doc,
+        output: &output,
+        theme: &theme,
+    };
+    let mut seen = Vec::new();
+    render_pages(&source, 0.5, |_, _, text| {
+        seen = text;
+        Ok(())
+    })
+    .unwrap();
+    let words: Vec<&str> = seen.iter().map(|r| r.text.as_str()).collect();
+    let all = words.join(" ");
+    for part in ["F", "10", "kN", "x", "2", "m"] {
+        assert!(words.iter().any(|w| w.trim() == part), "{part} in {all}");
+    }
+    // Reading order: the first region before the second.
+    let at = |needle: &str| words.iter().position(|w| w.trim() == needle).unwrap();
+    assert!(at("kN") < at("m"), "{all}");
+    for r in &seen {
+        assert!(r.x >= 0.0 && r.baseline > 0.0 && r.baseline < 1123.0 && r.width > 0.0);
+        assert!(r.text.chars().all(|c| !c.is_control()));
+    }
+    // And the file carries it.
+    let pdf = pdf_bytes(&source, 0.5).unwrap();
+    assert!(String::from_utf8_lossy(&pdf).contains(" Tj ET"));
 }

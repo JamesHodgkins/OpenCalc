@@ -3,11 +3,13 @@
 //! The pages are painted by the same code that paints the canvas, into an egui
 //! context of their own at a high resolution, and drawn to an image by the
 //! software renderer in `raster`. What is exported is therefore what is on screen
-//! (without the grid, selection and other editing marks). Text in a PDF is part of
-//! the page image, not selectable text.
+//! (without the grid, selection and other editing marks). A PDF page is that
+//! picture with the page's text laid over it invisibly (`runs`, `pdf`), so the text
+//! can be selected, copied and searched. The picture is what is seen and printed.
 
 pub mod pdf;
 pub mod raster;
+pub mod runs;
 
 use eframe::egui::{self, pos2, vec2, Context, Rect};
 use opencalc_core::document::Worksheet;
@@ -18,6 +20,7 @@ use crate::canvas::adapt::{rect_of, Sizes};
 use crate::canvas::{page, paint, Env};
 use crate::theme::Theme;
 use raster::{Image, Textures};
+use runs::TextRun;
 
 /// Most pages exported at once.
 pub const MAX_PAGES: usize = 200;
@@ -72,7 +75,7 @@ impl Session {
         &mut self,
         size: egui::Vec2,
         paint: impl FnOnce(&egui::Ui),
-    ) -> (Vec<egui::ClippedPrimitive>, f32) {
+    ) -> (Vec<egui::ClippedPrimitive>, f32, Vec<TextRun>) {
         self.time += 1.0;
         let mut input = egui::RawInput {
             screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), size)),
@@ -96,7 +99,9 @@ impl Session {
         });
         self.textures.apply(&full.textures_delta);
         let ppp = full.pixels_per_point;
-        (self.ctx.tessellate(full.shapes, ppp), ppp)
+        // The text is read off the shapes before they become triangles.
+        let text = runs::collect(&full.shapes);
+        (self.ctx.tessellate(full.shapes, ppp), ppp, text)
     }
 }
 
@@ -105,7 +110,7 @@ impl Session {
 pub fn render_pages(
     source: &Source,
     scale: f32,
-    mut each: impl FnMut(usize, Image) -> Result<(), String>,
+    mut each: impl FnMut(usize, Image, Vec<TextRun>) -> Result<(), String>,
 ) -> Result<usize, String> {
     let doc = source.doc;
     let setup = doc.page();
@@ -147,7 +152,7 @@ pub fn render_pages(
     let (w, h) = setup.size();
     for k in 0..count {
         let page_rect = page::page_rect(&setup, k);
-        let (primitives, ppp) = session.frame(vec2(w, h), |ui| {
+        let (primitives, ppp, text) = session.frame(vec2(w, h), |ui| {
             let painter = ui.painter().clone();
             let whole = Rect::from_min_size(pos2(0.0, 0.0), vec2(w, h));
             painter.rect_filled(whole, 0.0, paper.base);
@@ -161,7 +166,7 @@ pub fn render_pages(
         });
         let mut image = Image::white((w * ppp).round() as usize, (h * ppp).round() as usize);
         image.draw(&primitives, &session.textures, ppp);
-        each(k, image)?;
+        each(k, image, text)?;
     }
     Ok(count)
 }
@@ -184,15 +189,12 @@ pub fn png_bytes(image: &Image) -> Result<Vec<u8>, String> {
 pub fn pdf_bytes(source: &Source, scale: f32) -> Result<Vec<u8>, String> {
     let (w, h) = source.doc.page().size();
     let mut pages = Vec::new();
-    render_pages(source, scale, |_, image| {
+    render_pages(source, scale, |_, image, text| {
         // The page is w x h document units of 1/96 inch; a point is 1/72 inch.
-        pages.push(pdf::PdfPage::new(
-            w * 0.75,
-            h * 0.75,
-            image.width,
-            image.height,
-            &image.rgb(),
-        ));
+        pages.push(
+            pdf::PdfPage::new(w * 0.75, h * 0.75, image.width, image.height, &image.rgb())
+                .with_text(text),
+        );
         Ok(())
     })?;
     Ok(pdf::write_pdf(source.doc.title(), &pages))
