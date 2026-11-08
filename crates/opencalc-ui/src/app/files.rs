@@ -20,6 +20,10 @@ pub trait Files {
     fn pick_open(&mut self) -> Option<PathBuf>;
     /// `name` is the suggested file name.
     fn pick_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf>;
+    /// A template to start a new worksheet from.
+    fn pick_template_open(&mut self) -> Option<PathBuf>;
+    /// Where to write a template; `name` is suggested.
+    fn pick_template_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf>;
     /// An image file (PNG) to put in a picture region.
     fn pick_image_open(&mut self, folder: Option<&Path>) -> Option<PathBuf>;
     /// A CSV or text file to read numbers from.
@@ -47,6 +51,27 @@ impl Files for NativeFiles {
         filter(rfd::FileDialog::new())
             .set_title("Open worksheet")
             .pick_file()
+    }
+
+    fn pick_template_open(&mut self) -> Option<PathBuf> {
+        rfd::FileDialog::new()
+            .add_filter(
+                "OpenCalc template or worksheet",
+                &[persist::TEMPLATE_EXTENSION, EXTENSION],
+            )
+            .set_title("New from template")
+            .pick_file()
+    }
+
+    fn pick_template_save(&mut self, name: &str, folder: Option<&Path>) -> Option<PathBuf> {
+        let mut dialog = rfd::FileDialog::new()
+            .add_filter("OpenCalc template", &[persist::TEMPLATE_EXTENSION])
+            .set_title("Save as template")
+            .set_file_name(name);
+        if let Some(folder) = folder {
+            dialog = dialog.set_directory(folder);
+        }
+        dialog.save_file()
     }
 
     fn pick_image_open(&mut self, folder: Option<&Path>) -> Option<PathBuf> {
@@ -192,7 +217,15 @@ impl App {
         if let Some(title) = &rename {
             let _ = copy.apply(Edit::SetTitle(title.clone()));
         }
-        let written = persist::save_bytes(&copy)
+        let template = path
+            .extension()
+            .is_some_and(|e| e == persist::TEMPLATE_EXTENSION);
+        let saved = if template {
+            persist::save_template_bytes(&copy)
+        } else {
+            persist::save_bytes(&copy)
+        };
+        let written = saved
             .map_err(|e| e.to_string())
             .and_then(|bytes| persist::write_atomic(path, &bytes).map_err(|e| e.to_string()));
         match written {

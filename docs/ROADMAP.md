@@ -106,7 +106,7 @@ Design for the items still open: `DOCUMENT_FEATURES.md` (decisions A to E).
 - [ ] Rich text in text regions (needs bold/italic font files, TD-24).
 - [x] Region borders: `Region.border`, `Edit::SetBorder`, Math Formatting > Region > Border toggle; drawn on the page and in exports.
 - [ ] Content protection: password-protected regions and hidden content (needs a security design before code).
-- [ ] Templates (`.ocxt`, mirroring the worksheet format).
+- [x] Templates (`.ocxt`, the worksheet format with `kind: template`): New from template, Save as template. No built-in templates yet; no file association for `.ocxt` yet.
 
 ## Phase 6: Programming (L)
 
@@ -136,6 +136,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-08 | Phase 5: templates. |
 | 2026-11-08 | Phase 5: page backgrounds and tints; `≡` accepted as `:=`. |
 | 2026-11-08 | Phase 5: design note for backgrounds, templates, rich text, content protection and global definitions (`DOCUMENT_FEATURES.md`); no code. |
 | 2026-11-08 | Phase 5: headers and footers. |

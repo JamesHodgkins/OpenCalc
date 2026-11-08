@@ -21,11 +21,13 @@ pub fn window_title(state: &crate::app::AppState) -> String {
     }
 }
 
-pub(crate) const MENU: [CommandId; 9] = [
+pub(crate) const MENU: [CommandId; 11] = [
     CommandId::FileNew,
+    CommandId::FileNewFromTemplate,
     CommandId::FileOpen,
     CommandId::FileSave,
     CommandId::FileSaveAs,
+    CommandId::FileSaveAsTemplate,
     CommandId::FileExportPdf,
     CommandId::FileExportPng,
     CommandId::AppOptions,

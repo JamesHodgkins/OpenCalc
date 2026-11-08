@@ -27,6 +27,7 @@ fn content(ui: &mut Ui, state: &AppState, out: &mut Commands) {
     ui.horizontal(|ui| {
         for command in [
             CommandId::FileNew,
+            CommandId::FileNewFromTemplate,
             CommandId::FileOpen,
             CommandId::FileExample,
         ] {

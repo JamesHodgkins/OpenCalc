@@ -21,6 +21,7 @@ pub mod inserting;
 pub mod labels;
 mod recovery;
 mod state;
+mod templates;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -196,6 +197,8 @@ impl App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 Effect::ChooseOpen => self.choose_open(),
+                Effect::NewFromTemplate => self.new_from_template(),
+                Effect::SaveAsTemplate => self.save_as_template(),
                 Effect::RefreshFileType => self.refresh_file_type(),
                 Effect::SetFileType(on) => self.set_file_type(on),
                 Effect::Copy => self.copy(),

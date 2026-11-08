@@ -28,6 +28,9 @@ pub use validate::{Repair, MAX_COORD, MAX_CUSTOM_UNITS, MAX_EXTENT, MAX_REGIONS,
 /// The file extension, without the dot.
 pub const EXTENSION: &str = "ocx";
 
+/// The extension of a template: a worksheet kept to start new ones from.
+pub const TEMPLATE_EXTENSION: &str = "ocxt";
+
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
     #[error("this is not an OpenCalc worksheet (not a valid archive: {0})")]
@@ -80,6 +83,8 @@ pub struct Loaded {
     pub repairs: Vec<Repair>,
     /// Which program wrote the file, as it says in the manifest.
     pub saved_by: String,
+    /// Whether the manifest says the file is a template.
+    pub is_template: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -87,10 +92,22 @@ struct Manifest {
     format_version: u32,
     #[serde(default)]
     app: String,
+    /// `"template"` for a template; absent for a worksheet.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kind: Option<String>,
 }
 
 /// The bytes of the file for `ws`. The same worksheet always gives the same bytes.
 pub fn save_bytes(ws: &Worksheet) -> Result<Vec<u8>, SaveError> {
+    save_as(ws, None)
+}
+
+/// The bytes of a template made from `ws`: the same file with `"kind": "template"`.
+pub fn save_template_bytes(ws: &Worksheet) -> Result<Vec<u8>, SaveError> {
+    save_as(ws, Some("template"))
+}
+
+fn save_as(ws: &Worksheet, kind: Option<&str>) -> Result<Vec<u8>, SaveError> {
     // Anything the loader would repair or refuse is a fault in the worksheet.
     let mut copy = ws.clone();
     match validate::check(&mut copy) {
@@ -101,6 +118,7 @@ pub fn save_bytes(ws: &Worksheet) -> Result<Vec<u8>, SaveError> {
     let manifest = Manifest {
         format_version: FORMAT_VERSION,
         app: format!("opencalc {}", crate::version()),
+        kind: kind.map(str::to_owned),
     };
     let manifest =
         serde_json::to_vec(&manifest).map_err(|e| SaveError::Container(e.to_string()))?;
@@ -134,5 +152,6 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Loaded, LoadError> {
         worksheet,
         repairs,
         saved_by: manifest.app,
+        is_template: manifest.kind.as_deref() == Some("template"),
     })
 }

@@ -116,6 +116,8 @@ commands! {
     DialogRestore: "dialog.restore", "Restore", icons::REFRESH;
     DialogDropRecovery: "dialog.drop_recovery", "Discard", icons::DELETE;
     FileClose: "file.close", "Close worksheet", icons::CLOSE;
+    FileNewFromTemplate: "file.new_from_template", "New from template...", icons::FILE_NEW;
+    FileSaveAsTemplate: "file.save_as_template", "Save as template...", icons::FILE_NEW;
     FileExample: "file.example", "Open example", icons::BOOK;
     AppQuit: "app.quit", "Quit", icons::CLOSE;
     AppOptions: "app.options", "Options", icons::PROPERTIES;
@@ -262,19 +264,21 @@ impl CommandId {
             | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
             | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace
             | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
-            | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
-            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
-            | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..)
-            | MatrixClose | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext
-            | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
-            | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
-            | PictureChoose | TableImportCsv | TableExportCsv | InsertPicture | CalcAll
-            | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap
-            | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose
-            | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout
-            | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_)
-            | PageLandscape(_) | PageMarginMm(_) | DocPageSetup | DocPageSetupClose
-            | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => true,
+            | UnitsManage | UnitsClose | FileNew | FileNewFromTemplate | FileSaveAsTemplate
+            | FileOpen | FileSave | FileSaveAs | DialogSave | DialogDiscard | DialogCancel
+            | DialogOk | DialogRestore | DialogDropRecovery | OpenRecent(_) | GoToFinding(_)
+            | InsertMatrixSize(..) | MatrixClose | InsertMatrix | InsertRange | CheckClose
+            | CalcCheck | WarnNext | WarnPrev | FileClose | FileExample | AppQuit | TabHome
+            | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea
+            | InsertPlot | InsertTable | PictureChoose | TableImportCsv | TableExportCsv
+            | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
+            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
+            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
+            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
+                true
+            }
             HelpGuide => false,
         }
     }

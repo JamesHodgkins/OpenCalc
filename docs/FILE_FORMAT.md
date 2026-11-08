@@ -32,6 +32,9 @@ suit version control. A reader must not rely on that.
   A reader that only understands versions up to N must refuse a file with a larger
   number rather than guess at it.
 - `app` names the program that wrote the file. Informational.
+- `kind` is `"template"` for a template (extension `.ocxt`) and absent for a worksheet.
+  A template is otherwise an ordinary worksheet file. File > New from template makes
+  an untitled copy; opening the template itself edits it and saves it back as a template.
 
 ## 3. The worksheet
 

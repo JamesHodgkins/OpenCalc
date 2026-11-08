@@ -87,6 +87,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | UnitsManage
             | FileSave
             | FileSaveAs
+            | FileSaveAsTemplate
             | CalcAll
             | InsertMath
             | InsertText

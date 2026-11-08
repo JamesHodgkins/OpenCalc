@@ -33,6 +33,10 @@ pub enum Effect {
     SetFileType(bool),
     /// Ask which file to open, then open it.
     ChooseOpen,
+    /// Ask for a template (or worksheet) and start a new worksheet from it.
+    NewFromTemplate,
+    /// Ask where to write the active worksheet as a template.
+    SaveAsTemplate,
     /// Export the active worksheet.
     Export(crate::export::Kind),
     /// Fill the selected table from a CSV file, or write it to one.
@@ -90,6 +94,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             add_sheet(state, OpenSheet::new(&title));
             fx.push(Effect::Recalculate);
         }
+        FileNewFromTemplate => fx.push(Effect::NewFromTemplate),
+        FileSaveAsTemplate => fx.push(Effect::SaveAsTemplate),
         FileExample => {
             add_sheet(state, OpenSheet::sample());
             fx.push(Effect::Recalculate);
