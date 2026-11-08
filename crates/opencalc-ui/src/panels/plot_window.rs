@@ -4,15 +4,15 @@
 //! document and only asks for edits, like every panel.
 
 use eframe::egui::{self, Context, RichText, Ui};
-use opencalc_core::document::{
-    LegendMode, Marker, MathRegion, PlotOptions, PlotSpec, RegionId, RegionKind, SeriesKind,
-    SeriesStyle, YAxis, MAX_SERIES, PALETTE_SIZE,
-};
+use opencalc_core::document::{PlotKind, PlotOptions, PlotSpec, RegionId, RegionKind, MAX_SERIES};
 use opencalc_core::edit::Edit;
 
 use crate::app::AppState;
 use crate::canvas::CanvasCmd;
 use crate::theme::type_size;
+
+mod axes;
+mod series;
 
 /// The single selected plot region, if that is what is selected.
 pub fn selected_plot(state: &AppState) -> Option<(RegionId, &PlotSpec)> {
@@ -114,170 +114,6 @@ fn small(ui: &mut Ui, state: &AppState, text: &str) {
     );
 }
 
-/// How series `k` is drawn: type, marker, colour and legend name.
-fn series_style(
-    ui: &mut Ui,
-    state: &AppState,
-    id: RegionId,
-    spec: &PlotSpec,
-    k: usize,
-    out: &mut Vec<CanvasCmd>,
-) {
-    let style = spec.style(k);
-    egui::CollapsingHeader::new(format!("Style of series {}", k + 1))
-        .id_salt(("plot-style", id.0, k))
-        .show(ui, |ui| {
-            small(ui, state, "Type");
-            if let Some(kind) = choose(
-                ui,
-                ("plot-kind", id.0, k),
-                style.kind,
-                &SeriesKind::ALL,
-                &|o| o.label().to_owned(),
-            ) {
-                let new = SeriesStyle {
-                    kind,
-                    ..style.clone()
-                };
-                send(out, id, spec.clone().with_style(k, new));
-            }
-            if matches!(
-                style.kind,
-                SeriesKind::Markers | SeriesKind::LineMarkers | SeriesKind::Stem
-            ) {
-                small(ui, state, "Marker");
-                if let Some(marker) = choose(
-                    ui,
-                    ("plot-marker", id.0, k),
-                    style.marker,
-                    &Marker::ALL,
-                    &|o| o.label().to_owned(),
-                ) {
-                    let new = SeriesStyle {
-                        marker,
-                        ..style.clone()
-                    };
-                    send(out, id, spec.clone().with_style(k, new));
-                }
-            }
-            small(ui, state, "Colour");
-            let colours: Vec<Option<u8>> = std::iter::once(None)
-                .chain((0..PALETTE_SIZE).map(Some))
-                .collect();
-            let describe = |c: Option<u8>| match c {
-                None => "Automatic".to_owned(),
-                Some(n) => format!("\u{25a0} Colour {}", n + 1),
-            };
-            if let Some(colour) = choose(
-                ui,
-                ("plot-colour", id.0, k),
-                style.colour,
-                &colours,
-                &describe,
-            ) {
-                let new = SeriesStyle {
-                    colour,
-                    ..style.clone()
-                };
-                send(out, id, spec.clone().with_style(k, new));
-            }
-            field(ui, state, id, out, "Legend name", &style.name, &|t| {
-                let new = SeriesStyle {
-                    name: t.to_owned(),
-                    ..style.clone()
-                };
-                spec.clone().with_style(k, new)
-            });
-            small(ui, state, "Measured on");
-            if let Some(axis) = choose(ui, ("plot-axis", id.0, k), style.axis, &YAxis::ALL, &|o| {
-                o.label().to_owned()
-            }) {
-                let new = SeriesStyle {
-                    axis,
-                    ..style.clone()
-                };
-                send(out, id, spec.clone().with_style(k, new));
-            }
-            field(
-                ui,
-                state,
-                id,
-                out,
-                "Own x values (blank: the plot's x values)",
-                &style.x,
-                &|t| {
-                    let new = SeriesStyle {
-                        x: t.to_owned(),
-                        ..style.clone()
-                    };
-                    spec.clone().with_style(k, new)
-                },
-            );
-        });
-}
-
-/// Axis limits, grid, legend and log axes.
-fn axes(ui: &mut Ui, state: &AppState, id: RegionId, spec: &PlotSpec, out: &mut Vec<CanvasCmd>) {
-    let o: &PlotOptions = &spec.options;
-    egui::CollapsingHeader::new("Axes and grid")
-        .id_salt(("plot-axes", id.0))
-        .show(ui, |ui| {
-            let limits: [(&str, &MathRegion); 6] = [
-                ("x minimum (blank: automatic)", &o.x_min),
-                ("x maximum", &o.x_max),
-                ("y minimum", &o.y_min),
-                ("y maximum", &o.y_max),
-                ("Right axis minimum", &o.y2_min),
-                ("Right axis maximum", &o.y2_max),
-            ];
-            for (n, (label, current)) in limits.into_iter().enumerate() {
-                field(ui, state, id, out, label, current.source(), &|t| {
-                    let m = MathRegion::new(t);
-                    let mut options = o.clone();
-                    match n {
-                        0 => options.x_min = m,
-                        1 => options.x_max = m,
-                        2 => options.y_min = m,
-                        3 => options.y_max = m,
-                        4 => options.y2_min = m,
-                        _ => options.y2_max = m,
-                    }
-                    spec.clone().with_options(options)
-                });
-            }
-            let mut grid = o.grid;
-            let (mut x_log, mut y_log, mut y2_log) = (o.x_log, o.y_log, o.y2_log);
-            ui.checkbox(&mut grid, "Grid");
-            ui.checkbox(&mut x_log, "Logarithmic x axis");
-            ui.checkbox(&mut y_log, "Logarithmic y axis");
-            ui.checkbox(&mut y2_log, "Logarithmic right axis");
-            if (grid, x_log, y_log, y2_log) != (o.grid, o.x_log, o.y_log, o.y2_log) {
-                let options = PlotOptions {
-                    grid,
-                    x_log,
-                    y_log,
-                    y2_log,
-                    ..o.clone()
-                };
-                send(out, id, spec.clone().with_options(options));
-            }
-            small(ui, state, "Legend");
-            if let Some(legend) = choose(
-                ui,
-                ("plot-legend", id.0),
-                o.legend,
-                &LegendMode::ALL,
-                &|m| m.label().to_owned(),
-            ) {
-                let options = PlotOptions {
-                    legend,
-                    ..o.clone()
-                };
-                send(out, id, spec.clone().with_options(options));
-            }
-        });
-}
-
 /// Fields for what a plot shows. Each change is an edit of the whole spec, built
 /// from the current one, so the panel keeps no state of its own.
 fn plot_editor(
@@ -287,23 +123,48 @@ fn plot_editor(
     spec: &PlotSpec,
     out: &mut Vec<CanvasCmd>,
 ) {
+    let polar = spec.options.kind == PlotKind::Polar;
+    small(ui, state, "Plot type");
+    if let Some(kind) = choose(
+        ui,
+        ("plot-type", id.0),
+        spec.options.kind,
+        &PlotKind::ALL,
+        &|k| k.label().to_owned(),
+    ) {
+        let options = PlotOptions {
+            kind,
+            ..(*spec.options).clone()
+        };
+        send(out, id, spec.clone().with_options(options));
+    }
     field(ui, state, id, out, "Title", &spec.title, &|t| {
         spec.clone().with_title(t)
     });
-    field(ui, state, id, out, "x values", spec.x.source(), &|t| {
-        spec.clone().with_x(t)
-    });
+    field(
+        ui,
+        state,
+        id,
+        out,
+        if polar {
+            "Angles (radians; 30 deg works)"
+        } else {
+            "x values"
+        },
+        spec.x.source(),
+        &|t| spec.clone().with_x(t),
+    );
     for (k, series) in spec.series.iter().enumerate() {
         field(
             ui,
             state,
             id,
             out,
-            &format!("Series {}", k + 1),
+            &format!("{} {}", if polar { "Radius" } else { "Series" }, k + 1),
             series.source(),
             &|t| spec.clone().with_series(k, t),
         );
-        series_style(ui, state, id, spec, k, out);
+        series::style(ui, state, id, spec, k, out);
     }
     ui.horizontal(|ui| {
         if spec.series.len() < MAX_SERIES && ui.button("Add series").clicked() {
@@ -315,13 +176,25 @@ fn plot_editor(
             send(out, id, spec.clone().without_series(last));
         }
     });
-    field(ui, state, id, out, "x label", &spec.x_label, &|t| {
-        spec.clone().with_labels(t, &spec.y_label)
-    });
-    field(ui, state, id, out, "y label", &spec.y_label, &|t| {
-        spec.clone().with_labels(&spec.x_label, t)
-    });
-    if spec.uses_right_axis() {
+    field(
+        ui,
+        state,
+        id,
+        out,
+        if polar { "Angle caption" } else { "x label" },
+        &spec.x_label,
+        &|t| spec.clone().with_labels(t, &spec.y_label),
+    );
+    field(
+        ui,
+        state,
+        id,
+        out,
+        if polar { "Radius caption" } else { "y label" },
+        &spec.y_label,
+        &|t| spec.clone().with_labels(&spec.x_label, t),
+    );
+    if !polar && spec.uses_right_axis() {
         field(
             ui,
             state,
@@ -332,7 +205,7 @@ fn plot_editor(
             &|t| spec.clone().with_y2_label(t),
         );
     }
-    axes(ui, state, id, spec, out);
+    axes::show(ui, state, id, spec, out);
     ui.add_space(4.0);
     if ui
         .button("Explore this plot\u{2026}")

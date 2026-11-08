@@ -16,7 +16,7 @@ pub use geometry::{Point, Size};
 pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
 pub use plot::{PlotInput, PlotSeriesInput, PlotSpec, MAX_SERIES};
 pub use plot_style::{
-    LegendMode, Marker, PlotOptions, SeriesKind, SeriesStyle, YAxis, PALETTE_SIZE,
+    LegendMode, Marker, PlotKind, PlotOptions, SeriesKind, SeriesStyle, YAxis, PALETTE_SIZE,
 };
 pub use region::{
     clean_label, FontStyle, MathRegion, Region, RegionId, RegionKind, MAX_LABEL_CHARS,
@@ -168,6 +168,7 @@ impl Worksheet {
                             })
                             .collect(),
                         x_blank: p.x.source().trim().is_empty(),
+                        polar: p.options.kind == PlotKind::Polar,
                         x_log: p.options.x_log,
                         y_log: p.options.y_log,
                         y2_log: p.options.y2_log,

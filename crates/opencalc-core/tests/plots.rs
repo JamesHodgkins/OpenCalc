@@ -641,3 +641,126 @@ fn removing_a_series_takes_its_axis_and_x_values_with_it() {
     assert_eq!(p.style(0), SeriesStyle::default());
     assert!(!p.uses_right_axis());
 }
+
+// ---- polar plots ----------------------------------------------------------------
+
+use opencalc_core::document::PlotKind;
+
+fn polar(spec: PlotSpec) -> PlotSpec {
+    let options = (*spec.options).clone();
+    spec.with_options(PlotOptions {
+        kind: PlotKind::Polar,
+        ..options
+    })
+}
+
+#[test]
+fn a_polar_plot_takes_angles_as_x_and_radii_as_series() {
+    // A cardioid, r = 1 + cos(a), with the angle given in degrees.
+    let (w, id) = sheet(
+        &["a := 0 deg, 90 deg..270 deg", "r := 2 m * (1 + cos(a))"],
+        polar(spec("a", &["r"])),
+    );
+    let data = plot_of(&run(&w), id).unwrap();
+    assert!(data.polar);
+    assert_eq!(data.series[0].y_dim, Dimension::LENGTH);
+    let (angle, radius) = data.series[0].points[1];
+    assert!(
+        (angle - std::f64::consts::FRAC_PI_2).abs() < 1e-12,
+        "90 deg is pi/2 radians"
+    );
+    assert!((radius - 2.0).abs() < 1e-12);
+    assert!(!polar_off(&w, id), "an X-Y plot is not polar");
+}
+
+fn polar_off(w: &Worksheet, id: RegionId) -> bool {
+    let mut w = w.clone();
+    let RegionKind::Plot(p) = &w.region(id).unwrap().kind else {
+        panic!()
+    };
+    let xy = p.clone().with_options(PlotOptions::default());
+    w.apply(Edit::SetPlot { id, spec: xy }).unwrap();
+    plot_of(&run(&w), id).unwrap().polar
+}
+
+#[test]
+fn the_angles_of_a_polar_plot_must_be_plain_numbers() {
+    let (w, id) = sheet(
+        &["t := 0 s, 1 s..3 s", "r := 1 m * t / s"],
+        polar(spec("t", &["r"])),
+    );
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, error })
+            if part == "x" && matches!(*error, EvalError::Invalid(_))
+    ));
+    // A series with its own angles is held to the same rule.
+    let (w, id) = sheet(
+        &["a := 0..3", "t := 0 s, 1 s..3 s", "r := a"],
+        polar(with_own_x(spec("a", &["r"]), 0, "t")),
+    );
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "series 1 x"
+    ));
+}
+
+#[test]
+fn log_axes_x_limits_and_the_right_axis_do_not_apply_to_a_polar_plot() {
+    let options = PlotOptions {
+        x_log: true,
+        y_log: true,
+        x_max: MathRegion::new("3 s"),
+        y2_max: MathRegion::new("1 kg"),
+        ..PlotOptions::default()
+    };
+    // The radius is zero at the first point and the x limit has the wrong units:
+    // neither matters here.
+    let p = on_right(polar(spec("a", &["a", "a"])), 1).with_options(PlotOptions {
+        kind: PlotKind::Polar,
+        ..options
+    });
+    let (w, id) = sheet(&["a := 0..3"], p);
+    let data = plot_of(&run(&w), id).unwrap();
+    assert!(!data.x_log && !data.y_log && !data.y2_log);
+    assert_eq!(data.limits[1], None, "the x limit is ignored");
+    assert_eq!(data.y2_dim, None);
+    assert!(data.series.iter().all(|s| !s.right));
+}
+
+#[test]
+fn the_outer_radius_limit_of_a_polar_plot_is_checked_against_the_radius() {
+    let limited = |limit: &str| {
+        polar(spec("a", &["r"])).with_options(PlotOptions {
+            kind: PlotKind::Polar,
+            y_max: MathRegion::new(limit),
+            ..PlotOptions::default()
+        })
+    };
+    let lines = &["a := 0..3", "r := a * 1 m"];
+    let (w, id) = sheet(lines, limited("5 m"));
+    assert_eq!(plot_of(&run(&w), id).unwrap().limits[3], Some(5.0));
+    let (w, id) = sheet(lines, limited("5 s"));
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "y max"
+    ));
+}
+
+#[test]
+fn a_polar_plot_is_saved_and_a_plain_one_writes_nothing_for_the_kind() {
+    use opencalc_core::persist::{load_bytes, save_bytes};
+    let (w, id) = sheet(&["a := 0..3"], polar(spec("a", &["a"])));
+    let back = load_bytes(&save_bytes(&w).unwrap()).unwrap().worksheet;
+    assert_eq!(back, w);
+    let RegionKind::Plot(p) = &back.region(id).unwrap().kind else {
+        panic!()
+    };
+    assert_eq!(p.options.kind, PlotKind::Polar);
+    assert!(
+        PlotOptions::default().is_default(),
+        "X-Y is the default and is not written"
+    );
+    let json = serde_json::to_string(&PlotOptions::default()).unwrap();
+    assert!(json.contains("\"kind\":\"xy\""), "{json}");
+}

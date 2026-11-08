@@ -173,6 +173,8 @@ pub struct PlotInput {
     pub series: Vec<PlotSeriesInput>,
     /// The x source is empty (whatever `x` then holds).
     pub x_blank: bool,
+    /// A polar plot: the x values are angles and the series are radii.
+    pub polar: bool,
     /// Logarithmic axes.
     pub x_log: bool,
     pub y_log: bool,

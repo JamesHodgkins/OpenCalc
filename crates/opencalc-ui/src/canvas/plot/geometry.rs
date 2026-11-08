@@ -19,6 +19,15 @@ pub struct View {
     pub y2: Option<(f64, f64)>,
 }
 
+/// A polar plot's circle: its centre, the outer ring's radius in pixels and the
+/// radius that ring stands for, in the unit the radius is written in.
+#[derive(Clone, Copy, Debug)]
+pub struct Polar {
+    pub centre: Pos2,
+    pub ring: f32,
+    pub r_max: f64,
+}
+
 /// A data point near the pointer.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hit {
@@ -44,6 +53,9 @@ pub struct Geometry {
     /// Display name of each series, and whether it is on the right axis.
     pub names: Vec<String>,
     pub right: Vec<bool>,
+    /// Set for a polar plot, whose points are (angle in radians, radius) and whose
+    /// `scales` are stand-ins.
+    pub polar: Option<Polar>,
 }
 
 /// `v` to five significant digits without trailing zeros: `3.1416`, `120`,
@@ -132,8 +144,18 @@ impl Geometry {
         best.map(|(_, hit)| hit)
     }
 
-    /// What a hit is, in words: `load (right): x = 3 s, y = 12.5 N`.
+    /// What a hit is, in words: `load (right): x = 3 s, y = 12.5 N`; on a polar plot
+    /// `r (m): angle = 0.5236 rad (30\u{b0}), r = 2 m`.
     pub fn describe(&self, hit: &Hit) -> String {
+        if self.polar.is_some() {
+            return format!(
+                "{}: angle = {} rad ({}\u{b0}), r = {}",
+                self.names[hit.series],
+                significant(hit.x),
+                significant(hit.x.to_degrees()),
+                with_unit(hit.y, &self.scales.y_unit),
+            );
+        }
         let y_unit = if self.right[hit.series] {
             &self.scales.y2_unit
         } else {
@@ -149,6 +171,14 @@ impl Geometry {
 
     /// The values under the pointer, for a status line.
     pub fn describe_cursor(&self, p: Pos2) -> String {
+        if let Some(polar) = &self.polar {
+            let r = f64::from(p.distance(polar.centre) / polar.ring) * polar.r_max;
+            return format!(
+                "r = {}, angle = {}\u{b0}",
+                with_unit(r, &self.scales.y_unit),
+                significant(super::polar::angle_degrees(polar.centre, p)),
+            );
+        }
         let (x, y, y2) = self.cursor(p);
         let mut text = format!(
             "x = {}, y = {}",
@@ -174,6 +204,18 @@ impl View {
     /// Zoom by `factor` (below 1 zooms in) about the screen position `at`, on all
     /// axes: the data under the pointer stays under it.
     pub fn zoomed(&self, g: &Geometry, at: Pos2, factor: f64) -> View {
+        if let Some(polar) = &g.polar {
+            // Zooming a polar plot moves the outer ring: smaller shows the middle in
+            // more detail. There is no place to zoom about but the centre.
+            let outer = polar.r_max * factor;
+            let sane =
+                outer.is_finite() && outer > 1e-12 * polar.r_max && outer < 1e12 * polar.r_max;
+            let r_max = if sane { outer } else { polar.r_max };
+            return View {
+                y: Some((0.0, r_max * g.scales.y_scale)),
+                ..*self
+            };
+        }
         let (fx, fy) = g.fractions(at);
         let s = &g.scales;
         let to_si = |(lo, hi): (f64, f64), scale: f64| Some((lo * scale, hi * scale));
@@ -190,6 +232,9 @@ impl View {
     /// Move the view with a drag of `delta` screen pixels: the data follows the
     /// pointer.
     pub fn panned(&self, g: &Geometry, delta: Vec2) -> View {
+        if g.polar.is_some() {
+            return *self; // a polar plot is always centred
+        }
         let (dx, dy) = (
             -f64::from(delta.x / g.area.width()),
             f64::from(delta.y / g.area.height()),
@@ -236,6 +281,7 @@ mod tests {
             ],
             names: vec!["d".into(), "load".into()],
             right: vec![false, true],
+            polar: None,
         }
     }
 

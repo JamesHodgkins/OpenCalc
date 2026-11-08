@@ -98,6 +98,7 @@ Both are optional, and nothing is written for a setting left at its default.
 
 | Field | Values | Meaning |
 |---|---|---|
+| `kind` | `"xy"` (default), `"polar"` | `"polar"` draws radius against angle: the plot's `x` values are angles in radians (plain numbers, so `30 deg` works; a unit such as seconds is an error) and each series is a radius. In a polar plot `x_log`, `y_log`, the x and right-axis limits, and series on the right axis do not apply and are ignored; `y_max` is the outer radius. |
 | `grid` | `true` (default), `false` | Grid lines. |
 | `legend` | `"auto"` (default), `"show"`, `"hide"` | Auto shows it when there is more than one series. |
 | `x_log`, `y_log` | `false` (default), `true` | Logarithmic axis: every value on it must be positive. |

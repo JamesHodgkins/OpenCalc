@@ -19,6 +19,9 @@ pub struct PlotSeries {
 /// What a plot region draws.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlotData {
+    /// A polar plot: `points` are (angle in radians, radius) and `y_dim` is the
+    /// dimension of the radius.
+    pub polar: bool,
     pub x_dim: Dimension,
     pub series: Vec<PlotSeries>,
     /// The dimension of the right-hand axis, when some series use it.
@@ -75,18 +78,29 @@ fn in_plot(part: &str, error: EvalError) -> EvalError {
     }
 }
 
+fn angles_are_plain_numbers() -> EvalError {
+    EvalError::Invalid(
+        "the angles of a polar plot must be plain numbers in radians; 30 deg works".into(),
+    )
+}
+
 fn positive_only() -> EvalError {
     EvalError::Invalid("a logarithmic axis needs every value to be positive".into())
 }
 
 pub(super) fn evaluate_plot(input: &PlotInput, cx: &Cx) -> Result<PlotData, EvalError> {
+    // In a polar plot only the radius limits and the right-axis-free, linear scales
+    // apply: the angle is a plain number, the axes are not logarithmic and there is
+    // one radius axis.
+    let polar = input.polar;
     let mut data = PlotData {
+        polar,
         x_dim: Dimension::NONE,
         series: Vec::new(),
         y2_dim: None,
-        x_log: input.x_log,
-        y_log: input.y_log,
-        y2_log: input.y2_log,
+        x_log: input.x_log && !polar,
+        y_log: input.y_log && !polar,
+        y2_log: input.y2_log && !polar,
         limits: [None; 6],
     };
     // Every series needs the shared x values unless it has x values of its own.
@@ -106,27 +120,33 @@ pub(super) fn evaluate_plot(input: &PlotInput, cx: &Cx) -> Result<PlotData, Eval
         let (xs, dim) = value(&input.x)
             .and_then(|v| numbers(&v))
             .map_err(|e| in_plot("x", e))?;
-        if input.x_log && xs.iter().any(|x| *x <= 0.0) {
+        if data.x_log && xs.iter().any(|x| *x <= 0.0) {
             return Err(in_plot("x", positive_only()));
+        }
+        if polar && !dim.is_dimensionless() {
+            return Err(in_plot("x", angles_are_plain_numbers()));
         }
         data.x_dim = dim;
         Some((xs, dim))
     };
     // A series asking for the right axis only gets one if another is on the left.
-    let any_left = input.series.iter().any(|s| !s.right);
+    let any_left = polar || input.series.iter().any(|s| !s.right);
     let (mut left_dim, mut right_dim): (Option<Dimension>, Option<Dimension>) = (None, None);
     let mut x_dim_seen = shared.as_ref().map(|(_, d)| *d);
     for (k, series) in input.series.iter().enumerate() {
         let part = format!("series {}", k + 1);
-        let right = series.right && any_left;
+        let right = series.right && any_left && !polar;
         let (xs, x_dim) = match (&series.x, &shared) {
             (Some(e), _) => {
                 let own = format!("{part} x");
                 let (xs, dim) = value(e)
                     .and_then(|v| numbers(&v))
                     .map_err(|e| in_plot(&own, e))?;
-                if input.x_log && xs.iter().any(|x| *x <= 0.0) {
+                if data.x_log && xs.iter().any(|x| *x <= 0.0) {
                     return Err(in_plot(&own, positive_only()));
+                }
+                if polar && !dim.is_dimensionless() {
+                    return Err(in_plot(&own, angles_are_plain_numbers()));
                 }
                 (xs, dim)
             }
@@ -165,7 +185,7 @@ pub(super) fn evaluate_plot(input: &PlotInput, cx: &Cx) -> Result<PlotData, Eval
             }
             _ => *group = Some(y_dim),
         }
-        let log = if right { input.y2_log } else { input.y_log };
+        let log = if right { data.y2_log } else { data.y_log };
         if log && ys.iter().any(|y| *y <= 0.0) {
             return Err(in_plot(&part, positive_only()));
         }
@@ -195,6 +215,9 @@ fn resolve_limits(input: &PlotInput, data: &mut PlotData, cx: &Cx) -> Result<(),
     let left = data.left_dim();
     for (k, limit) in input.limits.iter().enumerate() {
         let Some(expr) = limit else { continue };
+        if data.polar && !(2..4).contains(&k) {
+            continue;
+        }
         let (axis, log) = match k {
             0 | 1 => (data.x_dim, data.x_log),
             2 | 3 => (left, data.y_log),

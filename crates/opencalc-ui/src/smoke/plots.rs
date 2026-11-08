@@ -535,3 +535,151 @@ fn the_legend_says_which_series_are_on_the_right() {
     let corner = |image: &Image| dark_in(image, (420, 300, 715, 400));
     assert!(corner(&with) > 0 || corner(&without) > 0);
 }
+
+// ---- polar plots ------------------------------------------------------------------
+
+use opencalc_core::document::PlotKind;
+
+fn polar_spec(series: &[&str]) -> PlotSpec {
+    plot(series).with_x("a").with_options(PlotOptions {
+        kind: PlotKind::Polar,
+        ..PlotOptions::default()
+    })
+}
+
+const ANGLES: &str = "a := 0, 0.1..6.3";
+
+fn centroid_x(image: &Image, k: usize) -> Option<f64> {
+    let colours = palette();
+    let (mut sum, mut n) = (0.0, 0.0);
+    for y in LOWER.1..LOWER.3.min(image.height) {
+        for x in LOWER.0..LOWER.2 {
+            let p = image.pixel(x, y);
+            if coloured(p) && (0..8).min_by_key(|i| distance(p, colours[*i])) == Some(k) {
+                sum += x as f64;
+                n += 1.0;
+            }
+        }
+    }
+    (n > 0.0).then(|| sum / n)
+}
+
+#[test]
+fn a_polar_circle_is_drawn_all_the_way_round() {
+    let doc = sheet_of(&[ANGLES, "r := 2 m + 0 m * a"], polar_spec(&["r"]));
+    let image = render(&doc);
+    let (x0, y0, x1, y1) = (216, 320, 704, 580);
+    let (mx, my) = ((x0 + x1) / 2, (y0 + y1) / 2);
+    for (name, r) in [
+        ("top left", (x0, y0, mx, my)),
+        ("top right", (mx, y0, x1, my)),
+        ("bottom left", (x0, my, mx, y1)),
+        ("bottom right", (mx, my, x1, y1)),
+    ] {
+        assert!(ink_in(&image, 0, r) > 15, "nothing drawn in the {name}");
+    }
+    // Nothing is drawn at the centre: the data is a ring, not a disc.
+    assert_eq!(ink_in(&image, 0, (mx - 20, my - 20, mx + 20, my + 20)), 0);
+}
+
+#[test]
+fn a_positive_radius_points_along_the_angle_and_a_negative_one_the_other_way() {
+    // r = 1 + cos a reaches out to the right (angle 0); minus that, to the left.
+    let out = render(&sheet_of(
+        &[ANGLES, "r := 1 m + 1 m * cos(a)"],
+        polar_spec(&["r"]),
+    ));
+    let back = render(&sheet_of(
+        &[ANGLES, "r := -1 m - 1 m * cos(a)"],
+        polar_spec(&["r"]),
+    ));
+    let centre = 460.0;
+    let right = centroid_x(&out, 0).expect("drawn");
+    let left = centroid_x(&back, 0).expect("drawn");
+    assert!(
+        right > centre + 15.0,
+        "a positive radius reaches right: {right}"
+    );
+    assert!(
+        left < centre - 15.0,
+        "a negative radius reaches left: {left}"
+    );
+}
+
+#[test]
+fn the_polar_grid_can_be_turned_off() {
+    let on = render(&sheet_of(
+        &[ANGLES, "r := 2 m + 0 m * a"],
+        polar_spec(&["r"]),
+    ));
+    let off_spec = polar_spec(&["r"]).with_options(PlotOptions {
+        kind: PlotKind::Polar,
+        grid: false,
+        ..PlotOptions::default()
+    });
+    let off = render(&sheet_of(&[ANGLES, "r := 2 m + 0 m * a"], off_spec));
+    let marked_in = |image: &Image| {
+        (LOWER.1..LOWER.3)
+            .flat_map(|y| (LOWER.0..LOWER.2).map(move |x| image.pixel(x, y)))
+            .filter(|p| *p != [255, 255, 255])
+            .count()
+    };
+    assert!(
+        marked_in(&on) > marked_in(&off) + 400,
+        "rings and spokes: {} against {}",
+        marked_in(&on),
+        marked_in(&off)
+    );
+    assert!(ink_in(&off, 0, LOWER) > 20, "the data is still drawn");
+}
+
+#[test]
+fn angles_with_a_unit_show_the_error_instead_of_a_chart() {
+    let doc = sheet_of(
+        &["t := 0 s, 1 s..4 s", "r := 1 m + 0 m * t / s"],
+        polar_spec(&["r"]).with_x("t"),
+    );
+    let image = render(&doc);
+    // No chart: no frame, rings or spokes, only the message (which is red text, so
+    // it cannot be told from a series by colour).
+    assert!(
+        longest_line_in(&image, LOWER) < 100,
+        "the longest line is {} pixels",
+        longest_line_in(&image, LOWER)
+    );
+}
+
+#[test]
+fn a_stem_is_a_spoke_from_the_centre_and_markers_are_not() {
+    let styled = |kind| {
+        let spec = polar_spec(&["r"]);
+        series_style(spec, 0, |s| s.kind = kind)
+    };
+    let lines = &["a := 0, 1..6", "r := 2 m + 0 m * a"];
+    let stems = render(&sheet_of(lines, styled(SeriesKind::Stem)));
+    let dots = render(&sheet_of(lines, styled(SeriesKind::Markers)));
+    let near_centre = (420, 410, 500, 490);
+    assert!(
+        ink_in(&stems, 0, near_centre) > 30,
+        "spokes reach the middle"
+    );
+    assert_eq!(ink_in(&dots, 0, near_centre), 0, "markers do not");
+}
+
+#[test]
+fn a_polar_plot_ignores_the_right_axis_and_log_settings() {
+    // The settings carry over from an X-Y plot that had them; they do no harm.
+    let spec = polar_spec(&["r", "r"]).with_options(PlotOptions {
+        kind: PlotKind::Polar,
+        y_log: true,
+        x_log: true,
+        ..PlotOptions::default()
+    });
+    let spec = series_style(spec, 1, |s| s.axis = YAxis::Right);
+    let image = render(&sheet_of(&[ANGLES, "r := 1 m + 1 m * cos(a)"], spec));
+    assert!(ink_in(&image, 0, LOWER) > 20, "drawn");
+    assert!(
+        ink_in(&image, 1, LOWER) > 20,
+        "the second series too, on the same circle"
+    );
+}

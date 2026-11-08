@@ -1,8 +1,10 @@
 //! The legend of a plot: which series is which.
 
 use eframe::egui::{Color32, FontId, Painter, Pos2, Rect, Vec2};
-use opencalc_core::document::{SeriesKind, SeriesStyle};
+use opencalc_core::document::{LegendMode, PlotSpec, SeriesKind, SeriesStyle};
+use opencalc_core::eval::PlotData;
 
+use super::context::series_name;
 use super::marks;
 use super::PlotCtx;
 
@@ -11,6 +13,43 @@ pub struct Entry<'a> {
     pub name: String,
     pub style: &'a SeriesStyle,
     pub colour: Color32,
+}
+
+/// The legend's rows, or `None` when the plot is not to show one: when asked for, or
+/// by default when there is more than one series. `used[k]` is the position in the
+/// spec of the k-th series drawn; series on the right axis are marked as such when
+/// `mark_right`.
+pub fn entries<'a>(
+    ctx: &PlotCtx,
+    spec: &PlotSpec,
+    data: &PlotData,
+    styles: &'a [SeriesStyle],
+    used: &[usize],
+    mark_right: bool,
+) -> Option<Vec<Entry<'a>>> {
+    let wanted = match spec.options.legend {
+        LegendMode::Hide => false,
+        LegendMode::Show => !data.series.is_empty(),
+        LegendMode::Auto => data.series.len() >= 2,
+    };
+    wanted.then(|| {
+        styles
+            .iter()
+            .enumerate()
+            .map(|(k, style)| {
+                let base = series_name(spec, used.get(k).copied().unwrap_or(k), style);
+                Entry {
+                    name: if mark_right && data.series[k].right {
+                        format!("{base} (right)")
+                    } else {
+                        base
+                    },
+                    style,
+                    colour: ctx.paper.series[style.colour.map_or(k, usize::from) % 8],
+                }
+            })
+            .collect()
+    })
 }
 
 /// Draw the legend in the top right of `area`, on a faint backing panel because it

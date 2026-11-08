@@ -8,18 +8,18 @@ mod context;
 mod geometry;
 mod legend;
 mod marks;
+mod polar;
 mod scales;
 mod ticks;
 
 use eframe::egui::{Align2, Color32, FontId, Painter, Pos2, Rect, Stroke, StrokeKind};
-use opencalc_core::document::{LegendMode, PlotSpec, Region, RegionId, SeriesKind, SeriesStyle};
+use opencalc_core::document::{PlotSpec, Region, RegionId, SeriesKind, SeriesStyle};
 use opencalc_core::eval::PlotData;
 
 use super::adapt::vec;
 use super::Env;
 use crate::theme::{metrics, type_size};
 pub use geometry::{Geometry, View};
-use legend::Entry;
 use marks::{Frame, Look};
 use scales::Scales;
 
@@ -141,6 +141,9 @@ fn chart(painter: &Painter, ctx: &PlotCtx, c: &Chart) -> Option<Geometry> {
     let styles: Vec<SeriesStyle> = (0..data.series.len())
         .map(|k| spec.style(used.get(k).copied().unwrap_or(k)))
         .collect();
+    if data.polar {
+        return polar::draw(painter, ctx, c, &styles, &used);
+    }
     let scales = Scales::new(ctx, data, &styles, view);
     let has_right = scales.y2.is_some();
 
@@ -310,29 +313,7 @@ fn chart(painter: &Painter, ctx: &PlotCtx, c: &Chart) -> Option<Geometry> {
                 theme.text_weak,
             );
         }
-        let wanted = match spec.options.legend {
-            LegendMode::Hide => false,
-            LegendMode::Show => !data.series.is_empty(),
-            LegendMode::Auto => data.series.len() >= 2,
-        };
-        if wanted {
-            let entries: Vec<Entry> = styles
-                .iter()
-                .enumerate()
-                .map(|(k, style)| {
-                    let at = used.get(k).copied().unwrap_or(k);
-                    let base = series_name(spec, at, style);
-                    Entry {
-                        name: if has_right && data.series[k].right {
-                            format!("{base} (right)")
-                        } else {
-                            base
-                        },
-                        style,
-                        colour: ctx.paper.series[style.colour.map_or(k, usize::from) % 8],
-                    }
-                })
-                .collect();
+        if let Some(entries) = legend::entries(ctx, spec, data, &styles, &used, has_right) {
             legend::draw(painter, ctx, &entries, area, &font, zoom);
         }
     }
@@ -359,5 +340,6 @@ fn chart(painter: &Painter, ctx: &PlotCtx, c: &Chart) -> Option<Geometry> {
         values,
         names,
         right: data.series.iter().map(|s| s.right).collect(),
+        polar: None,
     })
 }

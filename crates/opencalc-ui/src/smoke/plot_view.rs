@@ -255,3 +255,101 @@ fn the_window_closes_when_its_plot_is_gone_and_nothing_is_saved_by_looking() {
         "the request to look at something that is not a plot is dropped"
     );
 }
+
+// ---- a polar plot --------------------------------------------------------------------
+
+fn polar_doc() -> (Worksheet, RegionId) {
+    use opencalc_core::document::{PlotKind, PlotOptions};
+    let mut s = OpenSheet::new("t");
+    s.add(
+        RegionKind::math("a := 0, 0.5236..6.2832"),
+        Point::new(40.0, 10.0),
+    );
+    s.add(
+        RegionKind::math("r := 3 m + 0 m * a"),
+        Point::new(40.0, 40.0),
+    );
+    let spec = PlotSpec::default()
+        .with_x("a")
+        .with_series(0, "r")
+        .with_options(PlotOptions {
+            kind: PlotKind::Polar,
+            ..PlotOptions::default()
+        });
+    let id = s.add(RegionKind::Plot(spec), Point::new(100.0, 100.0));
+    (s.doc, id)
+}
+
+#[test]
+fn a_polar_plot_reports_its_circle_and_where_each_point_is_on_it() {
+    let (doc, id) = polar_doc();
+    let (_, g) = paint(&doc, id, &View::default());
+    let g = g.expect("a polar chart was drawn");
+    let polar = g.polar.expect("the geometry knows it is polar");
+    assert!(g.area.contains(polar.centre));
+    assert!(
+        polar.r_max >= 3.0 && polar.r_max <= 5.0,
+        "a round outer radius: {}",
+        polar.r_max
+    );
+    // Every point of the constant-radius series is the same distance from the centre.
+    let distances: Vec<f32> = g.screen[0]
+        .iter()
+        .map(|p| p.distance(polar.centre))
+        .collect();
+    let first = distances[0];
+    assert!(
+        distances.iter().all(|d| (d - first).abs() < 0.5),
+        "{distances:?}"
+    );
+    assert!(
+        (f64::from(first / polar.ring) * polar.r_max - 3.0).abs() < 0.01,
+        "3 m on the scale"
+    );
+}
+
+#[test]
+fn hovering_a_polar_point_says_its_angle_and_radius() {
+    let (doc, id) = polar_doc();
+    let (_, g) = paint(&doc, id, &View::default());
+    let g = g.unwrap();
+    // The second point is at 30 degrees (0.5236 radians).
+    let near = g.screen[0][1] + egui::vec2(2.0, 2.0);
+    let hit = g.nearest(near, 14.0).expect("a point is near");
+    let text = g.describe(&hit);
+    assert!(text.contains("angle = 0.5236 rad (30"), "{text}");
+    assert!(text.contains("r = 3 m"), "{text}");
+    // The pointer alone: a distance from the centre and a direction.
+    let polar = g.polar.unwrap();
+    let text = g.describe_cursor(polar.centre + egui::vec2(0.0, -polar.ring / 2.0));
+    assert!(text.contains("angle = 90"), "straight up: {text}");
+    assert!(text.starts_with("r = "), "{text}");
+    assert!(g.describe_cursor(polar.centre).contains("r = 0 m"));
+}
+
+#[test]
+fn zooming_a_polar_plot_moves_the_outer_ring_and_panning_does_nothing() {
+    let (doc, id) = polar_doc();
+    let (_, g) = paint(&doc, id, &View::default());
+    let g = g.unwrap();
+    let before = g.polar.unwrap().r_max;
+    let zoomed = View::default().zoomed(&g, g.area.center(), 0.5);
+    let (_, gz) = paint(&doc, id, &zoomed);
+    let after = gz.unwrap().polar.unwrap().r_max;
+    assert!(
+        (after - before / 2.0).abs() < 1e-9,
+        "{before} became {after}"
+    );
+    assert_eq!(
+        View::default().panned(&g, egui::vec2(30.0, 30.0)),
+        View::default()
+    );
+    // Zooming far enough stops, rather than collapsing to nothing.
+    let mut view = View::default();
+    for _ in 0..200 {
+        let (_, g) = paint(&doc, id, &view);
+        view = view.zoomed(&g.unwrap(), Pos2::ZERO, 0.1);
+    }
+    let (_, g) = paint(&doc, id, &view);
+    assert!(g.unwrap().polar.unwrap().r_max > 0.0);
+}

@@ -141,6 +141,30 @@ impl SeriesStyle {
     }
 }
 
+/// What kind of chart the plot is.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlotKind {
+    /// Series of y against x on rectangular axes.
+    #[default]
+    Xy,
+    /// Series of radius against angle: the plot's x values are angles in radians
+    /// (plain numbers, so `30 deg` works) and each series is a radius. Log axes,
+    /// x limits and the right axis do not apply; the limits of y are the outer radius.
+    Polar,
+}
+
+impl PlotKind {
+    pub const ALL: [PlotKind; 2] = [PlotKind::Xy, PlotKind::Polar];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            PlotKind::Xy => "X-Y",
+            PlotKind::Polar => "Polar",
+        }
+    }
+}
+
 /// Whether the legend is drawn.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -167,6 +191,9 @@ impl LegendMode {
 /// Settings of the plot as a whole.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PlotOptions {
+    /// X-Y (the default) or polar.
+    #[serde(default)]
+    pub kind: PlotKind,
     #[serde(default = "yes")]
     pub grid: bool,
     #[serde(default)]
@@ -208,6 +235,7 @@ fn blank() -> MathRegion {
 impl Default for PlotOptions {
     fn default() -> PlotOptions {
         PlotOptions {
+            kind: PlotKind::Xy,
             grid: true,
             legend: LegendMode::Auto,
             x_log: false,
