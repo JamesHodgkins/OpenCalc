@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+GenericName=Engineering worksheet
+{{#if comment}}
+Comment={{comment}}
+{{/if}}
+Exec={{exec}} {{exec_arg}}
+Icon={{icon}}
+Terminal=false
+Categories=Education;Science;Engineering;
+Keywords=calculation;engineering;units;worksheet;
+# The window's app id, so the desktop gives it this icon and groups it.
+StartupWMClass=opencalc
+# What the program opens.
+MimeType=application/vnd.opencalc.worksheet;

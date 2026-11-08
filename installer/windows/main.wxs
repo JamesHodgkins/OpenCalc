@@ -1,0 +1,172 @@
+<?if $(sys.BUILDARCH)="x64"?>
+    <?define Win64 = "yes" ?>
+<?else?>
+    <?error OpenCalc is built for 64-bit Windows only; sys.BUILDARCH=$(sys.BUILDARCH)?>
+<?endif?>
+
+<!--
+  OpenCalc's Windows installer, for cargo-packager's `wix` format (`template`
+  in Cargo.toml's [package.metadata.packager.wix]; the double-brace
+  fields are its variables). It replaces the packager's own template because that one installs
+  for the whole machine only, makes a Desktop shortcut, and its file association
+  loop reads a field that does not exist, so it registers nothing.
+
+  This installs for the current user (no administrator prompt) in
+  %LOCALAPPDATA%\Programs\OpenCalc: opencalc.exe, opencalc-cli.exe, a Start
+  menu shortcut, and the .ocx file type (OpenCalc.Worksheet). Every component's
+  key path is a per-user registry value, as Windows Installer requires for files
+  in a user's profile (ICE38), and uninstalling removes all of it.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product
+            Id="*"
+            Name="{{product_name}}"
+            UpgradeCode="{{upgrade_code}}"
+            Language="!(loc.CargoPackagerLanguage)"
+            Manufacturer="{{manufacturer}}"
+            Version="{{version}}">
+
+        <Package Id="*"
+                 Keywords="Installer"
+                 InstallerVersion="450"
+                 Languages="0"
+                 Compressed="yes"
+                 InstallScope="perUser"
+                 SummaryCodepage="!(loc.CargoPackagerCodepage)"/>
+
+        <!-- reinstall all files; rewrite all registry entries; reinstall all shortcuts -->
+        <Property Id="REINSTALLMODE" Value="amus" />
+
+        <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="!(loc.DowngradeErrorMessage)" AllowSameVersionUpgrades="yes" />
+
+        <InstallExecuteSequence>
+            <RemoveShortcuts>Installed AND NOT UPGRADINGPRODUCTCODE</RemoveShortcuts>
+        </InstallExecuteSequence>
+
+        <Media Id="1" Cabinet="app.cab" EmbedCab="yes" />
+
+        {{#if banner_path}}
+        <WixVariable Id="WixUIBannerBmp" Value="{{banner_path}}" />
+        {{/if}}
+        {{#if dialog_image_path}}
+        <WixVariable Id="WixUIDialogBmp" Value="{{dialog_image_path}}" />
+        {{/if}}
+
+        {{#if icon_path}}
+        <Icon Id="ProductIcon" SourceFile="{{icon_path}}"/>
+        <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
+        {{/if}}
+        <Property Id="ARPNOREPAIR" Value="yes" Secure="yes" />
+        <SetProperty Id="ARPNOMODIFY" Value="1" After="InstallValidate" Sequence="execute"/>
+
+        <!-- start from the folder of an earlier install -->
+        <Property Id="INSTALLDIR">
+            <RegistrySearch Id="PrevInstallDirReg" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="InstallDir" Type="raw"/>
+        </Property>
+
+        <!-- launch app checkbox -->
+        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.LaunchApp)" />
+        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1"/>
+        <Property Id="WixShellExecTarget" Value="[!Path]" />
+        <CustomAction Id="LaunchApplication" BinaryKey="WixCA" DllEntry="WixShellExec" Impersonate="yes" />
+
+        <UI>
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
+
+            <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+
+            <!-- The licence (GPL-3.0-or-later) is installed beside the programs (LICENSE.txt); skip the dialog. -->
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2">1</Publish>
+            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">1</Publish>
+        </UI>
+
+        <UIRef Id="WixUI_InstallDir" />
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="LocalAppDataFolder">
+                <Directory Id="ProgramsDir" Name="Programs">
+                    <Directory Id="INSTALLDIR" Name="{{product_name}}"/>
+                </Directory>
+            </Directory>
+            <Directory Id="ProgramMenuFolder">
+                <Directory Id="ApplicationProgramsFolder" Name="{{product_name}}"/>
+            </Directory>
+        </Directory>
+
+        <DirectoryRef Id="INSTALLDIR">
+            <Component Id="Path" Guid="{{path_component_guid}}" Win64="$(var.Win64)">
+                <File Id="Path" Source="{{app_exe_source}}" Checksum="yes"/>
+                <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="InstallDir" Type="string" Value="[INSTALLDIR]" KeyPath="yes"/>
+                <RemoveFolder Id="RemoveInstallDir" On="uninstall"/>
+                <!-- Windows Installer wants every folder it makes in the profile listed;
+                     this one is only removed if nothing else is in it. -->
+                <RemoveFolder Id="RemoveProgramsDir" Directory="ProgramsDir" On="uninstall"/>
+            </Component>
+            {{#each binaries as |bin| ~}}
+            <Component Id="{{ bin.id }}" Guid="{{bin.guid}}" Win64="$(var.Win64)">
+                <File Id="Bin_{{ bin.id }}" Source="{{bin.path}}"/>
+                <RegistryValue Root="HKCU" Key="Software\\{{../manufacturer}}\\{{../product_name}}" Name="{{ bin.id }}" Type="integer" Value="1" KeyPath="yes"/>
+            </Component>
+            {{/each~}}
+
+            <!-- The licence and the third-party notices travel with the programs, as they do in the
+                 zip. The paths are relative to the folder cargo-packager builds in
+                 (dist/packager/.cargo-packager/wix/x64), which our `out-dir` fixes, so four
+                 levels up is dist/ and five is the repository. THIRD-PARTY-LICENSES.txt is made
+                 by scripts/package.sh (run it before building the installer). -->
+            <Component Id="CMP_Licences" Guid="a5190a4e-b441-429d-8f1c-26097e79ef4f" Win64="$(var.Win64)">
+                <File Id="LicenceFile" Name="LICENSE.txt" Source="..\..\..\..\..\LICENSE"/>
+                <File Id="ThirdPartyFile" Name="THIRD-PARTY-LICENSES.txt" Source="..\..\..\..\THIRD-PARTY-LICENSES.txt"/>
+                <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Licences" Type="integer" Value="1" KeyPath="yes"/>
+            </Component>
+
+            <!-- The .ocx file type (its icon is resource 2 inside opencalc.exe: see build.rs). Non-advertised, so it is plain per-user registry entries
+                 (Software\Classes) that uninstalling removes. -->
+            <Component Id="CMP_FileAssociation" Guid="*">
+                <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="FileAssociation" Type="integer" Value="1" KeyPath="yes"/>
+                <ProgId Id="OpenCalc.Worksheet" Description="OpenCalc worksheet" Advertise="no" Icon="Path" IconIndex="-2">
+                    <Extension Id="ocx" Advertise="no">
+                        <Verb Id="open" Command="Open" TargetFile="Path" Argument="&quot;%1&quot;"/>
+                    </Extension>
+                </ProgId>
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id="ApplicationProgramsFolder">
+            <Component Id="ApplicationShortcut" Guid="*">
+                <Shortcut Id="ApplicationStartMenuShortcut"
+                    Name="{{product_name}}"
+                    Description="Runs {{product_name}}"
+                    Target="[!Path]"
+                    {{#if icon_path}}
+                    Icon="ProductIcon"
+                    {{/if}}
+                    WorkingDirectory="INSTALLDIR">
+                    <ShortcutProperty Key="System.AppUserModel.ID" Value="{{identifier}}"/>
+                </Shortcut>
+                <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+                <RegistryValue Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="Start Menu Shortcut" Type="integer" Value="1" KeyPath="yes"/>
+            </Component>
+        </DirectoryRef>
+
+        <Feature
+                Id="MainProgram"
+                Title="{{product_name}}"
+                Description="!(loc.InstallAppFeature)"
+                Level="1"
+                ConfigurableDirectory="INSTALLDIR"
+                AllowAdvertise="no"
+                Display="expand"
+                Absent="disallow">
+            <ComponentRef Id="Path"/>
+            {{#each binaries as |bin| ~}}
+            <ComponentRef Id="{{ bin.id }}"/>
+            {{/each~}}
+            <ComponentRef Id="CMP_Licences"/>
+            <ComponentRef Id="CMP_FileAssociation"/>
+            <ComponentRef Id="ApplicationShortcut"/>
+        </Feature>
+
+        <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLDIR]" After="CostFinalize"/>
+    </Product>
+</Wix>

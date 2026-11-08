@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=OpenCalc
-Comment=Engineering worksheet with units and live recalculation
-Exec=opencalc %F
-Icon=opencalc
-Terminal=false
-Categories=Education;Science;Engineering;
-MimeType=application/vnd.opencalc.worksheet;

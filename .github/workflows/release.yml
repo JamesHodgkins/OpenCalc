@@ -1,0 +1,216 @@
+name: release
+# Builds the app and the command-line checker for each system and packages them
+# (scripts/package.sh). Runs by hand from the Actions tab (build only, nothing
+# is published), or when a version tag such as v0.1.0 is pushed. A tag build
+# checks that the tag names the version in Cargo.toml and sits on main, runs
+# the same checks as CI, builds every system, and only then publishes one
+# release holding all the packages and their checksums. A published release is
+# never changed: a mistake is fixed by a new version.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version=$(cargo pkgid -p opencalc-ui | sed 's/.*[#@]//')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Tag matches the version and is on main
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::tag $TAG does not match the version $VERSION in Cargo.toml (expected v$VERSION)"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG is not on main: merge the release commit first"
+            exit 1
+          fi
+  check:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-D warnings -C target-feature=+crt-static' || '-D warnings' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libgl1-mesa-dev
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets
+      - run: cargo test --workspace
+  package:
+    needs: [verify, check]
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux is built on the oldest runner we offer so the program runs on
+        # systems with an older glibc than the newest runner has.
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      # The Windows programs carry their C runtime, so they run without the
+      # Visual C++ Redistributable (an environment RUSTFLAGS replaces
+      # .cargo/config.toml, hence the repeat).
+      RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-D warnings -C target-feature=+crt-static' || '-D warnings' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libgl1-mesa-dev
+      - name: Licence tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - name: Installer tool (cargo-packager, pinned; cached so it is built once)
+        # Only for plain versions: a -beta tag gets no installers (their versions are numeric).
+        if: ${{ !contains(needs.verify.outputs.version, '-') }}
+        id: packager
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-packager*
+          key: cargo-packager-0.11.8-${{ runner.os }}
+      - name: Build cargo-packager
+        if: ${{ !contains(needs.verify.outputs.version, '-') && steps.packager.outputs.cache-hit != 'true' }}
+        run: cargo install cargo-packager --locked --version 0.11.8
+      - name: Package
+        shell: bash
+        run: bash scripts/package.sh
+      - name: The Windows programs do not need the Visual C++ runtime
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          for exe in target/release/opencalc.exe target/release/opencalc-cli.exe; do
+            if grep -aqi 'vcruntime140' "$exe"; then
+              echo "::error::$exe imports vcruntime140.dll: the static runtime flag was not applied"
+              exit 1
+            fi
+          done
+      - name: Windows installer (MSI)
+        # A version with a suffix (a beta) gets none: an MSI's version is numeric only.
+        if: runner.os == 'Windows' && !contains(needs.verify.outputs.version, '-')
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          cargo packager --release -f wix
+          cp "dist/packager/opencalc_${VERSION}_x64_en-US.msi" "dist/OpenCalc-${VERSION}-windows-x64.msi"
+      - name: Linux packages (.deb and AppImage)
+        if: runner.os == 'Linux' && !contains(needs.verify.outputs.version, '-')
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          # The AppImage tools are AppImages themselves; run them without FUSE.
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          # The AppImage bundles these from the build machine (appimage `libs` in Cargo.toml).
+          sudo apt-get install -y --no-install-recommends libxkbcommon0 libxkbcommon-x11-0 libxcursor1 libxi6 libx11-xcb1
+          cargo packager --release -f deb,appimage
+          ls -la dist/packager
+          cp dist/packager/*.deb "dist/OpenCalc-${VERSION}-linux-amd64.deb"
+          cp dist/packager/*.AppImage "dist/OpenCalc-${VERSION}-linux-x86_64.AppImage"
+          chmod +x "dist/OpenCalc-${VERSION}-linux-x86_64.AppImage"
+      - name: The .deb installs, works (the full smoke test) and removes cleanly on a bare Ubuntu 22.04
+        if: runner.os == 'Linux' && !contains(needs.verify.outputs.version, '-')
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD:/repo:ro" ubuntu:22.04             bash /repo/scripts/test_deb.sh "/dist/OpenCalc-${VERSION}-linux-amd64.deb"
+      - name: The AppImage starts on a bare Ubuntu 22.04, bringing its own libraries
+        if: runner.os == 'Linux' && !contains(needs.verify.outputs.version, '-')
+        shell: bash
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/scripts:/scripts:ro" ubuntu:22.04             bash /scripts/test_appimage.sh "/dist/OpenCalc-${VERSION}-linux-x86_64.AppImage"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenCalc-${{ runner.os }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.msi
+            dist/*.deb
+            dist/*.AppImage
+          if-no-files-found: error
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [verify, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: OpenCalc-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        shell: bash
+        run: |
+          shopt -s nullglob
+          sha256sum *.zip *.tar.gz *.msi *.deb *.AppImage > SHA256SUMS
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          # A published release is never replaced. A draft left by a run that
+          # failed part-way holds nothing anyone has seen, so it is started over.
+          # (`gh release view` cannot find a draft by tag, so the list is used.)
+          state=$(gh release list --limit 200 --json tagName,isDraft \
+            --jq "map(select(.tagName == \"$TAG\")) | first | if . == null then \"none\" elif .isDraft then \"draft\" else \"published\" end")
+          case "$state" in
+            published)
+              echo "::error::release $TAG is already published; it is not changed. Fix forward with a new version."
+              exit 1
+              ;;
+            draft) gh release delete "$TAG" --yes ;;
+          esac
+          flags=(--draft --verify-tag --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          shopt -s nullglob
+          files=(dist/*.zip dist/*.tar.gz dist/*.msi dist/*.deb dist/*.AppImage dist/SHA256SUMS)
+          gh release create "$TAG" "${flags[@]}" "${files[@]}"
+          # Every package is attached; only now does the release become visible.
+          gh release edit "$TAG" --draft=false

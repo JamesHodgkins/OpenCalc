@@ -1,7 +1,10 @@
-# Keep line endings stable across Windows, Linux and macOS.
+# Keep line endings stable across Windows and Linux.
 * text=auto eol=lf
 *.ttf binary
 *.png binary
 *.ron binary
 # Fixtures are binary; never convert line endings.
 *.ocx binary
+*.bmp binary
+*.ico binary
+*.sh text eol=lf

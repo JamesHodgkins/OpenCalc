@@ -3,7 +3,8 @@
     python scripts/make_icons.py
 
 Writes assets/icons/opencalc.ico (the application) and assets/icons/ocx.ico (a
-worksheet file), each with the usual sizes from 16 to 256 pixels. Needs Pillow. The
+worksheet file), each with the usual sizes from 16 to 256 pixels, and the
+application icon as separate PNGs in assets/app-icons/ for the Linux packages. Needs Pillow. The
 results are committed, so this only has to be run when the logo changes.
 """
 
@@ -68,9 +69,18 @@ def save(name, image):
     frames = [image.resize((s, s), Image.LANCZOS) for s in SIZES]
     frames[-1].save(OUT / f"{name}.ico", sizes=[(s, s) for s in SIZES], append_images=frames[:-1])
     frames[-1].save(OUT / f"{name}.png")
+    return frames
+
+
+def app_icon_pngs(frames):
+    """The application icon as separate PNGs, which the Linux packages want."""
+    folder = ROOT / "assets" / "app-icons"
+    folder.mkdir(parents=True, exist_ok=True)
+    for size, frame in zip(SIZES, frames):
+        frame.save(folder / f"{size}x{size}.png")
 
 
 if __name__ == "__main__":
-    save("opencalc", application())
+    app_icon_pngs(save("opencalc", application()))
     save("ocx", worksheet())
     print("wrote", OUT)

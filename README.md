@@ -30,12 +30,13 @@ cargo run -p opencalc-cli -- check some.ocx --quiet
 cargo test --workspace            # all tests
 cargo clippy --workspace          # lints
 powershell -File scripts/check.ps1   # all commit checks (fmt, clippy, tests, file sizes)
-powershell -File scripts/package.ps1 # release build, zipped into dist/ (Windows)
+bash scripts/package.sh              # release build and archive in dist/ (Git Bash or Linux)
+cargo packager --release -f wix      # the Windows installer (.msi), after package.sh
 ```
 
-On Windows the program carries its own icon and the worksheet icon, and Options has a button that makes double-clicking an `.ocx` file open it (per user, no administrator rights needed). `scripts/make_icons.py` rebuilds the icons from the logo. `packaging/linux/` has a desktop file and file type for Linux.
+Windows and Linux are supported; macOS is not yet. On Windows the program carries its own icon and the worksheet icon; the installer (`installer/windows/main.wxs`, built with cargo-packager like OpenDraft's) installs for the current user without an administrator prompt, adds a Start menu shortcut and makes double-clicking an `.ocx` file open it. Without the installer, Options has a button that does the file part. OpenCalc is a single window: starting it again, or double-clicking another worksheet, opens that worksheet as a tab in the running window. On Linux, `cargo packager --release -f deb,appimage` builds the packages (`installer/linux/`). `scripts/make_icons.py` and `scripts/installer_images.py` rebuild the icons and installer pictures from the logo. Third-party licence notices are made by `scripts/third_party.sh` (cargo-about) and shipped with every package.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the checks on Windows, Linux and macOS and builds a release binary on each.
+GitHub Actions (`.github/workflows/ci.yml`) runs the checks on Windows and Linux; `release.yml` builds and publishes the packages when a version tag is pushed.
 
 ## Clean-room policy
 
