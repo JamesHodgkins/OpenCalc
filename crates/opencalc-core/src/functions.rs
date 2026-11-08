@@ -41,7 +41,10 @@ macro_rules! function {
 
 use Arity::{AtLeast, Exactly};
 
+mod discrete;
 mod elementary;
+mod linalg;
+mod lists;
 
 pub const FUNCTIONS: &[FunctionDef] = &[
     function!(
@@ -229,17 +232,25 @@ pub fn category(name: &str) -> &'static str {
             "Rounding and integers"
         }
         "abs" | "re" | "im" | "conj" | "arg" => "Complex numbers",
-        "vec" | "mat" | "transpose" | "det" | "norm" | "dot" | "rows" | "cols" => {
-            "Vectors and matrices"
+        "vec" | "mat" | "transpose" | "det" | "norm" | "dot" | "rows" | "cols" | "identity"
+        | "tr" | "rank" | "cross" | "augment" | "stack" => "Vectors and matrices",
+        "sum" | "mean" | "stdev" | "stdev_sample" | "min" | "max" | "length" | "median"
+        | "mode" | "var" | "var_sample" | "sort" | "reverse" | "cumsum" | "cvar" | "corr" => {
+            "Statistics"
         }
-        "sum" | "mean" | "stdev" | "stdev_sample" | "min" | "max" | "length" => "Statistics",
+        "factorial" | "combin" | "permut" | "isprime" => "Number theory",
         _ => "Other",
     }
 }
 
-/// Every built-in function: the core table, then the elementary functions.
+/// Every built-in function: the core table, then the tables of each module.
 pub fn all() -> impl Iterator<Item = &'static FunctionDef> + Clone {
-    FUNCTIONS.iter().chain(elementary::ELEMENTARY)
+    FUNCTIONS
+        .iter()
+        .chain(elementary::ELEMENTARY)
+        .chain(linalg::LINALG)
+        .chain(lists::LISTS)
+        .chain(discrete::DISCRETE)
 }
 
 pub fn lookup(name: &str) -> Option<&'static FunctionDef> {
@@ -260,6 +271,12 @@ pub fn call(name: &str, args: &[Value]) -> Result<Value> {
     if let [Value::Series(list)] = args {
         if MAPS_OVER_LISTS.contains(&name) {
             return over_list(f, list);
+        }
+    }
+    // `abs` of a matrix is not element by element, so it is not in this list.
+    if let [Value::Matrix(m)] = args {
+        if name != "abs" && MAPS_OVER_LISTS.contains(&name) {
+            return lists::over_matrix(f, m);
         }
     }
     (f.run)(args)

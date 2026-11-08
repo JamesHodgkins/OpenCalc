@@ -9,7 +9,7 @@ use crate::units::{Dimension, UnitError};
 use crate::value::{Scalar, Value, ValueError};
 
 /// Every element of every argument, with the one dimension they share.
-fn gather(args: &[Value]) -> Result<(Vec<Complex64>, Dimension)> {
+pub(super) fn gather(args: &[Value]) -> Result<(Vec<Complex64>, Dimension)> {
     let mut out = Vec::new();
     let mut dim = None;
     for a in args {
@@ -34,7 +34,7 @@ fn gather(args: &[Value]) -> Result<(Vec<Complex64>, Dimension)> {
 }
 
 /// The same, but every element must be real (for ordering and spread).
-fn gather_real(name: &str, args: &[Value]) -> Result<(Vec<f64>, Dimension)> {
+pub(super) fn gather_real(name: &str, args: &[Value]) -> Result<(Vec<f64>, Dimension)> {
     let (items, dim) = gather(args)?;
     if items.iter().any(|z| !numeric::is_real(*z)) {
         return Err(ValueError::Unsupported(format!("'{name}' of complex numbers")).into());

@@ -1,0 +1,49 @@
+# source: original; inverse and powers of a 2x2 (determinant 10), the Fibonacci matrix, small statistics and counting, all worked by hand
+coeffs := mat(2, 2, 4, 7, 2, 6)
+fib := mat(2, 2, 1, 1, 1, 0)
+inverse_of_coeffs := coeffs ^ (0 - 1)
+identity_check := coeffs * inverse_of_coeffs
+fib_ten := fib ^ 10
+fib_zero := fib ^ 0
+coeffs_squared := coeffs ^ 2
+trace_of_coeffs := tr(coeffs)
+rank_full := rank(coeffs)
+rank_deficient := rank(mat(2, 2, 1, 2, 2, 4))
+roots := sqrt(mat(2, 2, 0, 1, 4, 9))
+joined := augment(coeffs, vec(5, 6))
+stacked := stack(coeffs, mat(1, 2, 7, 8))
+perpendicular := cross(vec(1, 0, 0), vec(0, 1, 0))
+middle := median(4, 1, 3, 2)
+common := mode(3, 1, 3, 1, 2)
+spread_pop := var(2, 4, 4, 4, 5, 5, 7, 9)
+ordered := sort(vec(3, 1, 2))
+running := cumsum(vec(3, 1, 2))
+perfect_corr := corr(vec(1, 2, 3, 4), vec(2, 4, 6, 8))
+five_factorial := factorial(5)
+cards := combin(52, 5)
+arrangements := permut(5, 2)
+prime_check := isprime(7919)
+composite_check := isprime(561)
+=> inverse_of_coeffs = mat(2, 2, 0.6, 0 - 0.7, 0 - 0.2, 0.4)
+=> identity_check = mat(2, 2, 1, 0, 0, 1)
+=> fib_ten = mat(2, 2, 89, 55, 55, 34)
+=> fib_zero = mat(2, 2, 1, 0, 0, 1)
+=> coeffs_squared = mat(2, 2, 30, 70, 20, 50)
+=> trace_of_coeffs = 10
+=> rank_full = 2
+=> rank_deficient = 1
+=> roots = mat(2, 2, 0, 1, 2, 3)
+=> joined = mat(2, 3, 4, 7, 5, 2, 6, 6)
+=> stacked = mat(3, 2, 4, 7, 2, 6, 7, 8)
+=> perpendicular = vec(0, 0, 1)
+=> middle = 2.5
+=> common = 1
+=> spread_pop = 4
+=> ordered = vec(1, 2, 3)
+=> running = vec(3, 4, 6)
+=> perfect_corr = 1
+=> five_factorial = 120
+=> cards = 2598960
+=> arrangements = 20
+=> prime_check = 1
+=> composite_check = 0

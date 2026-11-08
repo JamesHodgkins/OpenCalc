@@ -215,6 +215,17 @@ impl Value {
         }
         match (self, e) {
             (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(a.pow(*b)?)),
+            (Value::Matrix(m), Value::Scalar(e)) => {
+                let n = e
+                    .as_real()
+                    .filter(|q| {
+                        q.dim.is_dimensionless() && q.si.fract() == 0.0 && q.si.abs() < 1e18
+                    })
+                    .ok_or_else(|| {
+                        ValueError::Unsupported("a matrix power that is not a whole number".into())
+                    })?;
+                Ok(Value::Matrix(m.powi(n.si as i64)?))
+            }
             _ => Err(ValueError::Unsupported("a matrix power".into())),
         }
     }

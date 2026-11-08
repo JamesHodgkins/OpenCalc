@@ -35,10 +35,11 @@ Extends `functions.rs`, `functions/stats.rs`, `units.rs`. No format change unles
 **1.2 Functions**
 - [x] Inverse and hyperbolic trig: `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`. Real inside the real domain, complex outside. Open points: `atan2(x, y)` argument order follows Mathcad as I recall it and should be checked against PTC's help; the sign of the imaginary part on a branch cut (`asin(2)`) is whatever `num-complex` gives and is not asserted by any test.
 - [x] Logs and rounding: `log(x)` (base 10), `log(x, b)`, `floor`, `ceil`, `round(x[, n])`, `trunc`, `sign`, `mod` (sign of the divisor), `gcd`, `lcm`. No separate `log10`/`log2`. Rounding needs a dimensionless argument (rounding a length would depend on the display unit). `ln` was already there.
-- [ ] Element-wise functions on matrices (TD-08).
-- [ ] Matrix: inverse, integer powers, `identity`, `trace`, `rank`, `cross`, `augment`/`stack`, `rows`/`cols`, `submatrix`.
-- [ ] Stats: `median`, `var`, `mode`, `range`, `sort`, `reverse`, `cumsum`, `corr`, `cov`.
-- [ ] Number theory and combinatorics: `factorial`, `combin`, `permut`, `isprime`.
+- [x] Element-wise functions on matrices (TD-08): every one-number function except `abs` (which is not element by element for a matrix). Done 2026-11-08.
+- [x] Matrix: inverse and integer powers as `M ^ n` (including `M ^ -1`), `identity`, `tr`, `rank`, `cross`, `augment`, `stack` (`rows`/`cols` existed). Singular and rank tolerance: largest element x size x machine epsilon. Done 2026-11-08.
+- [ ] `submatrix`: needs the evaluator's `ORIGIN` so it does not silently differ when a worksheet sets `ORIGIN := 1`. Do with the Phase 2 evaluator context work.
+- [x] Stats: `median`, `mode` (smallest on a tie), `var` and `var_sample`, `sort`, `reverse`, `cumsum`, `cvar` (population covariance), `corr`. Done 2026-11-08. Not done: `range`, row vectors in `sort`/`reverse`/`cumsum` (column vectors and lists only).
+- [x] Number theory and combinatorics: `factorial` (to 170), `combin`, `permut`, `isprime` (exact for every whole number to 2^53). Done 2026-11-08. The `n!` postfix operator is a parser change and is not done.
 - [ ] Text and boolean values (TD-08), needed by later string functions and programming.
 
 **Exit:** each function has a unit test with a hand-checked value and a dimension-handling test; corpus gains a worksheet per group.
@@ -127,5 +128,6 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 1.2 part 2: matrix inverse/powers/`identity`/`tr`/`rank`/`cross`/`augment`/`stack`, element-wise functions on matrices, `median`/`mode`/`var`/`sort`/`cumsum`/`cvar`/`corr`, `factorial`/`combin`/`permut`/`isprime`; corpus `matrices_and_lists.calc`. |
 | 2026-11-08 | Phase 1.2 part: inverse and hyperbolic trig, `log`, rounding, `mod`, `sign`, `gcd`, `lcm` (new `functions/elementary.rs`, `functions::all()`), corpus worksheet `elementary_functions.calc`. |
 | 2026-11-08 | Phase 1.1 part: about 45 built-in units added with display tables for energy, power, voltage, resistance, frequency and volume. |

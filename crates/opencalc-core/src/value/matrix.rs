@@ -15,6 +15,8 @@ pub struct Matrix {
     pub dim: Dimension,
 }
 
+mod ops;
+
 fn shape_error(msg: &str) -> ValueError {
     ValueError::Shape(msg.to_owned())
 }
