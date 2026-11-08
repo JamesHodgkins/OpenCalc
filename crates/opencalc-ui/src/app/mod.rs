@@ -17,6 +17,7 @@ pub(crate) mod finding;
 mod formatting;
 mod frame;
 pub mod inserting;
+pub mod labels;
 mod recovery;
 mod state;
 

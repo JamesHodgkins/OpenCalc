@@ -74,6 +74,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
     if let Some(fx) = super::inserting::dispatch_insert(state, command) {
         return Some(fx);
     }
+    if let Some(fx) = super::labels::dispatch_labels(state, command) {
+        return Some(fx);
+    }
     let mut fx = Vec::new();
     match command {
         FileNew => {

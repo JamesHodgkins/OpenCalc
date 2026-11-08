@@ -57,7 +57,8 @@ impl Registry {
             | CommandId::PageMarginMm(_)
             | CommandId::OpenRecent(_)
             | CommandId::GoToFinding(_)
-            | CommandId::InsertMatrixSize(..) => true,
+            | CommandId::InsertMatrixSize(..)
+            | CommandId::GoToLabel(_) => true,
             CommandId::InsertSymbol(_) => self.symbols,
             other => self.enabled.contains(&other),
         }
@@ -104,6 +105,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | EditRedo
             | RegionDelete
             | CalcCheck
+            | ViewLabels
             | InsertMatrix
             | InsertRange
             | WarnNext

@@ -220,7 +220,11 @@ fn document() -> Tab {
             ),
             panel(
                 "Show",
-                vec![stack(&[CommandId::ViewGrid, CommandId::ViewSnap])],
+                vec![stack(&[
+                    CommandId::ViewGrid,
+                    CommandId::ViewSnap,
+                    CommandId::ViewLabels,
+                ])],
             ),
             panel(
                 "Arrange",
@@ -379,6 +383,7 @@ mod tests {
             CommandId::CheckClose,         // the Check window
             CommandId::MatrixClose,        // the Matrix window
             CommandId::LabelClose,         // the Label window
+            CommandId::LabelsClose,        // the Labels window
             CommandId::FileTypeRegister,   // the Options window
             CommandId::FileTypeRemove,     // the Options window
             CommandId::HelpShortcutsClose, // the Shortcuts window

@@ -9,6 +9,7 @@ pub mod find;
 pub mod functions;
 pub mod home;
 pub mod label;
+pub mod labels;
 pub mod matrix;
 pub mod options;
 pub mod page_setup;

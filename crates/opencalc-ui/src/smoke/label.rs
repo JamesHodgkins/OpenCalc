@@ -155,3 +155,31 @@ fn the_options_window_offers_to_register_the_file_type_and_reports_a_failure() {
     }
     assert_eq!(h.app.state.file_type, (true, false));
 }
+
+#[test]
+fn the_labels_window_lists_the_labelled_regions_and_goes_to_the_one_chosen() {
+    let (mut h, a, b) = two();
+    set(&mut h, b, "Column load");
+    set(&mut h, a, "Beam check");
+    h.command(CommandId::ViewLabels);
+    assert!(h.app.state.labels_open);
+    h.frame();
+    h.frame();
+    // `a` is the higher of the two, so it is first.
+    h.command(CommandId::GoToLabel(1));
+    assert_eq!(h.sheet().canvas.selection, [b]);
+    h.command(CommandId::GoToLabel(0));
+    assert_eq!(h.sheet().canvas.selection, [a]);
+    // A number past the end does nothing.
+    h.command(CommandId::GoToLabel(40));
+    assert_eq!(h.sheet().canvas.selection, [a]);
+    h.command(CommandId::LabelsClose);
+    assert!(!h.app.state.labels_open);
+    // It closes itself when the worksheet goes, and needs one to open.
+    h.command(CommandId::ViewLabels);
+    h.command(CommandId::TabHome);
+    h.frame();
+    h.frame();
+    assert!(!h.app.state.labels_open);
+    assert!(!h.app.registry().allows(CommandId::ViewLabels));
+}

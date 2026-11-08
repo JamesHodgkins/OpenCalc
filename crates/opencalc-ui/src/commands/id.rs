@@ -32,6 +32,8 @@ macro_rules! commands {
             GoToFinding(u16),
             /// Insert a matrix of this many rows and columns.
             InsertMatrixSize(u8, u8),
+            /// Go to the n-th labelled region of the Labels window.
+            GoToLabel(u16),
         }
 
         impl CommandId {
@@ -55,6 +57,7 @@ macro_rules! commands {
                     CommandId::OpenRecent(_) => "file.open_recent",
                     CommandId::GoToFinding(_) => "check.go_to",
                     CommandId::InsertMatrixSize(..) => "insert.matrix_size",
+                    CommandId::GoToLabel(_) => "labels.go_to",
                 }
             }
 
@@ -73,6 +76,7 @@ macro_rules! commands {
                     CommandId::OpenRecent(_) => "Open recent file",
                     CommandId::GoToFinding(_) => "Go to problem",
                     CommandId::InsertMatrixSize(..) => "Insert matrix",
+                    CommandId::GoToLabel(_) => "Go to labelled region",
                 }
             }
 
@@ -89,6 +93,7 @@ macro_rules! commands {
                     CommandId::OpenRecent(_) => icons::FOLDER_OPEN,
                     CommandId::GoToFinding(_) => icons::WARNING,
                     CommandId::InsertMatrixSize(..) => icons::TABLE,
+                    CommandId::GoToLabel(_) => icons::TAG,
                 }
             }
         }
@@ -190,6 +195,8 @@ commands! {
     ViewPageView: "view.page_view", "Page View", icons::FIT;
     ViewDraftView: "view.draft_view", "Draft View", icons::LIST;
     ViewFunctions: "view.functions", "Functions", icons::NAMES;
+    ViewLabels: "view.labels", "Labels", icons::TAG;
+    LabelsClose: "view.labels_close", "Close Labels", icons::CLOSE;
     ViewResetLayout: "view.reset_layout", "Reset layout", icons::RESET;
     // Help.
     HelpShortcuts: "help.shortcuts", "Shortcuts", icons::KEYBOARD;
@@ -243,15 +250,16 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            FileTypeRegister | FileTypeRemove | HelpShortcuts | HelpShortcutsClose | RegionTag
-            | LabelClose | RegionLock | ArrangeAlignH | ArrangeAlignV | FormatBold
-            | FormatItalic | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
-            | UnitsDisplayKn | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess
-            | FormatScientific | FormatEngineering | ClipboardPaste | ClipboardCut
-            | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind
-            | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose
-            | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave
-            | FileSaveAs | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
+            ViewLabels | LabelsClose | GoToLabel(_) | FileTypeRegister | FileTypeRemove
+            | HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
+            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | UnitsDisplayM
+            | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
+            | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
+            | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
+            | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace
+            | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
+            | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
+            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
             | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..)
             | MatrixClose | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext
             | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
