@@ -57,8 +57,9 @@ Depends on Phase 1 (inverse, boolean values). Builds the cancellation token that
 
 **2.2 Solvers**
 - [x] `root` and `polyroots` (2026-11-08). `root(f, x, a, b)` runs Brent's method inside a bracket where f changes sign (guaranteed to converge; accurate to about 2 eps |x| plus 1e-14 of the bracket). `root(f, x, guess)` steps outward from the guess, growing by 1.6 and dropping any side where f cannot be evaluated, until f changes sign, then runs the same method; it finds the nearest sign change, not necessarily the nearest root, and fails clearly when there is none. A sign change at a pole or jump (`1/x`, a step) is refused as a discontinuity, not returned as a root. Real roots of real functions only; the bounds share a dimension. `polyroots(v)` takes coefficients lowest power first (`vec(2, -3, 1)` is 2 - 3x + x^2) and returns all roots as a sorted column vector (Aberth-Ehrlich iteration; degree up to 64; roots at zero taken out exactly; complex coefficients allowed; a root of a real polynomial with a tiny imaginary part, 1e-12 relative or less, is shown as real; repeated roots are located only to about 1e-8). Not done: complex roots of `root`, multiple roots at once, `root` over a matrix of guesses.
-- [ ] Solve blocks: `Given`, constraints, `Find`, `Minerr` (new region kind or grouped Math regions; this is the wide exhaustive-match change, so audit first).
-- [ ] `minimize` / `maximize`, with a choice of algorithm.
+- [ ] Solve blocks (design written 2026-11-08 in `SOLVE_BLOCKS.md`, awaiting decisions in its section 7): Stage 1 `find`, `minerr`, `minimize`, `maximize` as evaluator forms with no format change; Stage 2 the `Given`/`Find` block as a new region kind (format version 2) that lowers to Stage 1. Audit done: `RegionKind` appears in 24 production files.
+- [ ] `minimize` / `maximize`, with a choice of algorithm: part of Stage 1 above; a choice of algorithm is not planned.
+
 - [ ] `odesolve` (fixed then adaptive step).
 - [ ] Non-convergence diagnostics and error badges; MultiStart.
 - [ ] Linear-algebra extras: eigenvalues/eigenvectors, LU/QR/Cholesky/SVD.
@@ -130,6 +131,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 2.2: solve-block audit and design (`SOLVE_BLOCKS.md`), no code. |
 | 2026-11-08 | Phase 2.2 part: `root` (bracketed and from a guess) and `polyroots`; corpus `roots.calc`. |
 | 2026-11-08 | Phase 2.1: step budget and cancellation; `integrate`, `derivative`, `limit`, `sum_over`, `product_over`; corpus `calculus.calc`, integration tests `tests/calculus.rs`. |
 | 2026-11-08 | Phase 1.1: compound units shown by name or as numerator over denominator in the chosen unit system; corpus `compound_units.calc`. |
