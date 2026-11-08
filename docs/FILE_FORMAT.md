@@ -82,7 +82,7 @@ characters; omitted when empty):
 | `kind` | JSON | Notes |
 |---|---|---|
 | Math | `{ "Math": { "source": "…", "format": { "notation": "scientific", "decimals": 4, "unit": "mm" } } }` | The expression, as text. `format` is how the result is shown and may be omitted: `notation` is `"general"` (default), `"scientific"` or `"engineering"`; `decimals` is 0 to 15, or omitted for up to three with trailing zeros dropped. `unit` is `"m"`, `"mm"`, `"in"`, `"N"` or `"kN"`: show the result in that unit when it is a length or a force of the same kind, otherwise ignored. Display only. A count above 15 is read as 15. |
-| Text | `{ "Text": { "text": "…" } }` | |
+| Text | `{ "Text": { "text": "…" } }` | Styled stretches are saved beside it on the region as `runs`; see section 3d. |
 | Area | `{ "Area": { "title": "…" } }` | A titled box. |
 | Plot | `{ "Plot": { "title": "", "x_label": "", "y_label": "", "x": { "source": "…" }, "series": [ { "source": "…" } ], "options": { … }, "styles": [ { … } ] } }` | At most 8 series, at least 1. Titles, labels, `options` and `styles` may be omitted; see section 3a. |
 | Table | `{ "Table": { "name": "loads", "columns": [ { "header": "x", "unit": "m" }, { "unit": "kN" } ], "rows": [ [ "1", "10" ], [ "2", "20" ] ] } }` | A grid of numbers that defines `name` as a matrix. Cells are the text typed; a column has one unit (blank for none). At least one row and column, at most 64 columns and 4096 cells; a file outside that is trimmed on opening. See section 3b. |
@@ -105,6 +105,17 @@ non-number cell makes the table an error that names the row and column.
 
 Files from before tables had content hold the bare string `"Table"` as the kind.
 The reader turns that into an empty 3 by 2 table.
+
+### 3d. Rich text (version 2)
+
+A text region may have `runs` on the region itself (beside `kind`, like `style`):
+a list of `{ "len": 5, "bold": true, "italic": false, "underline": false, "colour": 2 }`
+(every field but `len` optional and omitted when off). Runs follow one another from
+the first character; `len` counts characters; characters after the last run are
+plain. `colour` is 0 to 7, an index into the text palette (red, blue, green, orange,
+purple, teal, grey, brown). A run adds to the region's own `style` (bold or italic
+for all of it). A reader trims runs to the length of the text and drops colours it
+does not know. A text region with no `runs` is exactly a pre-rich-text region.
 
 ### 3c. Pictures (version 2)
 

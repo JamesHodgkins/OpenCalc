@@ -20,6 +20,7 @@ pub const PICTURE: char = '\u{e0f9}'; // image
 pub const GREEK: char = '\u{e61d}'; // omega
 pub const BOLD: char = '\u{e061}'; // bold
 pub const ITALIC: char = '\u{e100}'; // italic
+pub const UNDERLINE: char = '\u{e199}'; // underline
 pub const PLUS: char = '\u{e140}'; // plus
 pub const MINUS: char = '\u{e11f}'; // minus
 pub const SCIENTIFIC: char = '\u{e25d}'; // superscript

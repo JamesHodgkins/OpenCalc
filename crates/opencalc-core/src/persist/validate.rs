@@ -37,6 +37,8 @@ pub enum Repair {
     MarginFixed,
     /// A plot had more series styles than series, or a colour outside the palette.
     StylesFixed(RegionId),
+    /// A text region had styling that did not fit its text; it was trimmed.
+    RunsFixed(RegionId),
     /// A table had a ragged shape or too many cells; it was trimmed to fit.
     TableFixed(RegionId),
 }
@@ -52,6 +54,7 @@ impl fmt::Display for Repair {
             Repair::SeriesAdded(id) => write!(f, "plot {} had no series; one was added", id.0),
             Repair::MarginFixed => write!(f, "the page margin was out of range"),
             Repair::StylesFixed(id) => write!(f, "plot {} had unusable series styles", id.0),
+            Repair::RunsFixed(id) => write!(f, "text region {} had styling that did not fit", id.0),
             Repair::TableFixed(id) => write!(f, "table {} had an unusable shape", id.0),
         }
     }
@@ -230,6 +233,13 @@ pub fn check(ws: &mut Worksheet) -> Result<Vec<Repair>, LoadError> {
         let id = r.id;
         if let RegionKind::Plot(p) = &mut r.kind {
             repairs.extend(check_plot(id, p)?);
+        }
+        if let RegionKind::Text { text } = &r.kind {
+            let fitted = crate::document::normalise_runs(&r.runs, text.chars().count());
+            if fitted != r.runs {
+                r.runs = fitted;
+                repairs.push(Repair::RunsFixed(id));
+            }
         }
         if let RegionKind::Table(t) = &mut r.kind {
             if !t.is_valid() {

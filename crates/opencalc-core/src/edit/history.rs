@@ -19,6 +19,7 @@ enum RunKey {
     Move(Vec<RegionId>),
     Source(RegionId),
     Text(RegionId),
+    Runs(RegionId),
     Size(RegionId),
     Plot(RegionId),
     Table(RegionId),
@@ -39,6 +40,7 @@ impl RunKey {
             }
             Edit::SetMathSource { id, .. } => Some(RunKey::Source(*id)),
             Edit::SetText { id, .. } => Some(RunKey::Text(*id)),
+            Edit::SetRuns { id, .. } => Some(RunKey::Runs(*id)),
             Edit::SetRegionSize { id, .. } => Some(RunKey::Size(*id)),
             Edit::SetPlot { id, .. } => Some(RunKey::Plot(*id)),
             Edit::SetTable { id, .. } => Some(RunKey::Table(*id)),

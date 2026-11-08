@@ -15,10 +15,15 @@ use eframe::egui::{self, FontData, FontDefinitions, FontFamily};
 
 const INTER: &[u8] = include_bytes!("../assets/fonts/Inter-Regular.ttf");
 const INTER_BOLD: &[u8] = include_bytes!("../assets/fonts/Inter-Bold.ttf");
+const INTER_ITALIC: &[u8] = include_bytes!("../assets/fonts/Inter-Italic.ttf");
+const INTER_BOLD_ITALIC: &[u8] = include_bytes!("../assets/fonts/Inter-BoldItalic.ttf");
 const LUCIDE: &[u8] = include_bytes!("../assets/fonts/lucide.ttf");
 
 /// The name of the bold font family.
 pub const BOLD: &str = "bold";
+/// The names of the italic and bold italic font families.
+pub const ITALIC: &str = "italic";
+pub const BOLD_ITALIC: &str = "bold-italic";
 
 pub fn definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
@@ -32,6 +37,14 @@ pub fn definitions() -> FontDefinitions {
         "inter-bold".to_owned(),
         Arc::new(FontData::from_static(INTER_BOLD)),
     );
+    fonts.font_data.insert(
+        "inter-italic".to_owned(),
+        Arc::new(FontData::from_static(INTER_ITALIC)),
+    );
+    fonts.font_data.insert(
+        "inter-bold-italic".to_owned(),
+        Arc::new(FontData::from_static(INTER_BOLD_ITALIC)),
+    );
     let proportional = fonts.families.entry(FontFamily::Proportional).or_default();
     proportional.insert(0, "lucide".to_owned());
     proportional.insert(1, "inter".to_owned());
@@ -41,6 +54,14 @@ pub fn definitions() -> FontDefinitions {
         .map(|n| if n == "inter" { "inter-bold" } else { n }.to_owned())
         .collect();
     fonts.families.insert(FontFamily::Name(BOLD.into()), bold);
+    let proportional = fonts.families[&FontFamily::Proportional].clone();
+    for (name, face) in [(ITALIC, "inter-italic"), (BOLD_ITALIC, "inter-bold-italic")] {
+        let stack = proportional
+            .iter()
+            .map(|n| if n == "inter" { face } else { n }.to_owned())
+            .collect();
+        fonts.families.insert(FontFamily::Name(name.into()), stack);
+    }
     fonts
 }
 

@@ -4,7 +4,7 @@
 //! never a value, so nothing is recalculated.
 
 use opencalc_core::document::{
-    DisplayUnit, FontStyle, Notation, RegionId, RegionKind, ResultFormat,
+    DisplayUnit, FontStyle, Notation, RegionId, RegionKind, ResultFormat, Run, RunStyle,
 };
 use opencalc_core::edit::Edit;
 
@@ -50,8 +50,103 @@ pub fn all_styled(state: &AppState, flag: fn(&FontStyle) -> bool) -> bool {
     !styles.is_empty() && styles.iter().all(|(_, s)| flag(s))
 }
 
-/// Bold and italic, as the toggles switched on for the selected text regions.
+/// The single selected text region, with the characters of it that are marked
+/// (`start..end`, remembered from the editor) or, with none marked, the whole text.
+/// `marked` says which.
+pub struct TextTarget {
+    pub id: RegionId,
+    pub start: usize,
+    pub end: usize,
+    pub marked: bool,
+    pub chars: usize,
+    pub runs: Vec<Run>,
+}
+
+pub fn text_target(state: &AppState) -> Option<TextTarget> {
+    let sheet = state.active_sheet()?;
+    let [id] = sheet.canvas.selection.as_slice() else {
+        return None;
+    };
+    let region = sheet.doc.region(*id)?;
+    let RegionKind::Text { text } = &region.kind else {
+        return None;
+    };
+    if region.locked {
+        return None;
+    }
+    let chars = text.chars().count();
+    let marked = sheet
+        .canvas
+        .text_sel
+        .filter(|(sel, a, b)| sel == id && a < b && *b <= chars);
+    let (start, end) = marked.map_or((0, chars), |(_, a, b)| (a, b));
+    Some(TextTarget {
+        id: *id,
+        start,
+        end,
+        marked: marked.is_some(),
+        chars,
+        runs: region.runs.clone(),
+    })
+}
+
+impl TextTarget {
+    /// Whether every character of the target has `flag` in its run style.
+    pub fn all_have(&self, flag: fn(&RunStyle) -> bool) -> bool {
+        opencalc_core::document::runs_all_have(&self.runs, self.chars, self.start, self.end, flag)
+    }
+
+    /// The runs after `change` is applied to the target.
+    pub fn restyled(&self, change: impl Fn(&mut RunStyle)) -> Vec<Run> {
+        opencalc_core::document::restyle_runs(&self.runs, self.chars, self.start, self.end, change)
+    }
+}
+
+/// Apply `change` to the marked characters (or the whole text), as one undo step.
+pub fn restyle_text(state: &mut AppState, change: impl Fn(&mut RunStyle)) {
+    let Some(target) = text_target(state) else {
+        return;
+    };
+    let runs = target.restyled(change);
+    if let Some(i) = state.active {
+        let sheet = &mut state.sheets[i];
+        sheet.seal();
+        sheet.edit(Edit::SetRuns {
+            id: target.id,
+            runs,
+        });
+        sheet.seal();
+    }
+}
+
+/// Bold, italic and underline, as the toggles switched on: for the marked
+/// characters when some are marked, else for the selected text regions.
 pub fn style_commands(state: &AppState) -> Vec<CommandId> {
+    if let Some(t) = text_target(state).filter(|t| t.marked) {
+        let mut on = Vec::new();
+        if t.all_have(|s| s.bold) {
+            on.push(CommandId::FormatBold);
+        }
+        if t.all_have(|s| s.italic) {
+            on.push(CommandId::FormatItalic);
+        }
+        if t.all_have(|s| s.underline) {
+            on.push(CommandId::FormatUnderline);
+        }
+        if all_bordered(state) {
+            on.push(CommandId::FormatBorder);
+        }
+        return on;
+    }
+    let mut on = whole_region_style_commands(state);
+    if text_target(state).is_some_and(|t| t.chars > 0 && t.all_have(|s| s.underline)) {
+        on.push(CommandId::FormatUnderline);
+    }
+    on
+}
+
+/// Bold and italic, as the toggles switched on for the selected text regions.
+fn whole_region_style_commands(state: &AppState) -> Vec<CommandId> {
     let mut on = Vec::new();
     if all_styled(state, |s| s.bold) {
         on.push(CommandId::FormatBold);
@@ -162,7 +257,25 @@ pub fn dispatch_format(state: &mut AppState, command: CommandId) -> Option<Vec<E
         toggle_border(state);
         return Some(Vec::new());
     }
+    if command == FormatUnderline {
+        if let Some(t) = text_target(state) {
+            let on = !t.all_have(|s| s.underline);
+            restyle_text(state, |s| s.underline = on);
+        }
+        return Some(Vec::new());
+    }
     if matches!(command, FormatBold | FormatItalic) {
+        // With characters marked in a text region, the style goes on those alone.
+        if let Some(t) = text_target(state).filter(|t| t.marked) {
+            if command == FormatBold {
+                let on = !t.all_have(|s| s.bold);
+                restyle_text(state, |s| s.bold = on);
+            } else {
+                let on = !t.all_have(|s| s.italic);
+                restyle_text(state, |s| s.italic = on);
+            }
+            return Some(Vec::new());
+        }
         toggle_style(state, command == FormatBold);
         return Some(Vec::new());
     }

@@ -284,7 +284,7 @@ fn text(painter: &Painter, theme: &Theme, r: &Region, text: &str, place: Place) 
         (text, theme.text)
     };
     let wrap = (r.size.w * zoom - 2.0 * pad).max(10.0);
-    let job = super::text_style::job(shown, r.style, TEXT_SIZE * zoom, colour, wrap);
+    let job = super::text_style::job_runs(shown, r.style, &r.runs, TEXT_SIZE * zoom, colour, wrap);
     let galley = painter.layout_job(job);
     if !skip_content {
         painter.galley(top_left + Vec2::splat(pad), galley.clone(), colour);

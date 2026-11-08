@@ -195,6 +195,9 @@ pub struct Region {
     /// Draw a line round the region (on the page and in exports).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub border: bool,
+    /// Styled stretches of a text region (see `rich`); empty for plain text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runs: Vec<super::rich::Run>,
     /// A short name for finding the region again (empty: none). Shown beside the
     /// region while editing, never on the printed page.
     #[serde(default, skip_serializing_if = "String::is_empty")]

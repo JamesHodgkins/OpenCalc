@@ -89,6 +89,9 @@ pub struct CanvasUi {
     pub editing: Option<RegionId>,
     /// Characters to select when the editor next opens (a template just inserted).
     pub preselect: Option<(usize, usize)>,
+    /// The characters selected in a text region being edited, remembered after
+    /// the editor closes so a style button applies to them: region and char range.
+    pub text_sel: Option<(RegionId, usize, usize)>,
     /// What was being edited at the end of the last frame.
     last_editing: Option<RegionId>,
     /// Ask the in-place editor to take keyboard focus on its next frame.
@@ -116,6 +119,7 @@ impl Default for CanvasUi {
             selection: Vec::new(),
             editing: None,
             preselect: None,
+            text_sel: None,
             last_editing: None,
             focus_edit: false,
             enter_at_start: false,

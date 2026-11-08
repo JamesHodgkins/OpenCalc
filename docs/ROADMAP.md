@@ -103,7 +103,7 @@ Design for the items still open: `DOCUMENT_FEATURES.md` (decisions A to E).
 - [x] Headers and footers (first page and following pages): left, centre and right text with `{page}`, `{pages}`, `{title}` fields, edited in Page setup; drawn on the page and in PNG and PDF exports. No date field, on purpose.
 - [x] Page background styles: plain, grid, lines, dots; paper tints; left out of exports unless ticked.
 - [x] Global definitions `≡`: satisfied by design (every definition is already global); `≡` is accepted as `:=`. Cross-worksheet references stay out of scope.
-- [ ] Rich text in text regions (needs bold/italic font files, TD-24).
+- [x] Rich text in text regions: bold, italic, underline and 8 colours on marked characters or the whole text (`runs` on the region, `Edit::SetRuns`); real Inter Italic and Bold Italic bundled (TD-24 resolved). Out: font families and sizes, lists, links.
 - [x] Region borders: `Region.border`, `Edit::SetBorder`, Math Formatting > Region > Border toggle; drawn on the page and in exports.
 - [ ] Content protection: password-protected regions and hidden content (needs a security design before code).
 - [x] Templates (`.ocxt`, the worksheet format with `kind: template`): New from template, Save as template. No built-in templates yet; no file association for `.ocxt` yet.
@@ -136,6 +136,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-08 | Phase 5: rich text. |
 | 2026-11-08 | Phase 5: templates. |
 | 2026-11-08 | Phase 5: page backgrounds and tints; `≡` accepted as `:=`. |
 | 2026-11-08 | Phase 5: design note for backgrounds, templates, rich text, content protection and global definitions (`DOCUMENT_FEATURES.md`); no code. |

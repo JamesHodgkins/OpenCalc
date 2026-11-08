@@ -66,9 +66,18 @@ pub(super) fn edit_overlay(
                     // Laid out in the region's own style, so it does not jump to
                     // upright regular type while it is being edited.
                     let style = r.style;
-                    let mut layouter = |ui: &Ui, text: &str, wrap: f32| {
+                    let mut layouter = |ui: &Ui, shown: &str, wrap: f32| {
                         let colour = ui.visuals().text_color();
-                        let job = super::text_style::job(text, style, 14.0 * zoom, colour, wrap);
+                        // The text may have just changed: the styling follows it.
+                        let runs = opencalc_core::document::adjust_runs(&r.runs, text, shown);
+                        let job = super::text_style::job_runs(
+                            shown,
+                            style,
+                            &runs,
+                            14.0 * zoom,
+                            colour,
+                            wrap,
+                        );
                         ui.fonts(|f| f.layout_job(job))
                     };
                     TextEdit::multiline(&mut buf)
@@ -111,6 +120,12 @@ pub(super) fn edit_overlay(
                     cmds.push(CanvasCmd::Seal);
                     return;
                 }
+            }
+            // Remember what is selected, so a style button can act on it after the
+            // click moves the keyboard focus away.
+            if let Some(range) = out.cursor_range {
+                let (a, b) = (range.primary.ccursor.index, range.secondary.ccursor.index);
+                st.text_sel = (a != b).then(|| (id, a.min(b), a.max(b)));
             }
             let resp = out.response;
             let change = resp.changed().then_some(Edit::SetText { id, text: buf });

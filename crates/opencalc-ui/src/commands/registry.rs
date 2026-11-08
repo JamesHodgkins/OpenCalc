@@ -137,7 +137,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
                     | UnitsDisplayReset
             ))
         && (ctx.selects_several || !matches!(command, ArrangeAlignH | ArrangeAlignV))
-        && (ctx.selects_text || !matches!(command, FormatBold | FormatItalic))
+        && (ctx.selects_text || !matches!(command, FormatBold | FormatItalic | FormatUnderline))
         && (ctx.can_undo || command != EditUndo)
         && (ctx.can_redo || command != EditRedo)
         && (ctx.editing_math || command != InsertGreek)

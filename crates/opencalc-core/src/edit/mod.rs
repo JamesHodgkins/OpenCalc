@@ -11,8 +11,8 @@
 mod history;
 
 use crate::document::{
-    clean_label, FontStyle, HeaderFooter, PageSetup, PictureSpec, PlotSpec, Point, Region,
-    RegionId, RegionKind, ResultFormat, Size, TableSpec, Worksheet,
+    adjust_runs, clean_label, normalise_runs, FontStyle, HeaderFooter, PageSetup, PictureSpec,
+    PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Run, Size, TableSpec, Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -56,6 +56,11 @@ pub enum Edit {
     SetFontStyle {
         id: RegionId,
         style: FontStyle,
+    },
+    /// The styled stretches of a text region. The runs are cut to fit the text.
+    SetRuns {
+        id: RegionId,
+        runs: Vec<Run>,
     },
     /// Whether a region has a border. Display only.
     SetBorder {
@@ -214,6 +219,16 @@ impl Worksheet {
                     style: old,
                 })
             }
+            Edit::SetRuns { id, runs } => {
+                self.unlocked(*id)?;
+                let region = self.region_mut(*id)?;
+                let RegionKind::Text { text } = &region.kind else {
+                    return Err(EditError::WrongKind(*id));
+                };
+                let fitted = normalise_runs(runs, text.chars().count());
+                let old = std::mem::replace(&mut region.runs, fitted);
+                Ok(Edit::SetRuns { id: *id, runs: old })
+            }
             Edit::SetBorder { id, border } => {
                 self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
@@ -243,7 +258,21 @@ impl Worksheet {
                     return Err(EditError::WrongKind(*id));
                 };
                 let old = std::mem::replace(current, text.clone());
-                Ok(Edit::SetText { id: *id, text: old })
+                // Styled stretches follow the text they were made on.
+                let old_runs = region.runs.clone();
+                region.runs = adjust_runs(&old_runs, &old, text);
+                if region.runs == old_runs {
+                    Ok(Edit::SetText { id: *id, text: old })
+                } else {
+                    // Undo must bring the exact old styling back, not a guess.
+                    Ok(Edit::Batch(vec![
+                        Edit::SetText { id: *id, text: old },
+                        Edit::SetRuns {
+                            id: *id,
+                            runs: old_runs,
+                        },
+                    ]))
+                }
             }
             Edit::SetPlot { id, spec } => {
                 self.unlocked(*id)?;

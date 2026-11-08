@@ -356,9 +356,10 @@ fn the_style_is_saved_copied_and_drawn() {
             italic: false,
         };
         ctx.fonts(|f| {
-            f.layout_job(crate::canvas::text_style::job(
+            f.layout_job(crate::canvas::text_style::job_runs(
                 "Heading",
                 style,
+                &[],
                 20.0,
                 eframe::egui::Color32::BLACK,
                 1000.0,

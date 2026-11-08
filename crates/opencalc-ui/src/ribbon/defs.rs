@@ -170,6 +170,7 @@ fn math_formatting() -> Tab {
                 vec![Column::Rows(vec![vec![
                     Cell::Icon(it(CommandId::FormatBold)),
                     Cell::Icon(it(CommandId::FormatItalic)),
+                    Cell::Icon(it(CommandId::FormatUnderline)),
                 ]])],
             ),
             panel("Region", vec![Column::Large(it(CommandId::FormatBorder))]),

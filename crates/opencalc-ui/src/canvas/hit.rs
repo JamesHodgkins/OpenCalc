@@ -81,6 +81,7 @@ mod tests {
             style: Default::default(),
             locked: false,
             border: false,
+            runs: Vec::new(),
             label: String::new(),
         }
     }

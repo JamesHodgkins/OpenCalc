@@ -15,7 +15,7 @@ mod exporting;
 mod files;
 pub(crate) mod filing;
 pub(crate) mod finding;
-mod formatting;
+pub mod formatting;
 mod frame;
 pub mod inserting;
 pub mod labels;

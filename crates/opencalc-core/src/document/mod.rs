@@ -11,6 +11,7 @@ mod plot;
 mod plot_style;
 mod region;
 mod result_format;
+mod rich;
 mod table;
 
 use serde::{Deserialize, Serialize};
@@ -32,6 +33,10 @@ pub use region::{
     clean_label, FontStyle, MathRegion, Region, RegionId, RegionKind, MAX_LABEL_CHARS,
 };
 pub use result_format::{DisplayUnit, Notation, ResultFormat, MAX_DECIMALS};
+pub use rich::{
+    adjust as adjust_runs, all_have as runs_all_have, normalise as normalise_runs,
+    restyle as restyle_runs, Run, RunStyle, TEXT_COLOURS,
+};
 pub use table::{TableColumn, TableSpec, MAX_CELLS, MAX_COLUMNS, MAX_TEXT as MAX_TABLE_TEXT};
 
 use crate::expr::Expr;
@@ -159,6 +164,7 @@ impl Worksheet {
             style: FontStyle::default(),
             locked: false,
             border: false,
+            runs: Vec::new(),
             label: String::new(),
         }
     }

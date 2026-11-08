@@ -161,6 +161,7 @@ commands! {
     // Format.
     FormatBorder: "format.border", "Border", icons::AREA;
     FormatBold: "format.bold", "Bold", icons::BOLD;
+    FormatUnderline: "format.underline", "Underline", icons::UNDERLINE;
     FormatItalic: "format.italic", "Italic", icons::ITALIC;
     FormatDecimalsMore: "format.decimals_more", "More decimals", icons::PLUS;
     FormatDecimalsLess: "format.decimals_less", "Fewer decimals", icons::MINUS;
@@ -258,27 +259,26 @@ impl CommandId {
         match self {
             ViewLabels | LabelsClose | GoToLabel(_) | FileTypeRegister | FileTypeRemove
             | HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
-            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | FormatBorder
-            | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
-            | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
-            | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
-            | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace
-            | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
-            | UnitsManage | UnitsClose | FileNew | FileNewFromTemplate | FileSaveAsTemplate
-            | FileOpen | FileSave | FileSaveAs | DialogSave | DialogDiscard | DialogCancel
-            | DialogOk | DialogRestore | DialogDropRecovery | OpenRecent(_) | GoToFinding(_)
-            | InsertMatrixSize(..) | MatrixClose | InsertMatrix | InsertRange | CheckClose
-            | CalcCheck | WarnNext | WarnPrev | FileClose | FileExample | AppQuit | TabHome
-            | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea
-            | InsertPlot | InsertTable | PictureChoose | TableImportCsv | TableExportCsv
-            | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
-            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
-            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
-            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
-            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
-            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
-                true
-            }
+            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | FormatUnderline
+            | FormatBorder | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
+            | UnitsDisplayKn | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess
+            | FormatScientific | FormatEngineering | ClipboardPaste | ClipboardCut
+            | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind
+            | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose
+            | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileNewFromTemplate
+            | FileSaveAsTemplate | FileOpen | FileSave | FileSaveAs | DialogSave
+            | DialogDiscard | DialogCancel | DialogOk | DialogRestore | DialogDropRecovery
+            | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..) | MatrixClose
+            | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext | WarnPrev
+            | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo | RegionDelete
+            | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable | PictureChoose
+            | TableImportCsv | TableExportCsv | InsertPicture | CalcAll | ViewZoomIn
+            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
+            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral
+            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
+            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
+            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
+            | InsertGreek | InsertSymbol(_) => true,
             HelpGuide => false,
         }
     }

@@ -36,6 +36,7 @@ mod label;
 mod pictures;
 mod plot_view;
 mod plots;
+mod rich_text;
 mod tables;
 mod templates;
 mod text_edit;
