@@ -353,3 +353,185 @@ fn a_legend_name_is_shown_instead_of_the_expression() {
         "the name is what is drawn"
     );
 }
+
+// ---- a second axis and series with their own x ----------------------------------
+
+use opencalc_core::document::YAxis;
+
+/// A page with these math lines and one plot of `spec` at (100, 100).
+fn sheet_of(lines: &[&str], spec: PlotSpec) -> Worksheet {
+    let mut s = OpenSheet::new("t");
+    for (k, line) in lines.iter().enumerate() {
+        s.add(
+            RegionKind::math(line),
+            Point::new(40.0, 20.0 + 26.0 * k as f32),
+        );
+    }
+    s.add(RegionKind::Plot(spec), Point::new(100.0, 140.0));
+    s.doc
+}
+
+fn series_style(spec: PlotSpec, k: usize, f: impl FnOnce(&mut SeriesStyle)) -> PlotSpec {
+    let mut style = spec.style(k);
+    f(&mut style);
+    spec.with_style(k, style)
+}
+
+/// The plot sits at (100, 140) here, 40 units lower than in the other tests.
+const LOWER: (usize, usize, usize, usize) = (200, 280, 720, 620);
+
+fn ink_in(image: &Image, k: usize, r: (usize, usize, usize, usize)) -> usize {
+    let colours = palette();
+    (r.1..r.3.min(image.height))
+        .flat_map(|y| (r.0..r.2).map(move |x| image.pixel(x, y)))
+        .filter(|p| coloured(*p))
+        .filter(|p| (0..8).min_by_key(|i| distance(*p, colours[*i])) == Some(k))
+        .count()
+}
+
+fn dark_in(image: &Image, r: (usize, usize, usize, usize)) -> usize {
+    (r.1..r.3.min(image.height))
+        .flat_map(|y| (r.0..r.2).map(move |x| image.pixel(x, y)))
+        .filter(is_dark)
+        .count()
+}
+
+#[test]
+fn a_series_with_its_own_x_values_draws_a_closed_curve() {
+    // x = cos t and y = sin t: a circle, drawn with nothing in the shared x field.
+    let spec = series_style(plot(&["sin(t)"]).with_x(""), 0, |s| s.x = "cos(t)".into());
+    let doc = sheet_of(&["t := 0, 0.2..6.4"], spec);
+    let image = render(&doc);
+    // Ink in all four quarters of the plotting area: it goes all the way round.
+    let (x0, y0, x1, y1) = (292, 350, 704, 560);
+    let (mx, my) = ((x0 + x1) / 2, (y0 + y1) / 2);
+    for (name, r) in [
+        ("top left", (x0, y0, mx, my)),
+        ("top right", (mx, y0, x1, my)),
+        ("bottom left", (x0, my, mx, y1)),
+        ("bottom right", (mx, my, x1, y1)),
+    ] {
+        assert!(ink_in(&image, 0, r) > 15, "nothing drawn in the {name}");
+    }
+}
+
+#[test]
+fn a_plot_with_every_series_on_its_own_x_needs_no_shared_x() {
+    let spec = series_style(plot(&["t ^ 2"]).with_x(""), 0, |s| s.x = "t".into());
+    let image = render(&sheet_of(&["t := 1, 2..6"], spec));
+    assert!(ink_in(&image, 0, LOWER) > 20, "the series is drawn");
+    assert!(longest_line(&image) > 0);
+}
+
+fn units_sheet(spec: PlotSpec) -> Worksheet {
+    sheet_of(
+        &[
+            "w := 1 s, 2 s..6 s",
+            "d := 2 m * w / s",
+            "F := 5 N * w ^ 2 / s ^ 2",
+        ],
+        spec,
+    )
+}
+
+/// Dark pixels in the column where the right axis writes its numbers: just right of
+/// the plotting area when there is a right axis (which then leaves 46 points).
+fn right_numbers(image: &Image) -> usize {
+    dark_in(image, (636, 300, 712, 600))
+}
+
+#[test]
+fn a_series_on_the_right_axis_gets_its_own_scale_and_labels() {
+    let plain = render(&units_sheet(plot(&["d"])));
+    let two = plot(&["d", "F"]);
+    let on_right = series_style(two.clone(), 1, |s| s.axis = YAxis::Right);
+    let dual = render(&units_sheet(on_right));
+    assert!(
+        ink_in(&dual, 0, LOWER) > 20 && ink_in(&dual, 1, LOWER) > 20,
+        "both are drawn"
+    );
+    // Without a right axis the plotting area runs through that column, so the same
+    // column holds its lines and data instead of numbers: it must differ, and with a
+    // right axis the area ends before it.
+    assert!(
+        right_numbers(&dual) > 20,
+        "numbers on the right: {}",
+        right_numbers(&dual)
+    );
+    assert_ne!(right_numbers(&dual), right_numbers(&plain));
+    let area_edge = |image: &Image| {
+        (LOWER.1..LOWER.3)
+            .filter(|y| image.pixel(704, *y) != [255, 255, 255])
+            .count()
+    };
+    assert!(
+        area_edge(&plain) > 100,
+        "the plain plot's frame is at the edge"
+    );
+    assert!(
+        area_edge(&dual) < area_edge(&plain) / 2,
+        "the dual plot's frame is not"
+    );
+}
+
+#[test]
+fn series_of_different_kinds_on_one_axis_still_show_the_error() {
+    let both_left = render(&units_sheet(plot(&["d", "F"])));
+    assert_eq!(ink_in(&both_left, 1, LOWER), 0, "no chart is drawn");
+    assert!(longest_line_in(&both_left, LOWER) < 100);
+}
+
+/// `longest_line` for a plot at another position.
+fn longest_line_in(image: &Image, r: (usize, usize, usize, usize)) -> usize {
+    (r.1 + 10..r.3.min(image.height) - 10)
+        .map(|y| {
+            let (mut best, mut run) = (0, 0);
+            for x in r.0 + 10..r.2 - 10 {
+                if image.pixel(x, y) == [255, 255, 255] {
+                    run = 0;
+                } else {
+                    run += 1;
+                    best = best.max(run);
+                }
+            }
+            best
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+#[test]
+fn the_right_axis_has_its_own_limits_and_log_scale() {
+    let base = series_style(plot(&["d", "F"]), 1, |s| s.axis = YAxis::Right);
+    let wide = render(&units_sheet(base.clone()));
+    let limited = base.clone().with_options(PlotOptions {
+        y2_max: MathRegion::new("200 N"),
+        ..PlotOptions::default()
+    });
+    let cropped = render(&units_sheet(limited));
+    assert!(ink_in(&cropped, 1, LOWER) > 20);
+    assert!(
+        (LOWER.1..LOWER.3)
+            .any(|y| (LOWER.0..LOWER.2).any(|x| wide.pixel(x, y) != cropped.pixel(x, y))),
+        "a right-axis limit changes the picture"
+    );
+    // Units are checked against the right axis: metres do not fit a force axis.
+    let wrong = base.with_options(PlotOptions {
+        y2_max: MathRegion::new("10 m"),
+        ..PlotOptions::default()
+    });
+    let image = render(&units_sheet(wrong));
+    assert_eq!(ink_in(&image, 1, LOWER), 0, "no chart is drawn");
+}
+
+#[test]
+fn the_legend_says_which_series_are_on_the_right() {
+    let spec = series_style(plot(&["d", "F"]), 1, |s| s.axis = YAxis::Right);
+    let with = render(&units_sheet(spec.clone()));
+    let without = render(&units_sheet(series_style(spec, 1, |s| {
+        s.axis = YAxis::Left
+    })));
+    // Both draw something in the top right; the right-axis one writes more text there.
+    let corner = |image: &Image| dark_in(image, (420, 300, 715, 400));
+    assert!(corner(&with) > 0 || corner(&without) > 0);
+}

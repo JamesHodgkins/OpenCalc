@@ -198,6 +198,7 @@ fn sample_v2() -> Worksheet {
                 marker: Marker::Square,
                 colour: Some(5),
                 name: "cubes".into(),
+                ..SeriesStyle::default()
             },
         );
     add(&mut w, RegionKind::Plot(spec), 300.0, 300.0);
@@ -258,6 +259,39 @@ fn a_format_1_file_is_upgraded_to_2_when_saved_and_keeps_its_plots() {
         .unwrap();
     assert!(manifest.contains("\"format_version\":2"), "{manifest}");
     assert_eq!(load_bytes(&saved).unwrap().worksheet, old.worksheet);
+}
+
+#[test]
+fn a_right_axis_and_a_series_own_x_values_survive_saving() {
+    use opencalc_core::document::YAxis;
+    let mut w = Worksheet::new("p");
+    let spec = PlotSpec::default()
+        .with_x("t")
+        .with_series(0, "F")
+        .with_series(1, "d")
+        .with_options(PlotOptions {
+            y2_log: true,
+            y2_max: opencalc_core::document::MathRegion::new("1 m"),
+            ..PlotOptions::default()
+        })
+        .with_y2_label("displacement")
+        .with_style(
+            1,
+            SeriesStyle {
+                axis: YAxis::Right,
+                x: "u".into(),
+                ..SeriesStyle::default()
+            },
+        );
+    add(&mut w, RegionKind::Plot(spec), 0.0, 0.0);
+    let back = load_bytes(&save_bytes(&w).unwrap()).unwrap();
+    assert_eq!(back.worksheet, w);
+    let RegionKind::Plot(p) = &back.worksheet.regions()[0].kind else {
+        panic!()
+    };
+    assert!(p.uses_right_axis());
+    assert_eq!(p.style(1).x, "u");
+    assert_eq!(p.options.y2_label, "displacement");
 }
 
 #[test]

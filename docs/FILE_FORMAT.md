@@ -102,6 +102,8 @@ Both are optional, and nothing is written for a setting left at its default.
 | `legend` | `"auto"` (default), `"show"`, `"hide"` | Auto shows it when there is more than one series. |
 | `x_log`, `y_log` | `false` (default), `true` | Logarithmic axis: every value on it must be positive. |
 | `x_min`, `x_max`, `y_min`, `y_max` | `{ "source": "…" }` | Axis limits as math sources, so they may carry units (`10 s`) or read a variable. Blank is automatic. A limit must have the axis's dimension and be below its partner; on a log axis it must be positive. |
+| `y2_min`, `y2_max`, `y2_log` | as above | The same for the right-hand axis, which exists only while a series is on it; its limits are ignored otherwise. |
+| `y2_label` | text | The caption of the right-hand axis. |
 
 `styles` is a list by series position, shorter than `series` or absent when the rest
 are plain; trailing defaults are not saved. Each entry (all fields optional):
@@ -112,6 +114,8 @@ are plain; trailing defaults are not saved. Each entry (all fields optional):
 | `marker` | `"circle"` (default), `"square"`, `"triangle"`, `"cross"` | Marker shape. |
 | `colour` | whole number 0 to 7 | Palette colour; absent means the series' place in the cycle. A larger number is dropped on reading. |
 | `name` | text | Legend name; blank shows the expression. |
+| `axis` | `"left"` (default), `"right"` | The vertical axis the series is measured on. The series on one axis must share a dimension; the right axis may differ from the left. A series asking for the right axis while none is on the left is drawn on the left. |
+| `x` | text | A math source for this series' own x values; blank uses the plot's shared `x`. With every series having its own, the shared `x` may be blank. All x values of a plot must share a dimension. |
 
 A reader meeting a `kind` or `marker` it does not know must refuse the plot, not guess.
 
@@ -145,7 +149,7 @@ A reader meeting a `kind` or `marker` it does not know must refuse the plot, not
           "x": { "source": "w := 1, 2..5" },
           "series": [ { "source": "w^2" } ],
           "options": { "grid": false, "y_max": { "source": "30" } },
-          "styles": [ { "kind": "bar", "name": "squares" } ]
+          "styles": [ { "kind": "bar", "name": "squares", "axis": "right", "x": "w" } ]
         }
       }
     },

@@ -133,6 +133,36 @@ impl PlotSpec {
         self.y_label = y_label.to_owned();
         self
     }
+
+    pub fn with_y2_label(mut self, label: &str) -> PlotSpec {
+        self.options.y2_label = label.to_owned();
+        self
+    }
+
+    /// Whether any series with data is on the right axis.
+    pub fn uses_right_axis(&self) -> bool {
+        self.styles
+            .iter()
+            .enumerate()
+            .any(|(k, s)| s.axis == super::YAxis::Right && self.has_data(k))
+    }
+
+    /// Whether series `index` has something to plot.
+    pub fn has_data(&self, index: usize) -> bool {
+        self.series
+            .get(index)
+            .is_some_and(|s| !s.source().trim().is_empty())
+    }
+}
+
+/// One series as the evaluator takes it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlotSeriesInput {
+    pub y: Expr,
+    /// This series' own x values, if it has any.
+    pub x: Option<Expr>,
+    /// On the right-hand axis.
+    pub right: bool,
 }
 
 /// A plot as the evaluator takes it: the expressions to evaluate.
@@ -140,14 +170,16 @@ impl PlotSpec {
 pub struct PlotInput {
     pub x: Expr,
     /// One per non-blank series.
-    pub series: Vec<Expr>,
+    pub series: Vec<PlotSeriesInput>,
     /// The x source is empty (whatever `x` then holds).
     pub x_blank: bool,
     /// Logarithmic axes.
     pub x_log: bool,
     pub y_log: bool,
-    /// Axis limits in the order x min, x max, y min, y max; `None` is automatic.
-    pub limits: [Option<Expr>; 4],
+    pub y2_log: bool,
+    /// Axis limits in the order x min, x max, y min, y max, right min, right max;
+    /// `None` is automatic.
+    pub limits: [Option<Expr>; 6],
 }
 
 #[cfg(test)]

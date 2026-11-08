@@ -6,7 +6,7 @@
 use eframe::egui::{self, Context, RichText, Ui};
 use opencalc_core::document::{
     LegendMode, Marker, MathRegion, PlotOptions, PlotSpec, RegionId, RegionKind, SeriesKind,
-    SeriesStyle, MAX_SERIES, PALETTE_SIZE,
+    SeriesStyle, YAxis, MAX_SERIES, PALETTE_SIZE,
 };
 use opencalc_core::edit::Edit;
 
@@ -188,6 +188,31 @@ fn series_style(
                 };
                 spec.clone().with_style(k, new)
             });
+            small(ui, state, "Measured on");
+            if let Some(axis) = choose(ui, ("plot-axis", id.0, k), style.axis, &YAxis::ALL, &|o| {
+                o.label().to_owned()
+            }) {
+                let new = SeriesStyle {
+                    axis,
+                    ..style.clone()
+                };
+                send(out, id, spec.clone().with_style(k, new));
+            }
+            field(
+                ui,
+                state,
+                id,
+                out,
+                "Own x values (blank: the plot's x values)",
+                &style.x,
+                &|t| {
+                    let new = SeriesStyle {
+                        x: t.to_owned(),
+                        ..style.clone()
+                    };
+                    spec.clone().with_style(k, new)
+                },
+            );
         });
 }
 
@@ -197,11 +222,13 @@ fn axes(ui: &mut Ui, state: &AppState, id: RegionId, spec: &PlotSpec, out: &mut 
     egui::CollapsingHeader::new("Axes and grid")
         .id_salt(("plot-axes", id.0))
         .show(ui, |ui| {
-            let limits: [(&str, &MathRegion); 4] = [
+            let limits: [(&str, &MathRegion); 6] = [
                 ("x minimum (blank: automatic)", &o.x_min),
                 ("x maximum", &o.x_max),
                 ("y minimum", &o.y_min),
                 ("y maximum", &o.y_max),
+                ("Right axis minimum", &o.y2_min),
+                ("Right axis maximum", &o.y2_max),
             ];
             for (n, (label, current)) in limits.into_iter().enumerate() {
                 field(ui, state, id, out, label, current.source(), &|t| {
@@ -211,21 +238,25 @@ fn axes(ui: &mut Ui, state: &AppState, id: RegionId, spec: &PlotSpec, out: &mut 
                         0 => options.x_min = m,
                         1 => options.x_max = m,
                         2 => options.y_min = m,
-                        _ => options.y_max = m,
+                        3 => options.y_max = m,
+                        4 => options.y2_min = m,
+                        _ => options.y2_max = m,
                     }
                     spec.clone().with_options(options)
                 });
             }
             let mut grid = o.grid;
-            let (mut x_log, mut y_log) = (o.x_log, o.y_log);
+            let (mut x_log, mut y_log, mut y2_log) = (o.x_log, o.y_log, o.y2_log);
             ui.checkbox(&mut grid, "Grid");
             ui.checkbox(&mut x_log, "Logarithmic x axis");
             ui.checkbox(&mut y_log, "Logarithmic y axis");
-            if (grid, x_log, y_log) != (o.grid, o.x_log, o.y_log) {
+            ui.checkbox(&mut y2_log, "Logarithmic right axis");
+            if (grid, x_log, y_log, y2_log) != (o.grid, o.x_log, o.y_log, o.y2_log) {
                 let options = PlotOptions {
                     grid,
                     x_log,
                     y_log,
+                    y2_log,
                     ..o.clone()
                 };
                 send(out, id, spec.clone().with_options(options));
@@ -290,5 +321,16 @@ fn plot_editor(
     field(ui, state, id, out, "y label", &spec.y_label, &|t| {
         spec.clone().with_labels(&spec.x_label, t)
     });
+    if spec.uses_right_axis() {
+        field(
+            ui,
+            state,
+            id,
+            out,
+            "Right axis label",
+            &spec.options.y2_label,
+            &|t| spec.clone().with_y2_label(t),
+        );
+    }
     axes(ui, state, id, spec, out);
 }

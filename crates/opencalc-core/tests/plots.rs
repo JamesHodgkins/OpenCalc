@@ -244,7 +244,7 @@ fn axis_limits_are_evaluated_in_si_and_blank_ones_are_automatic() {
         with_options(base, limits("", "3 s", "0 N", "")),
     );
     let data = plot_of(&run(&w), id).unwrap();
-    assert_eq!(data.limits, [None, Some(3.0), Some(0.0), None]);
+    assert_eq!(data.limits, [None, Some(3.0), Some(0.0), None, None, None]);
     assert!(!data.x_log && !data.y_log);
 }
 
@@ -425,4 +425,219 @@ fn a_blank_series_does_not_shift_the_styles_of_the_ones_after_it() {
         1,
         "only the non-blank series is evaluated"
     );
+}
+
+// ---- a second axis and series with their own x ----------------------------------
+
+use opencalc_core::document::YAxis;
+
+fn on_right(spec: PlotSpec, index: usize) -> PlotSpec {
+    let style = spec.style(index);
+    spec.with_style(
+        index,
+        SeriesStyle {
+            axis: YAxis::Right,
+            ..style
+        },
+    )
+}
+
+fn with_own_x(spec: PlotSpec, index: usize, x: &str) -> PlotSpec {
+    let style = spec.style(index);
+    spec.with_style(
+        index,
+        SeriesStyle {
+            x: x.to_owned(),
+            ..style
+        },
+    )
+}
+
+#[test]
+fn a_series_with_its_own_x_values_needs_no_shared_ones() {
+    // A circle: x = cos t, y = sin t, with nothing in the shared x field.
+    let p = with_own_x(spec("", &["sin(t)"]), 0, "cos(t)");
+    let (w, id) = sheet(&["t := 0..4"], p);
+    let data = plot_of(&run(&w), id).unwrap();
+    let want: Vec<(f64, f64)> = (0..=4)
+        .map(|t| ((t as f64).cos(), (t as f64).sin()))
+        .collect();
+    assert_eq!(data.series[0].points, want);
+}
+
+#[test]
+fn series_may_mix_shared_and_own_x_values() {
+    let p = with_own_x(spec("t", &["t", "t ^ 2"]), 1, "2 * t");
+    let (w, id) = sheet(&["t := 1..3"], p);
+    let data = plot_of(&run(&w), id).unwrap();
+    assert_eq!(data.series[0].points, [(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)]);
+    assert_eq!(data.series[1].points, [(2.0, 1.0), (4.0, 4.0), (6.0, 9.0)]);
+}
+
+#[test]
+fn a_series_without_own_x_still_needs_the_shared_ones() {
+    let p = with_own_x(spec("", &["t", "t ^ 2"]), 0, "t");
+    let (w, id) = sheet(&["t := 1..3"], p);
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::Invalid(m)) if m.contains("x values")
+    ));
+}
+
+#[test]
+fn every_x_on_one_axis_must_measure_the_same_thing() {
+    let p = with_own_x(spec("t", &["t", "t"]), 1, "t * 1 m / s");
+    let (w, id) = sheet(&["t := 1 s, 2 s..3 s"], p);
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, error }) if part == "series 2 x" && matches!(*error, EvalError::Unit(_))
+    ));
+}
+
+#[test]
+fn an_own_x_with_a_different_length_names_the_series() {
+    let p = with_own_x(spec("t", &["t"]), 0, "t[0]");
+    let (w, id) = sheet(&["t := 1..3"], p);
+    let result = plot_of(&run(&w), id);
+    assert!(
+        matches!(result, Err(EvalError::InPlot { .. })),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn a_series_on_the_right_axis_may_measure_something_else() {
+    let base = spec("t", &["F", "d"]);
+    let p = on_right(base, 1);
+    assert!(p.uses_right_axis());
+    let (w, id) = sheet(
+        &[
+            "t := 0 s, 1 s..3 s",
+            "F := 2 N * t / s",
+            "d := 3 mm * t / s",
+        ],
+        p,
+    );
+    let data = plot_of(&run(&w), id).unwrap();
+    assert_eq!(data.y2_dim, Some(Dimension::LENGTH));
+    assert_eq!(data.left_dim(), Dimension::FORCE);
+    assert!(!data.series[0].right && data.series[1].right);
+}
+
+#[test]
+fn without_the_right_axis_mixed_series_are_still_refused() {
+    let (w, id) = sheet(
+        &[
+            "t := 0 s, 1 s..3 s",
+            "F := 2 N * t / s",
+            "d := 3 mm * t / s",
+        ],
+        spec("t", &["F", "d"]),
+    );
+    assert!(
+        matches!(plot_of(&run(&w), id), Err(EvalError::InPlot { part, .. }) if part == "series 2")
+    );
+}
+
+#[test]
+fn series_on_the_right_axis_must_agree_with_each_other() {
+    let p = on_right(on_right(spec("t", &["F", "d", "t"]), 1), 2);
+    let (w, id) = sheet(
+        &[
+            "t := 0 s, 1 s..3 s",
+            "F := 2 N * t / s",
+            "d := 3 mm * t / s",
+        ],
+        p,
+    );
+    assert!(
+        matches!(plot_of(&run(&w), id), Err(EvalError::InPlot { part, .. }) if part == "series 3")
+    );
+}
+
+#[test]
+fn a_lone_right_axis_series_is_drawn_on_the_left() {
+    let p = on_right(spec("x", &["x"]), 0);
+    assert!(p.uses_right_axis(), "the spec asks for it");
+    let (w, id) = sheet(&["x := 1..3"], p);
+    let data = plot_of(&run(&w), id).unwrap();
+    assert_eq!(data.y2_dim, None);
+    assert!(
+        !data.series[0].right,
+        "nothing is on the left, so it moves there"
+    );
+}
+
+#[test]
+fn the_right_axis_has_its_own_limits_log_scale_and_units() {
+    let options = |y2_min: &str, y2_max: &str, y2_log: bool| PlotOptions {
+        y2_min: MathRegion::new(y2_min),
+        y2_max: MathRegion::new(y2_max),
+        y2_log,
+        ..PlotOptions::default()
+    };
+    let lines = &[
+        "t := 1 s, 2 s..3 s",
+        "F := 2 N * t / s",
+        "d := 3 mm * t / s",
+    ];
+    let p = |o| on_right(spec("t", &["F", "d"]), 1).with_options(o);
+    let (w, id) = sheet(lines, p(options("1 mm", "10 mm", false)));
+    let data = plot_of(&run(&w), id).unwrap();
+    assert_eq!(data.limits[4], Some(0.001));
+    assert_eq!(data.limits[5], Some(0.01));
+    // Units are checked against the right axis, not the left.
+    let (w, id) = sheet(lines, p(options("", "10 N", false)));
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "right axis max"
+    ));
+    // The right axis is logarithmic on its own: the left may hold zero.
+    let (w, id) = sheet(
+        &[
+            "t := 0 s, 1 s..3 s",
+            "F := 2 N * t / s",
+            "d := 3 mm + t * 1 mm / s",
+        ],
+        p(options("", "", true)),
+    );
+    let data = plot_of(&run(&w), id).unwrap();
+    assert!(data.y2_log && !data.y_log);
+    let (w, id) = sheet(
+        &[
+            "t := 0 s, 1 s..3 s",
+            "F := 2 N * t / s",
+            "d := 3 mm * t / s",
+        ],
+        p(options("", "", true)),
+    );
+    assert!(
+        matches!(plot_of(&run(&w), id), Err(EvalError::InPlot { part, .. }) if part == "series 2")
+    );
+    // A minimum above the maximum.
+    let (w, id) = sheet(lines, p(options("10 mm", "1 mm", false)));
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "right axis limits"
+    ));
+}
+
+#[test]
+fn right_axis_limits_are_ignored_while_no_series_uses_it() {
+    let options = PlotOptions {
+        y2_max: MathRegion::new("999 kg"),
+        ..PlotOptions::default()
+    };
+    let (w, id) = sheet(&["x := 1..3"], spec("x", &["x"]).with_options(options));
+    let data = plot_of(&run(&w), id).unwrap();
+    assert_eq!(data.limits[5], None);
+}
+
+#[test]
+fn removing_a_series_takes_its_axis_and_x_values_with_it() {
+    let p = on_right(with_own_x(spec("x", &["a", "b"]), 0, "u"), 0);
+    let p = p.without_series(0);
+    assert_eq!(p.series.len(), 1);
+    assert_eq!(p.style(0), SeriesStyle::default());
+    assert!(!p.uses_right_axis());
 }

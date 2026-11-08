@@ -14,8 +14,10 @@ use serde::{Deserialize, Serialize};
 
 pub use geometry::{Point, Size};
 pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
-pub use plot::{PlotInput, PlotSpec, MAX_SERIES};
-pub use plot_style::{LegendMode, Marker, PlotOptions, SeriesKind, SeriesStyle, PALETTE_SIZE};
+pub use plot::{PlotInput, PlotSeriesInput, PlotSpec, MAX_SERIES};
+pub use plot_style::{
+    LegendMode, Marker, PlotOptions, SeriesKind, SeriesStyle, YAxis, PALETTE_SIZE,
+};
 pub use region::{
     clean_label, FontStyle, MathRegion, Region, RegionId, RegionKind, MAX_LABEL_CHARS,
 };
@@ -153,12 +155,22 @@ impl Worksheet {
                         series: p
                             .series
                             .iter()
-                            .filter(|s| !s.source().trim().is_empty())
-                            .map(|s| s.expr().clone())
+                            .enumerate()
+                            .filter(|(_, s)| !s.source().trim().is_empty())
+                            .map(|(k, s)| {
+                                let style = p.style(k);
+                                PlotSeriesInput {
+                                    y: s.expr().clone(),
+                                    x: (!style.x.trim().is_empty())
+                                        .then(|| MathRegion::new(&style.x).expr().clone()),
+                                    right: style.axis == YAxis::Right,
+                                }
+                            })
                             .collect(),
                         x_blank: p.x.source().trim().is_empty(),
                         x_log: p.options.x_log,
                         y_log: p.options.y_log,
+                        y2_log: p.options.y2_log,
                         limits: p
                             .options
                             .limits()

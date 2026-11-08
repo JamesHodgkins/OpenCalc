@@ -75,8 +75,8 @@ Depends on Phase 1 (inverse, boolean values). Builds the cancellation token that
 Extends `PlotSpec` (format bump with migration). TD-31 records the current plot decisions.
 
 - [x] Plot options and series styles (2026-11-08), **file format 2** (a real migration step; format 1 files open unchanged, fixtures of both are tested). Per plot: axis limits for x and y (math sources, so they carry units or read a variable; blank is automatic; a limit must have its axis's dimension and the minimum must be below the maximum), grid on or off, legend automatic, shown or hidden, and a logarithmic x or y axis (every value and limit on it must be positive, else an error naming the part). Per series: type (line, markers, line and markers, step, stem, bar), marker shape (circle, square, triangle, cross), a colour from the palette, and a legend name. Columns grow from zero, group side by side when there are several bar series, and leave room for half a column at each end; markers and stems get a little room too. Edited in the Plot window (a section per series, an Axes and grid section), searched and replaced by Find and Replace, painted identically by the PDF and PNG export. Not done: error bars, secondary axes, line width and dash styles, user-chosen tick marks.
-- [ ] `f(x)`-style function plotting and parametric plots (a range already gives function plots; parametric needs a per-series x).
-- [ ] Mixed units on an axis (per-series dimensions).
+- [x] Parametric plots (2026-11-08): a series may have its own x values (a math source in its settings; blank uses the plot's x), so `sin(t)` against `cos(t)` draws a circle with nothing in the shared x field. All x values of one plot must share a dimension; a series lacking its own x still needs the shared ones. `f(x)`-style plots need no new syntax: a range variable already gives them. Same file format 2 (not yet released, so extended in place).
+- [x] Mixed units (2026-11-08): a second, right-hand y axis. A series is set to the left or right axis; the series on one axis share a dimension, the two axes may differ (a displacement and a force on one plot). The right axis has its own unit, limits, log setting, ticks, caption and baseline for bars and stems; the legend marks `(right)` series; the evaluator checks units per axis and reports the part (`series 3`, `right axis max`). A series asking for the right axis with none on the left is drawn on the left; right-axis limits are ignored while nothing uses it. Not done: more than two axes, and x axes of different kinds.
 - [ ] Plot types: bar/column, stem, scatter, polar, error bars, box.
 - [ ] Contour plot, then 3D (surface, curve, scatter) with rotate/pan/zoom.
 - [ ] Interactive plot view with hover readout, pan and zoom (revisit `egui_plot`, TD-31).
@@ -133,6 +133,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 3.2: parametric plots (a series' own x values) and a second y axis; scales, legend and frame split into `canvas/plot/` modules. |
 | 2026-11-08 | Phase 3.1: plot options and series styles (file format 2): axis limits, grid, legend, log axes, six series types, markers, colours, legend names; rendering tests on real pixels. |
 | 2026-11-08 | Phase 2.2: `odesolve` (adaptive RK45, mixed-unit states, table output), `col` / `row`; corpus `odes.calc`, `tests/ode.rs`. |
 | 2026-11-08 | Phase 1.1: per-element dimensions in matrices (TD-28 resolved); solver unknowns may now differ in dimension; corpus `mixed_units.calc`. |

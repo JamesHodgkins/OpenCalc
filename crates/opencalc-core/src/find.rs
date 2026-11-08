@@ -34,7 +34,11 @@ pub enum Field {
     PlotSeries(usize),
     /// The legend name of a series that has a style.
     PlotSeriesName(usize),
-    /// One of the four axis limits: x min, x max, y min, y max.
+    /// The own x values of a series that has a style.
+    PlotSeriesX(usize),
+    /// The caption of the right axis.
+    PlotY2Label,
+    /// One of the six axis limits: x min, x max, y min, y max, right min, right max.
     PlotLimit(usize),
     /// The region's label (any kind of region has one).
     Label,
@@ -73,11 +77,18 @@ fn kind_fields(kind: &RegionKind) -> Vec<(Field, &str)> {
                     .enumerate()
                     .map(|(i, s)| (Field::PlotSeries(i), s.source())),
             );
+            v.push((Field::PlotY2Label, p.options.y2_label.as_str()));
             v.extend(
                 p.styles
                     .iter()
                     .enumerate()
                     .map(|(i, s)| (Field::PlotSeriesName(i), s.name.as_str())),
+            );
+            v.extend(
+                p.styles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| (Field::PlotSeriesX(i), s.x.as_str())),
             );
             v.extend(
                 p.options
@@ -261,9 +272,17 @@ fn replace_in_plot(
             changed = true;
         }
     }
+    if let Some(t) = new_text(Field::PlotY2Label, &p.options.y2_label) {
+        spec.options.y2_label = t;
+        changed = true;
+    }
     for (i, s) in p.styles.iter().enumerate() {
         if let Some(t) = new_text(Field::PlotSeriesName(i), &s.name) {
             spec.styles[i].name = t;
+            changed = true;
+        }
+        if let Some(t) = new_text(Field::PlotSeriesX(i), &s.x) {
+            spec.styles[i].x = t;
             changed = true;
         }
     }
@@ -274,7 +293,9 @@ fn replace_in_plot(
                 0 => spec.options.x_min = limit,
                 1 => spec.options.x_max = limit,
                 2 => spec.options.y_min = limit,
-                _ => spec.options.y_max = limit,
+                3 => spec.options.y_max = limit,
+                4 => spec.options.y2_min = limit,
+                _ => spec.options.y2_max = limit,
             }
             changed = true;
         }

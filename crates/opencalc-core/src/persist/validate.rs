@@ -121,7 +121,9 @@ fn check_plot(id: RegionId, p: &mut PlotSpec) -> Result<Option<Repair>, LoadErro
     }
     for s in &p.styles {
         too_long("a series name", &s.name)?;
+        too_long("a series' x values", &s.x)?;
     }
+    too_long("a plot axis caption", &p.options.y2_label)?;
     for limit in p.options.limits() {
         too_long("a plot axis limit", limit.source())?;
     }

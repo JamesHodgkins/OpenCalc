@@ -1,5 +1,6 @@
 //! How a plot looks and how its axes behave: the settings of the whole plot
-//! ([`PlotOptions`]) and of each data series ([`SeriesStyle`]).
+//! ([`PlotOptions`]) and of each data series ([`SeriesStyle`], which also says
+//! which y axis the series is on and whether it has x values of its own).
 //!
 //! All of it is saved, and nothing is saved for a setting left at its default, so
 //! a plain plot's file is the same size as before these options existed. Axis
@@ -80,6 +81,28 @@ impl Marker {
     }
 }
 
+/// Which vertical axis a series is measured on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum YAxis {
+    /// The left axis, shared by every series that does not ask for the right.
+    #[default]
+    Left,
+    /// A second axis on the right, for series that measure something else.
+    Right,
+}
+
+impl YAxis {
+    pub const ALL: [YAxis; 2] = [YAxis::Left, YAxis::Right];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            YAxis::Left => "Left axis",
+            YAxis::Right => "Right axis",
+        }
+    }
+}
+
 /// Number of line colours in the palette; a series picks one by index.
 pub const PALETTE_SIZE: u8 = 8;
 
@@ -98,6 +121,14 @@ pub struct SeriesStyle {
     /// Legend name; blank shows the expression.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
+    /// The vertical axis this series is measured on.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub axis: YAxis,
+    /// A math source for this series' own x values; blank uses the plot's shared
+    /// x values. With one per series a plot can draw curves that are not functions
+    /// of a common x, such as a circle (`cos(t)` against `sin(t)`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub x: String,
 }
 
 fn is_default<T: Default + PartialEq>(v: &T) -> bool {
@@ -154,6 +185,16 @@ pub struct PlotOptions {
     pub y_min: MathRegion,
     #[serde(default = "blank")]
     pub y_max: MathRegion,
+    /// The right axis, used by series set to [`YAxis::Right`].
+    #[serde(default)]
+    pub y2_log: bool,
+    #[serde(default = "blank")]
+    pub y2_min: MathRegion,
+    #[serde(default = "blank")]
+    pub y2_max: MathRegion,
+    /// Caption of the right axis.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub y2_label: String,
 }
 
 fn yes() -> bool {
@@ -175,6 +216,10 @@ impl Default for PlotOptions {
             x_max: blank(),
             y_min: blank(),
             y_max: blank(),
+            y2_log: false,
+            y2_min: blank(),
+            y2_max: blank(),
+            y2_label: String::new(),
         }
     }
 }
@@ -184,9 +229,17 @@ impl PlotOptions {
         *self == PlotOptions::default()
     }
 
-    /// The four limit sources in the order x min, x max, y min, y max.
-    pub fn limits(&self) -> [&MathRegion; 4] {
-        [&self.x_min, &self.x_max, &self.y_min, &self.y_max]
+    /// The limit sources in the order x min, x max, y min, y max, right min,
+    /// right max.
+    pub fn limits(&self) -> [&MathRegion; 6] {
+        [
+            &self.x_min,
+            &self.x_max,
+            &self.y_min,
+            &self.y_max,
+            &self.y2_min,
+            &self.y2_max,
+        ]
     }
 }
 
@@ -211,11 +264,13 @@ mod tests {
             marker: Marker::Triangle,
             colour: Some(3),
             name: "load".into(),
+            axis: YAxis::Right,
+            x: "cos(t)".into(),
         };
         let json = serde_json::to_string(&s).unwrap();
         assert_eq!(
             json,
-            r#"{"kind":"stem","marker":"triangle","colour":3,"name":"load"}"#
+            r#"{"kind":"stem","marker":"triangle","colour":3,"name":"load","axis":"right","x":"cos(t)"}"#
         );
         assert_eq!(serde_json::from_str::<SeriesStyle>(&json).unwrap(), s);
         let only_kind = SeriesStyle {
