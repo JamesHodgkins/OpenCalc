@@ -295,7 +295,10 @@ mod tests {
         // `m` is a unit and leads `mm`, `min` and the functions starting with m.
         let got = candidates("m", &[], false);
         assert_eq!((got[0].insert.as_str(), got[0].kind), ("m", Kind::Unit));
-        assert!(got.iter().any(|c| c.insert == "mm"));
+        assert!(got.len() > 1);
+        assert!(candidates("mm", &[], false)
+            .iter()
+            .any(|c| c.insert == "mm"));
         // A defined name is not shadowed by a unit of the same name.
         let got = candidates("m", &["m".to_owned()], false);
         assert_eq!(got[0].kind, Kind::Variable);

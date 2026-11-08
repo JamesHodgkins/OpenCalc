@@ -65,6 +65,23 @@ impl Dimension {
     pub const VELOCITY: Dimension = Dimension::new([1, 0, -1, 0, 0, 0, 0]);
     pub const ACCELERATION: Dimension = Dimension::new([1, 0, -2, 0, 0, 0, 0]);
     pub const AREA: Dimension = Dimension::new([2, 0, 0, 0, 0, 0, 0]);
+    pub const VOLUME: Dimension = Dimension::new([3, 0, 0, 0, 0, 0, 0]);
+    pub const CURRENT: Dimension = Dimension::new([0, 0, 0, 1, 0, 0, 0]);
+    pub const TEMPERATURE: Dimension = Dimension::new([0, 0, 0, 0, 1, 0, 0]);
+    pub const AMOUNT: Dimension = Dimension::new([0, 0, 0, 0, 0, 1, 0]);
+    pub const LUMINOSITY: Dimension = Dimension::new([0, 0, 0, 0, 0, 0, 1]);
+    /// Time^-1.
+    pub const FREQUENCY: Dimension = Dimension::new([0, 0, -1, 0, 0, 0, 0]);
+    /// Mass * length^2 / time^2.
+    pub const ENERGY: Dimension = Dimension::new([2, 1, -2, 0, 0, 0, 0]);
+    /// Mass * length^2 / time^3.
+    pub const POWER: Dimension = Dimension::new([2, 1, -3, 0, 0, 0, 0]);
+    /// Current * time.
+    pub const CHARGE: Dimension = Dimension::new([0, 0, 1, 1, 0, 0, 0]);
+    /// Power / current.
+    pub const VOLTAGE: Dimension = Dimension::new([2, 1, -3, -1, 0, 0, 0]);
+    /// Voltage / current.
+    pub const RESISTANCE: Dimension = Dimension::new([2, 1, -3, -2, 0, 0, 0]);
 
     const fn new(e: [i8; 7]) -> Self {
         Dimension {
@@ -171,6 +188,51 @@ const BUILTIN: &[(&str, Dimension, f64)] = &[
     ("ksi", Dimension::PRESSURE, 6_894_757.293_168_36),
     ("dyn", Dimension::FORCE, 1e-5),
     ("Ba", Dimension::PRESSURE, 0.1),
+    // More length, mass and time.
+    ("um", Dimension::LENGTH, 1e-6),
+    ("nm", Dimension::LENGTH, 1e-9),
+    ("yd", Dimension::LENGTH, 0.9144),
+    ("mi", Dimension::LENGTH, 1_609.344),
+    ("mg", Dimension::MASS, 1e-6),
+    ("oz", Dimension::MASS, 0.028_349_523_125),
+    ("tonne", Dimension::MASS, 1e3),
+    ("ms", Dimension::TIME, 1e-3),
+    ("min", Dimension::TIME, 60.0),
+    ("hr", Dimension::TIME, 3_600.0),
+    ("day", Dimension::TIME, 86_400.0),
+    ("Hz", Dimension::FREQUENCY, 1.0),
+    ("kHz", Dimension::FREQUENCY, 1e3),
+    ("MHz", Dimension::FREQUENCY, 1e6),
+    // The other SI base dimensions. Kelvin has no offset; degC and degF are not
+    // built in (see TECH_DEBT TD-09).
+    ("A", Dimension::CURRENT, 1.0),
+    ("mA", Dimension::CURRENT, 1e-3),
+    ("K", Dimension::TEMPERATURE, 1.0),
+    ("mol", Dimension::AMOUNT, 1.0),
+    ("cd", Dimension::LUMINOSITY, 1.0),
+    // Derived units.
+    ("J", Dimension::ENERGY, 1.0),
+    ("kJ", Dimension::ENERGY, 1e3),
+    ("MJ", Dimension::ENERGY, 1e6),
+    ("kWh", Dimension::ENERGY, 3.6e6),
+    ("cal", Dimension::ENERGY, 4.184),
+    ("BTU", Dimension::ENERGY, 1_055.055_852_62),
+    ("W", Dimension::POWER, 1.0),
+    ("kW", Dimension::POWER, 1e3),
+    ("MW", Dimension::POWER, 1e6),
+    ("hp", Dimension::POWER, 745.699_871_582_270_2),
+    ("C", Dimension::CHARGE, 1.0),
+    ("V", Dimension::VOLTAGE, 1.0),
+    ("kV", Dimension::VOLTAGE, 1e3),
+    ("mV", Dimension::VOLTAGE, 1e-3),
+    ("ohm", Dimension::RESISTANCE, 1.0),
+    ("kohm", Dimension::RESISTANCE, 1e3),
+    ("bar", Dimension::PRESSURE, 1e5),
+    ("atm", Dimension::PRESSURE, 101_325.0),
+    ("psf", Dimension::PRESSURE, 47.880_258_980_335_84),
+    ("L", Dimension::VOLUME, 1e-3),
+    ("mL", Dimension::VOLUME, 1e-6),
+    ("gal", Dimension::VOLUME, 0.003_785_411_784),
 ];
 
 /// Look up a built-in unit by symbol.
@@ -451,6 +513,57 @@ mod tests {
         assert_eq!(si(100.0, "cm"), si(1.0, "m"));
         assert_eq!(si(1.0, "km"), 1000.0 * si(1.0, "m"));
         assert_eq!(si(1000.0, "g"), si(1.0, "kg"));
+    }
+
+    /// The units added in roadmap Phase 1.1, against definitions stated apart
+    /// from the table.
+    #[test]
+    fn the_added_units_agree_with_their_definitions() {
+        let si = |v: f64, u: &str| Quantity::from_unit(v, u).unwrap().si;
+        let close = |a: f64, b: f64| (a - b).abs() <= 1e-12 * b.abs();
+        assert!(close(si(3.0, "yd"), si(9.0, "ft")), "1 yd = 3 ft");
+        assert!(
+            close(si(1.0, "mi"), 5280.0 * si(1.0, "ft")),
+            "1 mi = 5280 ft"
+        );
+        assert!(close(si(16.0, "oz"), si(1.0, "lb")), "16 oz = 1 lb");
+        assert_eq!(si(1.0, "hr"), 60.0 * si(1.0, "min"));
+        assert_eq!(si(1.0, "day"), 24.0 * si(1.0, "hr"));
+        assert!(close(si(1.0, "kWh"), si(1.0, "kW") * si(1.0, "hr")));
+        assert!(close(si(1.0, "L"), si(1000.0, "mL")));
+        assert!(close(
+            si(1.0, "gal"),
+            231.0 * si(1.0, "in") * si(1.0, "in") * si(1.0, "in")
+        ));
+        assert!(close(
+            si(1.0, "psf"),
+            si(1.0, "lbf") / (si(1.0, "ft") * si(1.0, "ft"))
+        ));
+        assert!(
+            close(si(1.0, "hp"), 550.0 * si(1.0, "lbf") * si(1.0, "ft")),
+            "1 hp = 550 ft lbf/s"
+        );
+        assert_eq!(si(1.0, "atm"), 101_325.0);
+    }
+
+    /// Derived units must be the products and quotients of base units.
+    #[test]
+    fn derived_unit_dimensions_follow_from_the_base_units() {
+        let mul = |a: Quantity, b: Quantity| a.times(b).unwrap();
+        let div = |a: Quantity, b: Quantity| a.over(b).unwrap();
+        let q = |u: &str| Quantity::from_unit(1.0, u).unwrap();
+        assert_eq!(mul(q("N"), q("m")).dim, q("J").dim, "J = N m");
+        assert_eq!(div(q("J"), q("s")).dim, q("W").dim, "W = J / s");
+        assert_eq!(div(q("W"), q("A")).dim, q("V").dim, "V = W / A");
+        assert_eq!(div(q("V"), q("A")).dim, q("ohm").dim, "ohm = V / A");
+        assert_eq!(mul(q("A"), q("s")).dim, q("C").dim, "C = A s");
+        assert_eq!(div(q("m"), q("m")).dim, Dimension::NONE);
+        assert_eq!(div(Quantity::dimensionless(1.0), q("s")).dim, q("Hz").dim);
+        assert_eq!(
+            mul(mul(q("m"), q("m")), q("m")).dim,
+            q("L").dim,
+            "L is a volume"
+        );
     }
 
     #[test]

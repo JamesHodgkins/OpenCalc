@@ -24,6 +24,22 @@ const SI: &[(&str, Dimension, f64)] = &[
     ("Pa", Dimension::PRESSURE, 1.0),
     ("kPa", Dimension::PRESSURE, 1e3),
     ("MPa", Dimension::PRESSURE, 1e6),
+    ("m\u{00b3}", Dimension::VOLUME, 1.0),
+    ("Hz", Dimension::FREQUENCY, 1.0),
+    ("kHz", Dimension::FREQUENCY, 1e3),
+    ("MHz", Dimension::FREQUENCY, 1e6),
+    ("J", Dimension::ENERGY, 1.0),
+    ("kJ", Dimension::ENERGY, 1e3),
+    ("MJ", Dimension::ENERGY, 1e6),
+    ("W", Dimension::POWER, 1.0),
+    ("kW", Dimension::POWER, 1e3),
+    ("MW", Dimension::POWER, 1e6),
+    ("C", Dimension::CHARGE, 1.0),
+    ("mV", Dimension::VOLTAGE, 1e-3),
+    ("V", Dimension::VOLTAGE, 1.0),
+    ("kV", Dimension::VOLTAGE, 1e3),
+    ("ohm", Dimension::RESISTANCE, 1.0),
+    ("kohm", Dimension::RESISTANCE, 1e3),
 ];
 
 const USCS: &[(&str, Dimension, f64)] = &[
@@ -37,6 +53,8 @@ const USCS: &[(&str, Dimension, f64)] = &[
     ("kip", Dimension::FORCE, 4_448.221_615_260_5),
     ("psi", Dimension::PRESSURE, 6_894.757_293_168_36),
     ("ksi", Dimension::PRESSURE, 6_894_757.293_168_36),
+    ("in\u{00b3}", Dimension::VOLUME, 0.0254 * 0.0254 * 0.0254),
+    ("ft\u{00b3}", Dimension::VOLUME, 0.3048 * 0.3048 * 0.3048),
 ];
 
 const CGS: &[(&str, Dimension, f64)] = &[
@@ -46,6 +64,7 @@ const CGS: &[(&str, Dimension, f64)] = &[
     ("s", Dimension::TIME, 1.0),
     ("dyn", Dimension::FORCE, 1e-5),
     ("Ba", Dimension::PRESSURE, 0.1),
+    ("cm\u{00b3}", Dimension::VOLUME, 1e-6),
 ];
 
 /// A system's display units for a dimension. A dimension the system has no unit
@@ -281,6 +300,17 @@ mod tests {
         format_quantity(Quantity::from_unit(v, unit).unwrap(), UnitSystem::Si)
     }
 
+    #[test]
+    fn derived_units_show_by_name_not_as_base_units() {
+        assert_eq!(show(1500.0, "W"), "1.5 kW");
+        assert_eq!(show(2.0, "J"), "2 J");
+        assert_eq!(show(5.0, "V"), "5 V");
+        assert_eq!(show(50.0, "Hz"), "50 Hz");
+        assert_eq!(show(4.0, "ohm"), "4 ohm");
+        assert_eq!(shown("2 m * 3 m * 4 m"), "24 m\u{00b3}");
+        assert_eq!(shown("10 N * 3 m"), "30 J");
+    }
+
     fn shown(src: &str) -> String {
         use opencalc_core::eval::{evaluate, RegionId};
         let regions = vec![(RegionId(1), opencalc_core::parser::parse(src))];
@@ -314,12 +344,13 @@ mod tests {
     #[test]
     fn a_dimension_with_no_unit_in_the_system_falls_back_to_si() {
         // Time has "s" everywhere; an unlisted dimension shows SI base units.
-        let volume = Quantity::from_unit(2.0, "m")
+        // Volume has a display unit in each system, so use length^4.
+        let quartic = Quantity::from_unit(2.0, "m")
             .unwrap()
-            .pow(Quantity::dimensionless(3.0))
+            .pow(Quantity::dimensionless(4.0))
             .unwrap();
         for system in UnitSystem::ALL {
-            assert_eq!(format_quantity(volume, system), "8 m^3");
+            assert_eq!(format_quantity(quartic, system), "16 m^4");
         }
     }
 

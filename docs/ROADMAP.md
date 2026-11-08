@@ -24,8 +24,10 @@ size limit; `scripts/check.ps1` passes.
 Extends `functions.rs`, `functions/stats.rs`, `units.rs`. No format change unless noted.
 
 **1.1 Units**
-- [ ] Remaining SI base units: `A`, `K`, `mol`, `cd`, plus common derived units (`J`, `W`, `V`, `Hz`, `C`, `Ω`, `L`, `min`, `hr`, `day`, `deg`, `rad`).
-- [ ] More US customary and length/mass/time units (`yd`, `mi`, `oz`, `ton`, `gal`, `psf`, `BTU`, `hp`).
+- [x] Remaining SI base units (`A`, `K`, `mol`, `cd`) and derived units (`J`, `kJ`, `MJ`, `kWh`, `cal`, `BTU`, `W`, `kW`, `MW`, `hp`, `C`, `V`, `ohm`, `Hz`, `bar`, `atm`, `L`, `mL`, `min`, `hr`, `day`, ...). Ohm is spelt `ohm`. Done 2026-11-08.
+- [ ] Angle units `deg` and `rad`: built-in units may not be dimensionless today (a unit-table test enforces it), so this needs a design decision first.
+- [x] More US customary and length/mass/time units (`yd`, `mi`, `oz`, `gal`, `psf`, `um`, `nm`, `mg`, `tonne`, `ms`). `ton` (short or metric?) left out on purpose; `tonne` is the metric one. Done 2026-11-08.
+- [ ] Note: new unit symbols (`A`, `C`, `K`, `L`, `V`, `W`, `J`) take over `5 A`-style implicit multiplication from variables of those names, and a saved custom unit with one of these names would now be rejected. No released files exist yet; revisit if that changes.
 - [ ] Compound unit symbols in the parser (`kN*m`, `m/s`) (TD-09).
 - [ ] Temperature units `degC`, `degF` with a decided offset policy (TD-09). Needs a written decision first.
 - [ ] Per-element dimensions in vectors and matrices, so `(1 m, 2 s)` works (TD-28). Larger (M), may need a format bump.
@@ -125,3 +127,4 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 1.1 part: about 45 built-in units added with display tables for energy, power, voltage, resistance, frequency and volume. |
