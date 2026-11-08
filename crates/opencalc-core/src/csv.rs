@@ -224,6 +224,34 @@ pub fn parse_number(field: &str) -> Option<f64> {
     t.parse::<f64>().ok().filter(|v| v.is_finite())
 }
 
+/// Reads a number whose decimal mark is `decimal` (`'.'` or `','`). With a comma,
+/// a field that also holds a point is refused rather than guessed at.
+pub fn parse_number_with(field: &str, decimal: char) -> Option<f64> {
+    if decimal == ',' {
+        if field.contains('.') {
+            return None;
+        }
+        return parse_number(&field.replace(',', "."));
+    }
+    parse_number(field)
+}
+
+/// Guesses the decimal mark: a comma when the separator is not a comma and some
+/// field is a number written with a comma and no point; otherwise a point.
+pub fn detect_decimal(rows: &[Vec<String>], delimiter: char) -> char {
+    if delimiter == ',' {
+        return '.';
+    }
+    let comma = rows.iter().flatten().any(|f| {
+        f.contains(',') && parse_number_with(f, ',').is_some() && parse_number(f).is_none()
+    });
+    if comma {
+        ','
+    } else {
+        '.'
+    }
+}
+
 /// Numbers read from text, with any header row split off.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Grid {
@@ -272,12 +300,14 @@ impl std::error::Error for GridError {}
 
 /// Makes rows of fields into numbers. The first row is taken as headers when none of
 /// its fields is a number and a later row exists.
-pub fn to_grid(rows: &[Vec<String>]) -> Result<Grid, GridError> {
+pub fn to_grid(rows: &[Vec<String>], decimal: char) -> Result<Grid, GridError> {
     let Some(first) = rows.first() else {
         return Err(GridError::Empty);
     };
     let width = first.len();
-    let header = first.iter().all(|f| parse_number(f).is_none());
+    let header = first
+        .iter()
+        .all(|f| parse_number_with(f, decimal).is_none());
     if header && rows.len() == 1 {
         return Err(GridError::Empty);
     }
@@ -293,7 +323,7 @@ pub fn to_grid(rows: &[Vec<String>]) -> Result<Grid, GridError> {
         }
         let mut nums = Vec::with_capacity(width);
         for (j, f) in r.iter().enumerate() {
-            match parse_number(f) {
+            match parse_number_with(f, decimal) {
                 Some(v) => nums.push(v),
                 None => {
                     return Err(GridError::NotANumber {
@@ -483,40 +513,82 @@ mod tests {
     }
 
     #[test]
+    fn decimal_comma() {
+        assert_eq!(parse_number_with("1,5", ','), Some(1.5));
+        assert_eq!(parse_number_with("-0,25", ','), Some(-0.25));
+        assert_eq!(parse_number_with("1.5", ','), None);
+        assert_eq!(parse_number_with("1.000,5", ','), None);
+        assert_eq!(parse_number_with("1.5", '.'), Some(1.5));
+        let rows = parse(
+            "x;y
+1,5;2
+3;4,25
+",
+            ';',
+        )
+        .unwrap();
+        assert_eq!(detect_decimal(&rows, ';'), ',');
+        let g = to_grid(&rows, ',').unwrap();
+        assert_eq!(g.rows, vec![vec![1.5, 2.0], vec![3.0, 4.25]]);
+        assert_eq!(
+            detect_decimal(
+                &parse(
+                    "1.5;2
+", ';'
+                )
+                .unwrap(),
+                ';'
+            ),
+            '.'
+        );
+        assert_eq!(
+            detect_decimal(
+                &parse(
+                    "1,5,2
+", ','
+                )
+                .unwrap(),
+                ','
+            ),
+            '.'
+        );
+    }
+
+    #[test]
     fn grid_with_headers() {
-        let g = to_grid(&s(&[&["x [m]", "t [s]"], &["1", "2"], &["3", "4.5"]])).unwrap();
+        let g = to_grid(&s(&[&["x [m]", "t [s]"], &["1", "2"], &["3", "4.5"]]), '.').unwrap();
         assert_eq!(g.headers.as_deref().map(<[String]>::len), Some(2));
         assert_eq!(g.rows, vec![vec![1.0, 2.0], vec![3.0, 4.5]]);
     }
 
     #[test]
     fn grid_without_headers() {
-        let g = to_grid(&s(&[&["1", "2"], &["3", "4"]])).unwrap();
+        let g = to_grid(&s(&[&["1", "2"], &["3", "4"]]), '.').unwrap();
         assert!(g.headers.is_none());
         assert_eq!(g.rows.len(), 2);
     }
 
     #[test]
     fn a_lone_text_row_is_not_data() {
-        assert_eq!(to_grid(&s(&[&["a", "b"]])), Err(GridError::Empty));
-        assert_eq!(to_grid(&[]), Err(GridError::Empty));
+        assert_eq!(to_grid(&s(&[&["a", "b"]]), '.'), Err(GridError::Empty));
+        assert_eq!(to_grid(&[], '.'), Err(GridError::Empty));
     }
 
     #[test]
     fn grid_errors_name_the_place() {
         assert_eq!(
-            to_grid(&s(&[&["1", "2"], &["3"]])),
+            to_grid(&s(&[&["1", "2"], &["3"]]), '.'),
             Err(GridError::Ragged {
                 row: 2,
                 found: 1,
                 expected: 2
             })
         );
-        let e = to_grid(&s(&[&["1", "2"], &["3", "x"]])).unwrap_err();
+        let e = to_grid(&s(&[&["1", "2"], &["3", "x"]]), '.').unwrap_err();
         assert_eq!(e.to_string(), "row 2, column 2: \"x\" is not a number");
         // a blank cell is not a number either
         assert!(matches!(
-            to_grid(&s(&[&["1", ""]])),
+            to_grid(&s(&[&["1", ""]]), '.'),
             Err(GridError::NotANumber { col: 2, .. })
         ));
     }
