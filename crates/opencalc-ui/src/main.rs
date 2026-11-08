@@ -1,5 +1,8 @@
 //! OpenCalc desktop application.
 
+// A release build on Windows is a window, not a console program.
+#![cfg_attr(all(not(debug_assertions), windows), windows_subsystem = "windows")]
+
 mod app;
 mod canvas;
 mod commands;

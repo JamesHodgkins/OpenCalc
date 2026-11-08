@@ -13,3 +13,6 @@ private/
 *.swp
 Thumbs.db
 .DS_Store
+
+# Packaged builds
+dist/

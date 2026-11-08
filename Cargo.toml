@@ -26,3 +26,8 @@ opencalc-core = { path = "crates/opencalc-core" }
 
 [profile.dev.package."*"]
 opt-level = 2
+
+# A smaller, faster program to ship: thin link-time optimisation and no debug symbols.
+[profile.release]
+lto = "thin"
+strip = true

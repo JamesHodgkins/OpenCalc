@@ -3,7 +3,7 @@
 An original engineering worksheet written in Rust, using egui for the interface.
 Free-form calculation notes with units, live recalculation and document export.
 
-**Status:** Milestone 1 (skeleton): window shell, free-form canvas and undo/redo working. Phases A and B of the refactor plan (docs/ARCHITECTURE.md) are done. See `docs/SPEC.md` for the full specification and roadmap.
+**Status:** early but usable. Worksheets with units, live recalculation, plots, custom units, find and replace, clipboard, undo, `.ocx` files with crash recovery, and PDF and PNG export all work. See `docs/SPEC.md` for the full specification and roadmap, and `docs/FILE_FORMAT.md` for the file format.
 
 ## Layout
 
@@ -30,7 +30,10 @@ cargo run -p opencalc-cli -- check some.ocx --quiet
 cargo test --workspace            # all tests
 cargo clippy --workspace          # lints
 powershell -File scripts/check.ps1   # all commit checks (fmt, clippy, tests, file sizes)
+powershell -File scripts/package.ps1 # release build, zipped into dist/ (Windows)
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the checks on Windows, Linux and macOS and builds a release binary on each.
 
 ## Clean-room policy
 

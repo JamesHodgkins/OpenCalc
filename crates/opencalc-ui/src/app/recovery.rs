@@ -39,6 +39,8 @@ pub fn default_dir() -> Option<PathBuf> {
     };
     let base = if cfg!(windows) {
         var("APPDATA")?
+    } else if cfg!(target_os = "macos") {
+        var("HOME")?.join("Library").join("Application Support")
     } else {
         var("XDG_STATE_HOME").or_else(|| var("HOME").map(|h| h.join(".local").join("state")))?
     };
