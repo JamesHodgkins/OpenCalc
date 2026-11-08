@@ -6,6 +6,7 @@
 //! - This module: owns the worker thread and the ribbon, and carries out effects.
 
 mod arranging;
+pub mod association;
 mod checking;
 mod clipboard;
 pub(crate) mod dispatch;
@@ -44,6 +45,8 @@ pub struct App {
     pub queue: Vec<CommandId>,
     /// How the app asks for file paths.
     files: Box<dyn Files>,
+    /// Whether `.ocx` files open in this program (a setting of the system).
+    pub(crate) file_type: Box<dyn association::FileType>,
     /// The system clipboard.
     pub(crate) clipboard: Box<dyn Clipboard>,
     /// Set once quitting has been decided, so closing the window is let through.
@@ -71,6 +74,8 @@ impl App {
     pub fn with_state(ctx: egui::Context, state: AppState) -> App {
         let mut app = App::with_files(ctx, state, Box::new(NativeFiles));
         app.clipboard = Box::new(NativeClipboard);
+        app.file_type = Box::new(association::NativeFileType::new());
+        app.refresh_file_type();
         app
     }
 
@@ -86,6 +91,7 @@ impl App {
             queue: Vec::new(),
             files,
             clipboard: Box::new(MemoryClipboard::default()),
+            file_type: Box::new(association::MemoryFileType::default()),
             allow_close: false,
             window_title: String::new(),
             export_shrink: 1.0,
@@ -97,6 +103,22 @@ impl App {
         };
         app.recalculate();
         app
+    }
+
+    /// Read from the system whether `.ocx` files open here, for the Options window.
+    pub(crate) fn refresh_file_type(&mut self) {
+        self.state.file_type = (self.file_type.supported(), self.file_type.registered());
+    }
+
+    /// Make `.ocx` files open in this program (or stop doing so), and say if it fails.
+    fn set_file_type(&mut self, on: bool) {
+        if let Err(reason) = self.file_type.set(on) {
+            self.state.message(
+                "File type",
+                format!("The change could not be made: {reason}"),
+            );
+        }
+        self.refresh_file_type();
     }
 
     pub fn registry(&self) -> Registry {
@@ -147,6 +169,8 @@ impl App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 Effect::ChooseOpen => self.choose_open(),
+                Effect::RefreshFileType => self.refresh_file_type(),
+                Effect::SetFileType(on) => self.set_file_type(on),
                 Effect::Copy => self.copy(),
                 Effect::Cut => self.cut(),
                 Effect::Paste => self.paste(),

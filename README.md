@@ -33,6 +33,8 @@ powershell -File scripts/check.ps1   # all commit checks (fmt, clippy, tests, fi
 powershell -File scripts/package.ps1 # release build, zipped into dist/ (Windows)
 ```
 
+On Windows the program carries its own icon and the worksheet icon, and Options has a button that makes double-clicking an `.ocx` file open it (per user, no administrator rights needed). `scripts/make_icons.py` rebuilds the icons from the logo. `packaging/linux/` has a desktop file and file type for Linux.
+
 GitHub Actions (`.github/workflows/ci.yml`) runs the checks on Windows, Linux and macOS and builds a release binary on each.
 
 ## Clean-room policy

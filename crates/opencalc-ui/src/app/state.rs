@@ -57,6 +57,8 @@ pub struct AppState {
     pub draft: bool,
     /// The Options window (settings such as the theme).
     pub options_open: bool,
+    /// Whether `.ocx` can be registered here, and whether it is (read when Options opens).
+    pub file_type: (bool, bool),
     /// The Units window (custom units).
     pub units_open: bool,
     /// The region whose Label window is open.
@@ -106,6 +108,7 @@ impl AppState {
             text_box_focus: false,
             draft: false,
             options_open: false,
+            file_type: (false, false),
             units_open: false,
             label_for: None,
             shortcuts_open: false,

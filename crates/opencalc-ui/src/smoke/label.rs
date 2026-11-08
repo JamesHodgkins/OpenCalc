@@ -123,3 +123,35 @@ fn the_shortcuts_window_opens_draws_and_closes() {
     h.frame();
     assert!(h.app.state.shortcuts_open);
 }
+
+#[test]
+fn the_options_window_offers_to_register_the_file_type_and_reports_a_failure() {
+    use crate::app::association::MemoryFileType;
+    let mut h = Harness::new();
+    h.settle();
+    h.command(CommandId::AppOptions);
+    assert_eq!(
+        h.app.state.file_type,
+        (true, false),
+        "read when Options opens"
+    );
+    h.frame();
+    h.command(CommandId::FileTypeRegister);
+    assert_eq!(h.app.state.file_type, (true, true));
+    h.command(CommandId::FileTypeRemove);
+    assert_eq!(h.app.state.file_type, (true, false));
+
+    // A refusal from the system is said, and the state still tells the truth.
+    h.app.file_type = Box::new(MemoryFileType {
+        on: false,
+        fail: true,
+    });
+    h.command(CommandId::FileTypeRegister);
+    match &h.app.state.dialog {
+        Some(crate::app::filing::Dialog::Message { text, .. }) => {
+            assert!(text.contains("access denied"), "{text}");
+        }
+        other => panic!("expected a message, found {other:?}"),
+    }
+    assert_eq!(h.app.state.file_type, (true, false));
+}

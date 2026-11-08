@@ -27,6 +27,10 @@ pub enum Effect {
     Quit,
     /// Size the dock panels from the current window width.
     ResetDockWidths,
+    /// Read the system's `.ocx` file type again (the Options window shows it).
+    RefreshFileType,
+    /// Register this program for `.ocx` files, or remove that.
+    SetFileType(bool),
     /// Ask which file to open, then open it.
     ChooseOpen,
     /// Export the active worksheet.
@@ -158,7 +162,12 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         ThemeSlate => set_palette(state, &mut fx, PaletteKey::Slate),
         UnitsDefine | UnitsManage => state.units_open = true,
         UnitsClose => state.units_open = false,
-        AppOptions => state.options_open = true,
+        AppOptions => {
+            state.options_open = true;
+            fx.push(Effect::RefreshFileType);
+        }
+        FileTypeRegister => fx.push(Effect::SetFileType(true)),
+        FileTypeRemove => fx.push(Effect::SetFileType(false)),
         AppOptionsClose => state.options_open = false,
         DocPageSetup => state.page_setup_open = true,
         DocPageSetupClose => {

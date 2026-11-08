@@ -115,6 +115,8 @@ commands! {
     AppQuit: "app.quit", "Quit", icons::CLOSE;
     AppOptions: "app.options", "Options", icons::PROPERTIES;
     AppOptionsClose: "app.options_close", "Close Options", icons::CLOSE;
+    FileTypeRegister: "app.file_type_register", "Open .ocx files with OpenCalc", icons::FILE_NEW;
+    FileTypeRemove: "app.file_type_remove", "Stop opening .ocx files with OpenCalc", icons::CLOSE;
     ThemeNeutral: "theme.neutral", "Neutral", icons::THEME;
     ThemeSlate: "theme.slate", "Slate", icons::THEME;
     TabHome: "tab.home", "Home", icons::HOME;
@@ -241,15 +243,15 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
-            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | UnitsDisplayM
-            | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN | UnitsDisplayKn
-            | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess | FormatScientific
-            | FormatEngineering | ClipboardPaste | ClipboardCut | ClipboardCopy
-            | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind | EditReplace
-            | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose | UnitsDefine
-            | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave | FileSaveAs
-            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
+            FileTypeRegister | FileTypeRemove | HelpShortcuts | HelpShortcutsClose | RegionTag
+            | LabelClose | RegionLock | ArrangeAlignH | ArrangeAlignV | FormatBold
+            | FormatItalic | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
+            | UnitsDisplayKn | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess
+            | FormatScientific | FormatEngineering | ClipboardPaste | ClipboardCut
+            | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind
+            | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose
+            | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileOpen | FileSave
+            | FileSaveAs | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
             | DialogDropRecovery | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..)
             | MatrixClose | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext
             | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo

@@ -379,6 +379,8 @@ mod tests {
             CommandId::CheckClose,         // the Check window
             CommandId::MatrixClose,        // the Matrix window
             CommandId::LabelClose,         // the Label window
+            CommandId::FileTypeRegister,   // the Options window
+            CommandId::FileTypeRemove,     // the Options window
             CommandId::HelpShortcutsClose, // the Shortcuts window
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
