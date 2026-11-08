@@ -157,7 +157,7 @@ pub fn render_pages(
         let (primitives, ppp, text) = session.frame(vec2(w, h), |ui| {
             let painter = ui.painter().clone();
             let whole = Rect::from_min_size(pos2(0.0, 0.0), vec2(w, h));
-            painter.rect_filled(whole, 0.0, paper.base);
+            page::paint_paper(&painter, whole, 1.0, &setup, true);
             page::header_footer(&painter, whole, 1.0, &setup, &env, k, count);
             for r in doc.regions() {
                 if !rect_of(r, &sizes).intersects(page_rect) {

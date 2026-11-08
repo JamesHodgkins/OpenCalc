@@ -212,6 +212,11 @@ same margin on all four sides, from 0 to 60. Each may be omitted. A margin outsi
 the range is clamped on reading.
 
 
+The page may also have `background` (`"plain"` default, `"grid"`, `"lines"` or `"dots"`,
+drawn every quarter inch), `tint` (the paper colour: `"white"` default, `"cream"`,
+`"grey"` or `"blue"`) and `print_background` (default false). Each is omitted when it
+has its default value. Exports are plain white unless `print_background` is true.
+
 ### 6a. Headers and footers
 
 `headers` holds `header` and `footer`, each with `left`, `centre` and `right` text

@@ -17,7 +17,9 @@ use serde::{Deserialize, Serialize};
 
 pub use geometry::{Point, Size};
 pub use header::{expand as expand_page_text, HeaderFooter, PageText, MAX_HEADER_CHARS};
-pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
+pub use page::{
+    Background, PageSetup, PaperSize, Tint, MARGIN_RANGE_MM, PATTERN_SPACING, UNITS_PER_MM,
+};
 pub use picture::{
     PictureSpec, MAX_PICTURES, MAX_PICTURE_BYTES, MAX_PICTURE_PIXELS, MAX_PICTURE_SIDE,
     MAX_PICTURE_TEXT,
@@ -363,6 +365,7 @@ mod tests {
             paper: PaperSize::Letter,
             landscape: true,
             margin_mm: 12.5,
+            ..PageSetup::default()
         };
         let back: Worksheet = serde_json::from_str(&serde_json::to_string(&w).unwrap()).unwrap();
         assert_eq!(back.page(), w.page());

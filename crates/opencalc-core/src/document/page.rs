@@ -36,6 +36,72 @@ impl PaperSize {
     }
 }
 
+/// A pattern drawn on the page under the regions.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Background {
+    #[default]
+    Plain,
+    Grid,
+    Lines,
+    Dots,
+}
+
+impl Background {
+    pub const ALL: [Background; 4] = [
+        Background::Plain,
+        Background::Grid,
+        Background::Lines,
+        Background::Dots,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Background::Plain => "Plain",
+            Background::Grid => "Grid",
+            Background::Lines => "Lines",
+            Background::Dots => "Dots",
+        }
+    }
+}
+
+/// The colour of the paper.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Tint {
+    #[default]
+    White,
+    Cream,
+    Grey,
+    Blue,
+}
+
+impl Tint {
+    pub const ALL: [Tint; 4] = [Tint::White, Tint::Cream, Tint::Grey, Tint::Blue];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Tint::White => "White",
+            Tint::Cream => "Cream",
+            Tint::Grey => "Grey",
+            Tint::Blue => "Blue",
+        }
+    }
+
+    /// The paper colour as red, green and blue.
+    pub fn rgb(self) -> [u8; 3] {
+        match self {
+            Tint::White => [255, 255, 255],
+            Tint::Cream => [255, 250, 235],
+            Tint::Grey => [240, 240, 240],
+            Tint::Blue => [236, 244, 255],
+        }
+    }
+}
+
+/// Spacing of a background pattern, in document units (a quarter inch).
+pub const PATTERN_SPACING: f32 = 24.0;
+
 /// Smallest and largest margin accepted, in millimetres.
 pub const MARGIN_RANGE_MM: (f32, f32) = (0.0, 60.0);
 
@@ -48,6 +114,24 @@ pub struct PageSetup {
     /// The same margin on all four sides, in millimetres.
     #[serde(default = "default_margin")]
     pub margin_mm: f32,
+    /// A pattern under the regions (default plain).
+    #[serde(default, skip_serializing_if = "is_plain")]
+    pub background: Background,
+    /// The paper colour (default white).
+    #[serde(default, skip_serializing_if = "is_white")]
+    pub tint: Tint,
+    /// Whether exports include the pattern and tint. They are for working on screen,
+    /// so the default is off.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub print_background: bool,
+}
+
+fn is_plain(b: &Background) -> bool {
+    *b == Background::Plain
+}
+
+fn is_white(t: &Tint) -> bool {
+    *t == Tint::White
 }
 
 fn default_margin() -> f32 {
@@ -60,6 +144,9 @@ impl Default for PageSetup {
             paper: PaperSize::default(),
             landscape: false,
             margin_mm: default_margin(),
+            background: Background::Plain,
+            tint: Tint::White,
+            print_background: false,
         }
     }
 }
@@ -105,6 +192,32 @@ mod tests {
             ..PageSetup::default()
         };
         assert_eq!(landscape.size(), (h, w));
+    }
+
+    #[test]
+    fn backgrounds_are_saved_only_when_chosen() {
+        assert_eq!(
+            serde_json::to_string(&PageSetup::default()).unwrap(),
+            r#"{"paper":"A4","landscape":false,"margin_mm":20.0}"#
+        );
+        let p = PageSetup {
+            background: Background::Dots,
+            tint: Tint::Cream,
+            print_background: true,
+            ..PageSetup::default()
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        assert!(
+            json.contains("\"dots\"") && json.contains("\"cream\""),
+            "{json}"
+        );
+        assert_eq!(serde_json::from_str::<PageSetup>(&json).unwrap(), p);
+        // a file from before backgrounds
+        let old: PageSetup = serde_json::from_str(r#"{"paper":"Letter"}"#).unwrap();
+        assert_eq!(
+            (old.background, old.tint, old.print_background),
+            (Background::Plain, Tint::White, false)
+        );
     }
 
     #[test]

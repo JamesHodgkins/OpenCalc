@@ -3,7 +3,8 @@
 
 use eframe::egui::{self, Context, RichText};
 use opencalc_core::document::{
-    HeaderFooter, PageText, PaperSize, MARGIN_RANGE_MM, MAX_HEADER_CHARS,
+    Background, HeaderFooter, PageSetup, PageText, PaperSize, Tint, MARGIN_RANGE_MM,
+    MAX_HEADER_CHARS,
 };
 use opencalc_core::edit::Edit;
 
@@ -68,6 +69,7 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, edits: &mut Vec
             if ui.add(drag).changed() {
                 out.push(CommandId::PageMarginMm(mm.round() as u8));
             }
+            background(ui, state, page, edits);
             headers(ui, state, sheet.doc.headers(), edits);
         });
     if !open {
@@ -161,5 +163,53 @@ fn headers(ui: &mut egui::Ui, state: &AppState, all: &HeaderFooter, edits: &mut 
         band(ui, "hf-first-header", all, |h| &mut h.first_header, edits);
         heading(ui, "Footer, first page");
         band(ui, "hf-first-footer", all, |h| &mut h.first_footer, edits);
+    }
+}
+
+/// The background section: a pattern, a paper colour, and whether exports keep them.
+fn background(ui: &mut egui::Ui, state: &AppState, page: PageSetup, edits: &mut Vec<CanvasCmd>) {
+    let heading = |ui: &mut egui::Ui, text: &str| {
+        ui.label(
+            RichText::new(text)
+                .size(type_size::SMALL)
+                .color(state.theme.text_weak),
+        );
+    };
+    let mut set = |next: PageSetup| {
+        edits.push(CanvasCmd::Edit(Edit::SetPageSetup(next)));
+        edits.push(CanvasCmd::Seal);
+    };
+    ui.add_space(6.0);
+    heading(ui, "BACKGROUND PATTERN");
+    ui.horizontal(|ui| {
+        for b in Background::ALL {
+            if ui
+                .selectable_label(page.background == b, b.label())
+                .clicked()
+            {
+                set(PageSetup {
+                    background: b,
+                    ..page
+                });
+            }
+        }
+    });
+    heading(ui, "PAPER COLOUR");
+    ui.horizontal(|ui| {
+        for t in Tint::ALL {
+            if ui.selectable_label(page.tint == t, t.label()).clicked() {
+                set(PageSetup { tint: t, ..page });
+            }
+        }
+    });
+    let mut print = page.print_background;
+    if ui
+        .checkbox(&mut print, "Include the background when exporting")
+        .changed()
+    {
+        set(PageSetup {
+            print_background: print,
+            ..page
+        });
     }
 }

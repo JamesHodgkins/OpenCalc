@@ -8,7 +8,7 @@
 use eframe::egui::{
     epaint::Shadow, Align2, Color32, FontId, Painter, Pos2, Rect, Shape, Stroke, Vec2,
 };
-use opencalc_core::document::{PageSetup, Region};
+use opencalc_core::document::{Background, PageSetup, Region, PATTERN_SPACING};
 
 use super::adapt::{rect_of, Sizes};
 use super::view::{CanvasView, MAX_ZOOM, MIN_ZOOM};
@@ -72,6 +72,58 @@ pub fn fit_width(setup: &PageSetup, viewport: Vec2) -> CanvasView {
     CanvasView {
         zoom,
         offset: Vec2::new((viewport.x - w * zoom) / 2.0, FIT_MARGIN),
+    }
+}
+
+/// The colour of the pattern lines and dots.
+const PATTERN: Color32 = Color32::from_rgb(208, 213, 224);
+
+/// The colour of the paper for `setup`, and the plain white that goes with `print`
+/// being false (exports leave the tint out unless the setup asks for it).
+pub fn paper_colour(setup: &PageSetup, printing: bool) -> Color32 {
+    if printing && !setup.print_background {
+        return Color32::WHITE;
+    }
+    let [r, g, b] = setup.tint.rgb();
+    Color32::from_rgb(r, g, b)
+}
+
+/// Fill `rect` (a page, or the whole sheet in draft view) with the paper colour and
+/// the background pattern, drawn at `zoom`. With `printing`, a setup that does not
+/// ask for the background in exports gets plain white.
+pub fn paint_paper(painter: &Painter, rect: Rect, zoom: f32, setup: &PageSetup, printing: bool) {
+    painter.rect_filled(rect, 0.0, paper_colour(setup, printing));
+    if (printing && !setup.print_background) || setup.background == Background::Plain {
+        return;
+    }
+    let step = PATTERN_SPACING * zoom;
+    if step < 5.0 {
+        return;
+    }
+    let painter = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
+    let stroke = Stroke::new(1.0_f32, PATTERN);
+    let columns = (rect.width() / step).floor() as i32;
+    let rows = (rect.height() / step).floor() as i32;
+    match setup.background {
+        Background::Plain => {}
+        Background::Grid | Background::Lines => {
+            for j in 1..=rows {
+                painter.hline(rect.x_range(), rect.top() + j as f32 * step, stroke);
+            }
+            if setup.background == Background::Grid {
+                for i in 1..=columns {
+                    painter.vline(rect.left() + i as f32 * step, rect.y_range(), stroke);
+                }
+            }
+        }
+        Background::Dots => {
+            for j in 1..=rows {
+                for i in 1..=columns {
+                    let at = Pos2::new(rect.left() + i as f32 * step, rect.top() + j as f32 * step);
+                    painter.circle_filled(at, (1.2 * zoom).max(0.8), PATTERN);
+                }
+            }
+        }
     }
 }
 
@@ -156,7 +208,7 @@ pub fn paint(
         let sheet = page_rect(setup, 0).union(page_rect(setup, count.saturating_sub(1)));
         let screen = view.rect_to_screen(sheet, origin);
         if screen.intersects(viewport) {
-            painter.rect_filled(screen, 0.0, paper.base);
+            paint_paper(painter, screen, view.zoom, setup, false);
             drawn.push(screen);
         }
         return drawn;
@@ -173,7 +225,7 @@ pub fn paint(
             color: Color32::from_black_alpha(90),
         };
         painter.add(shadow.as_shape(screen, 0.0));
-        painter.rect_filled(screen, 0.0, paper.base);
+        paint_paper(painter, screen, view.zoom, setup, false);
         header_footer(painter, screen, view.zoom, setup, env, k, count);
         // The margin box, dashed, so the text area is plain to see.
         let inner = view.rect_to_screen(margin_box(page_rect(setup, k), setup.margin()), origin);

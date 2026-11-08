@@ -66,6 +66,7 @@ fn sample() -> Worksheet {
         paper: PaperSize::Letter,
         landscape: true,
         margin_mm: 12.5,
+        ..PageSetup::default()
     }))
     .unwrap();
     w.apply(Edit::SetCustomUnits(vec![UnitDef {

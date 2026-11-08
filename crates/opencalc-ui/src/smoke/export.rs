@@ -80,6 +80,7 @@ fn the_page_setup_decides_the_size() {
         paper: PaperSize::Letter,
         landscape: true,
         margin_mm: 20.0,
+        ..PageSetup::default()
     }))
     .unwrap();
     let p = pages(&doc, 1.0);

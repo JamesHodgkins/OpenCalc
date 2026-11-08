@@ -101,12 +101,12 @@ the decisions in `DATA_IO.md` section 7.
 Design for the items still open: `DOCUMENT_FEATURES.md` (decisions A to E).
 
 - [x] Headers and footers (first page and following pages): left, centre and right text with `{page}`, `{pages}`, `{title}` fields, edited in Page setup; drawn on the page and in PNG and PDF exports. No date field, on purpose.
-- [ ] Page background styles.
+- [x] Page background styles: plain, grid, lines, dots; paper tints; left out of exports unless ticked.
+- [x] Global definitions `≡`: satisfied by design (every definition is already global); `≡` is accepted as `:=`. Cross-worksheet references stay out of scope.
 - [ ] Rich text in text regions (needs bold/italic font files, TD-24).
 - [x] Region borders: `Region.border`, `Edit::SetBorder`, Math Formatting > Region > Border toggle; drawn on the page and in exports.
 - [ ] Content protection: password-protected regions and hidden content (needs a security design before code).
 - [ ] Templates (`.ocxt`, mirroring the worksheet format).
-- [ ] Global definitions `≡` (needs worksheet-qualified region IDs, TD-23).
 
 ## Phase 6: Programming (L)
 
@@ -136,6 +136,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-08 | Phase 5: page backgrounds and tints; `≡` accepted as `:=`. |
 | 2026-11-08 | Phase 5: design note for backgrounds, templates, rich text, content protection and global definitions (`DOCUMENT_FEATURES.md`); no code. |
 | 2026-11-08 | Phase 5: headers and footers. |
 | 2026-11-08 | Phase 5: region borders. |
