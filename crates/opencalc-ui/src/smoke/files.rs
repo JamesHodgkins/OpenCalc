@@ -579,6 +579,21 @@ fn an_unsaved_worksheet_recovers_to_the_app_folder_and_closing_it_deletes_the_fi
     assert!(Rig::files_in(&dir).is_empty());
 }
 
+/// Give `newer` a modification time two seconds after `older`'s. The app offers a
+/// recovery file only when it is strictly newer than the saved file, and a file
+/// written a moment after another can get the very same timestamp (the system
+/// clock ticks about every 15 ms), so a test that writes both back to back would
+/// pass or fail by chance. In real use the autosave comes seconds after a save.
+fn make_newer(newer: &Path, older: &Path) {
+    let base = std::fs::metadata(older).unwrap().modified().unwrap();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(newer)
+        .unwrap()
+        .set_modified(base + std::time::Duration::from_secs(2))
+        .unwrap();
+}
+
 #[test]
 fn after_a_crash_the_next_start_offers_to_restore_and_restoring_leaves_it_unsaved() {
     let mut t = setup("crash1", blank());
@@ -592,6 +607,7 @@ fn after_a_crash_the_next_start_offers_to_restore_and_restoring_leaves_it_unsave
     t.tick();
     let recovery = t.dir.join("w.ocx.recovery");
     assert!(recovery.exists());
+    make_newer(&recovery, &target);
 
     // The program stops without a clean close. A new one starts and knows the file
     // only from its recent list.
