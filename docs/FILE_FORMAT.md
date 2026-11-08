@@ -1,4 +1,4 @@
-# The OpenCalc file format (`.ocx`), version 1
+# The OpenCalc file format (`.ocx`), version 2
 
 This describes what is in a worksheet file, so other tools can read or write one.
 The code that does it is `opencalc-core/src/persist*`. The examples below are
@@ -25,7 +25,7 @@ suit version control. A reader must not rely on that.
 ## 2. The manifest
 
 ```json manifest
-{"format_version":1,"app":"opencalc 0.0.1"}
+{"format_version":2,"app":"opencalc 0.0.1"}
 ```
 
 - `format_version` (whole number, at least 1) is the version of `worksheet.json`.
@@ -78,7 +78,7 @@ characters; omitted when empty):
 | Math | `{ "Math": { "source": "…", "format": { "notation": "scientific", "decimals": 4, "unit": "mm" } } }` | The expression, as text. `format` is how the result is shown and may be omitted: `notation` is `"general"` (default), `"scientific"` or `"engineering"`; `decimals` is 0 to 15, or omitted for up to three with trailing zeros dropped. `unit` is `"m"`, `"mm"`, `"in"`, `"N"` or `"kN"`: show the result in that unit when it is a length or a force of the same kind, otherwise ignored. Display only. A count above 15 is read as 15. |
 | Text | `{ "Text": { "text": "…" } }` | |
 | Area | `{ "Area": { "title": "…" } }` | A titled box. |
-| Plot | `{ "Plot": { "title": "", "x_label": "", "y_label": "", "x": { "source": "…" }, "series": [ { "source": "…" } ] } }` | At most 8 series, at least 1. Titles and labels may be omitted. |
+| Plot | `{ "Plot": { "title": "", "x_label": "", "y_label": "", "x": { "source": "…" }, "series": [ { "source": "…" } ], "options": { … }, "styles": [ { … } ] } }` | At most 8 series, at least 1. Titles, labels, `options` and `styles` may be omitted; see section 3a. |
 | Table | `"Table"` | Not built yet; reserved. |
 | Picture | `"Picture"` | Not built yet; reserved. |
 
@@ -89,6 +89,31 @@ never lost.
 
 Unknown fields are ignored on reading. A reader that writes a file back out should
 keep what it does not understand where it can, but is not required to.
+
+### 3a. Plot options and series styles (version 2)
+
+Both are optional, and nothing is written for a setting left at its default.
+
+`options` (all fields optional):
+
+| Field | Values | Meaning |
+|---|---|---|
+| `grid` | `true` (default), `false` | Grid lines. |
+| `legend` | `"auto"` (default), `"show"`, `"hide"` | Auto shows it when there is more than one series. |
+| `x_log`, `y_log` | `false` (default), `true` | Logarithmic axis: every value on it must be positive. |
+| `x_min`, `x_max`, `y_min`, `y_max` | `{ "source": "…" }` | Axis limits as math sources, so they may carry units (`10 s`) or read a variable. Blank is automatic. A limit must have the axis's dimension and be below its partner; on a log axis it must be positive. |
+
+`styles` is a list by series position, shorter than `series` or absent when the rest
+are plain; trailing defaults are not saved. Each entry (all fields optional):
+
+| Field | Values | Meaning |
+|---|---|---|
+| `kind` | `"line"` (default), `"markers"`, `"line_markers"`, `"step"`, `"stem"`, `"bar"` | How the series is drawn. |
+| `marker` | `"circle"` (default), `"square"`, `"triangle"`, `"cross"` | Marker shape. |
+| `colour` | whole number 0 to 7 | Palette colour; absent means the series' place in the cycle. A larger number is dropped on reading. |
+| `name` | text | Legend name; blank shows the expression. |
+
+A reader meeting a `kind` or `marker` it does not know must refuse the plot, not guess.
 
 ## 4. A fuller example
 
@@ -118,7 +143,9 @@ keep what it does not understand where it can, but is not required to.
           "x_label": "x",
           "y_label": "y",
           "x": { "source": "w := 1, 2..5" },
-          "series": [ { "source": "w^2" } ]
+          "series": [ { "source": "w^2" } ],
+          "options": { "grid": false, "y_max": { "source": "30" } },
+          "styles": [ { "kind": "bar", "name": "squares" } ]
         }
       }
     },
@@ -183,6 +210,7 @@ understands, duplicate region ids, a bad custom unit, or a limit exceeded.
 | Version | Program | Change |
 |---|---|---|
 | 1 | OpenCalc 0.0.1 | First version. |
+| 2 | OpenCalc 0.0.1 | Plots gain `options` and `styles` (section 3a). A version 1 file reads unchanged; the number moves so that a program that only knows version 1 refuses a version 2 file instead of dropping the plot settings. |
 
 When the format changes in a way older programs cannot read, `format_version` goes
 up and a migration is added that turns version N into N + 1. A new program opens

@@ -9,6 +9,7 @@ use std::fmt;
 use super::LoadError;
 use crate::document::{
     MathRegion, PlotSpec, Point, Region, RegionId, RegionKind, Size, Worksheet, MAX_SERIES,
+    PALETTE_SIZE,
 };
 
 pub const MAX_REGIONS: usize = 50_000;
@@ -33,6 +34,8 @@ pub enum Repair {
     SeriesAdded(RegionId),
     /// The page margin was out of range.
     MarginFixed,
+    /// A plot had more series styles than series, or a colour outside the palette.
+    StylesFixed(RegionId),
 }
 
 impl fmt::Display for Repair {
@@ -45,6 +48,7 @@ impl fmt::Display for Repair {
             Repair::SizeFixed(id) => write!(f, "region {} had an unusable size", id.0),
             Repair::SeriesAdded(id) => write!(f, "plot {} had no series; one was added", id.0),
             Repair::MarginFixed => write!(f, "the page margin was out of range"),
+            Repair::StylesFixed(id) => write!(f, "plot {} had unusable series styles", id.0),
         }
     }
 }
@@ -115,11 +119,28 @@ fn check_plot(id: RegionId, p: &mut PlotSpec) -> Result<Option<Repair>, LoadErro
             limit: MAX_SERIES,
         });
     }
+    for s in &p.styles {
+        too_long("a series name", &s.name)?;
+    }
+    for limit in p.options.limits() {
+        too_long("a plot axis limit", limit.source())?;
+    }
+    let mut repaired = false;
+    if p.styles.len() > p.series.len() {
+        p.styles.truncate(p.series.len());
+        repaired = true;
+    }
+    for s in &mut p.styles {
+        if s.colour.is_some_and(|c| c >= PALETTE_SIZE) {
+            s.colour = None;
+            repaired = true;
+        }
+    }
     if p.series.is_empty() {
         p.series.push(MathRegion::new(""));
         return Ok(Some(Repair::SeriesAdded(id)));
     }
-    Ok(None)
+    Ok(repaired.then_some(Repair::StylesFixed(id)))
 }
 
 /// Check `ws`, repairing what can be repaired. Returns the repairs made.

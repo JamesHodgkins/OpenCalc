@@ -6,6 +6,7 @@
 mod geometry;
 mod page;
 mod plot;
+mod plot_style;
 mod region;
 mod result_format;
 
@@ -14,6 +15,7 @@ use serde::{Deserialize, Serialize};
 pub use geometry::{Point, Size};
 pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
 pub use plot::{PlotInput, PlotSpec, MAX_SERIES};
+pub use plot_style::{LegendMode, Marker, PlotOptions, SeriesKind, SeriesStyle, PALETTE_SIZE};
 pub use region::{
     clean_label, FontStyle, MathRegion, Region, RegionId, RegionKind, MAX_LABEL_CHARS,
 };
@@ -155,6 +157,12 @@ impl Worksheet {
                             .map(|s| s.expr().clone())
                             .collect(),
                         x_blank: p.x.source().trim().is_empty(),
+                        x_log: p.options.x_log,
+                        y_log: p.options.y_log,
+                        limits: p
+                            .options
+                            .limits()
+                            .map(|m| (!m.source().trim().is_empty()).then(|| m.expr().clone())),
                     },
                 )),
                 _ => None,

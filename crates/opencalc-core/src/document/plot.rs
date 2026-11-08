@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::plot_style::{PlotOptions, SeriesStyle};
 use super::region::MathRegion;
 use crate::expr::Expr;
 
@@ -22,6 +23,15 @@ pub struct PlotSpec {
     pub y_label: String,
     pub x: MathRegion,
     pub series: Vec<MathRegion>,
+    /// Axis limits, grid, legend and log axes. Saved only when changed. Boxed
+    /// because it is big and rarely changed, and every region (and every edit)
+    /// would otherwise be as large as the biggest plot.
+    #[serde(default, skip_serializing_if = "PlotOptions::is_default")]
+    pub options: Box<PlotOptions>,
+    /// How each series is drawn, by position. Shorter than `series` (or empty)
+    /// means the rest are plain lines; trailing defaults are not kept.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub styles: Vec<SeriesStyle>,
 }
 
 impl Default for PlotSpec {
@@ -32,6 +42,8 @@ impl Default for PlotSpec {
             y_label: String::new(),
             x: MathRegion::new(""),
             series: vec![MathRegion::new("")],
+            options: Box::default(),
+            styles: Vec::new(),
         }
     }
 }
@@ -66,9 +78,47 @@ impl PlotSpec {
         if self.series.len() > 1 {
             if index < self.series.len() {
                 self.series.remove(index);
+                if index < self.styles.len() {
+                    self.styles.remove(index);
+                }
             }
         } else if let Some(s) = self.series.get_mut(index) {
             *s = MathRegion::new("");
+            self.styles.clear();
+        }
+        self.trimmed()
+    }
+
+    /// The style of series `index`: its own, or the default.
+    pub fn style(&self, index: usize) -> SeriesStyle {
+        self.styles.get(index).cloned().unwrap_or_default()
+    }
+
+    /// A copy with series `index` drawn in `style`. An index past the last series
+    /// is ignored.
+    pub fn with_style(mut self, index: usize, style: SeriesStyle) -> PlotSpec {
+        if index >= self.series.len() {
+            return self;
+        }
+        if self.styles.len() <= index {
+            self.styles.resize(index + 1, SeriesStyle::default());
+        }
+        self.styles[index] = style;
+        self.trimmed()
+    }
+
+    /// A copy with other plot-wide options.
+    pub fn with_options(mut self, options: PlotOptions) -> PlotSpec {
+        self.options = Box::new(options);
+        self
+    }
+
+    /// Styles are kept sparse: no more than there are series, and no trailing
+    /// defaults, so plots that look the same compare equal.
+    pub fn trimmed(mut self) -> PlotSpec {
+        self.styles.truncate(self.series.len());
+        while self.styles.last().is_some_and(SeriesStyle::is_default) {
+            self.styles.pop();
         }
         self
     }
@@ -93,6 +143,11 @@ pub struct PlotInput {
     pub series: Vec<Expr>,
     /// The x source is empty (whatever `x` then holds).
     pub x_blank: bool,
+    /// Logarithmic axes.
+    pub x_log: bool,
+    pub y_log: bool,
+    /// Axis limits in the order x min, x max, y min, y max; `None` is automatic.
+    pub limits: [Option<Expr>; 4],
 }
 
 #[cfg(test)]

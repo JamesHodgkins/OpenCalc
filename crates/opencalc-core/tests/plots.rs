@@ -217,3 +217,212 @@ fn the_worker_returns_plot_data_with_the_values() {
     let data = result.output.plots[&id].clone().unwrap();
     assert_eq!(data.series[0].points[2], (2.0, 3.0));
 }
+
+// ---- options and styles ---------------------------------------------------------
+
+use opencalc_core::document::{MathRegion, PlotOptions, SeriesKind, SeriesStyle};
+
+fn with_options(base: PlotSpec, options: PlotOptions) -> PlotSpec {
+    base.with_options(options)
+}
+
+fn limits(x_min: &str, x_max: &str, y_min: &str, y_max: &str) -> PlotOptions {
+    PlotOptions {
+        x_min: MathRegion::new(x_min),
+        x_max: MathRegion::new(x_max),
+        y_min: MathRegion::new(y_min),
+        y_max: MathRegion::new(y_max),
+        ..PlotOptions::default()
+    }
+}
+
+#[test]
+fn axis_limits_are_evaluated_in_si_and_blank_ones_are_automatic() {
+    let base = spec("t", &["F"]);
+    let (w, id) = sheet(
+        &["t := 0 s, 1 s..5 s", "F := 2 N * t / s"],
+        with_options(base, limits("", "3 s", "0 N", "")),
+    );
+    let data = plot_of(&run(&w), id).unwrap();
+    assert_eq!(data.limits, [None, Some(3.0), Some(0.0), None]);
+    assert!(!data.x_log && !data.y_log);
+}
+
+#[test]
+fn a_limit_may_read_a_variable() {
+    let (w, id) = sheet(
+        &["x := 1..4", "top := 10"],
+        with_options(spec("x", &["x ^ 2"]), limits("", "", "", "top")),
+    );
+    assert_eq!(plot_of(&run(&w), id).unwrap().limits[3], Some(10.0));
+}
+
+#[test]
+fn a_limit_with_the_wrong_units_is_an_error_naming_it() {
+    let (w, id) = sheet(
+        &["t := 0 s, 1 s..3 s", "F := 1 N * t / s"],
+        with_options(spec("t", &["F"]), limits("", "3 m", "", "")),
+    );
+    match plot_of(&run(&w), id) {
+        Err(EvalError::InPlot { part, error }) => {
+            assert_eq!(part, "x max");
+            assert!(matches!(*error, EvalError::Unit(_)), "{error}");
+        }
+        other => panic!("{other:?}"),
+    }
+    // A plain number is not a force either.
+    let (w, id) = sheet(
+        &["t := 0 s, 1 s..3 s", "F := 1 N * t / s"],
+        with_options(spec("t", &["F"]), limits("", "", "", "10")),
+    );
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "y max"
+    ));
+}
+
+#[test]
+fn a_limit_that_is_not_a_real_number_or_does_not_evaluate_is_an_error() {
+    let (w, id) = sheet(
+        &["x := 1..3"],
+        with_options(spec("x", &["x"]), limits("", "", "", "2 + i")),
+    );
+    assert!(
+        matches!(plot_of(&run(&w), id), Err(EvalError::InPlot { part, .. }) if part == "y max")
+    );
+    let (w, id) = sheet(
+        &["x := 1..3"],
+        with_options(spec("x", &["x"]), limits("", "", "nowhere", "")),
+    );
+    assert!(
+        matches!(plot_of(&run(&w), id), Err(EvalError::InPlot { part, .. }) if part == "y min")
+    );
+}
+
+#[test]
+fn a_minimum_must_be_below_its_maximum() {
+    let (w, id) = sheet(
+        &["x := 1..3"],
+        with_options(spec("x", &["x"]), limits("5", "2", "", "")),
+    );
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, error }) if part == "x limits" && matches!(*error, EvalError::Invalid(_))
+    ));
+}
+
+#[test]
+fn a_log_axis_needs_positive_data_and_positive_limits() {
+    let log_y = PlotOptions {
+        y_log: true,
+        ..PlotOptions::default()
+    };
+    let (w, id) = sheet(
+        &["x := 1..3"],
+        with_options(spec("x", &["x - 1"]), log_y.clone()),
+    );
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "series 1"
+    ));
+    let (w, id) = sheet(&["x := 1..3"], with_options(spec("x", &["x"]), log_y));
+    let data = plot_of(&run(&w), id).unwrap();
+    assert!(data.y_log && !data.x_log);
+    let log_x = PlotOptions {
+        x_log: true,
+        ..PlotOptions::default()
+    };
+    let (w, id) = sheet(&["x := 0..3"], with_options(spec("x", &["x"]), log_x));
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "x"
+    ));
+    let bad_limit = PlotOptions {
+        y_log: true,
+        y_min: MathRegion::new("0"),
+        ..PlotOptions::default()
+    };
+    let (w, id) = sheet(&["x := 1..3"], with_options(spec("x", &["x"]), bad_limit));
+    assert!(matches!(
+        plot_of(&run(&w), id),
+        Err(EvalError::InPlot { part, .. }) if part == "y min"
+    ));
+}
+
+#[test]
+fn a_style_belongs_to_its_series_and_follows_it_when_one_is_removed() {
+    let bar = SeriesStyle {
+        kind: SeriesKind::Bar,
+        ..SeriesStyle::default()
+    };
+    let stem = SeriesStyle {
+        kind: SeriesKind::Stem,
+        ..SeriesStyle::default()
+    };
+    let p = spec("x", &["a", "b", "c"])
+        .with_style(0, bar.clone())
+        .with_style(2, stem.clone());
+    assert_eq!(p.styles.len(), 3);
+    assert_eq!(
+        (p.style(0), p.style(1), p.style(2)),
+        (bar.clone(), SeriesStyle::default(), stem.clone())
+    );
+    let p = p.without_series(0);
+    assert_eq!(p.series.len(), 2);
+    assert_eq!((p.style(0), p.style(1)), (SeriesStyle::default(), stem));
+    // Removing the style leaves nothing behind: equal to a plot never styled.
+    let plain = spec("x", &["a", "b"]);
+    assert_eq!(plain.clone().with_style(1, SeriesStyle::default()), plain);
+    // A style for a series that does not exist is ignored.
+    assert_eq!(plain.clone().with_style(5, bar), plain);
+}
+
+#[test]
+fn options_and_styles_change_by_undoable_edits_and_restore_exactly() {
+    let (mut w, id) = sheet(&["x := 1..3"], spec("x", &["x"]));
+    let before = w.region(id).unwrap().kind.clone();
+    let styled = spec("x", &["x"])
+        .with_options(PlotOptions {
+            grid: false,
+            ..PlotOptions::default()
+        })
+        .with_style(
+            0,
+            SeriesStyle {
+                kind: SeriesKind::Stem,
+                name: "load".into(),
+                ..SeriesStyle::default()
+            },
+        );
+    let mut history = History::default();
+    history
+        .apply(
+            &mut w,
+            Edit::SetPlot {
+                id,
+                spec: styled.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(w.region(id).unwrap().kind, RegionKind::Plot(styled));
+    history.undo(&mut w).unwrap();
+    assert_eq!(w.region(id).unwrap().kind, before);
+}
+
+#[test]
+fn a_blank_series_does_not_shift_the_styles_of_the_ones_after_it() {
+    // Series 0 is blank (not evaluated); the style of series 1 still applies to it.
+    let stem = SeriesStyle {
+        kind: SeriesKind::Stem,
+        ..SeriesStyle::default()
+    };
+    let p = spec("x", &["", "x"]).with_style(1, stem.clone());
+    assert_eq!(p.style(1), stem);
+    let (w, id) = sheet(&["x := 1..3"], p);
+    let data = plot_of(&run(&w), id).unwrap();
+    assert_eq!(
+        data.series.len(),
+        1,
+        "only the non-blank series is evaluated"
+    );
+}

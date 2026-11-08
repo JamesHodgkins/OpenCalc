@@ -6,7 +6,10 @@ mod common;
 
 use std::io::Write;
 
-use opencalc_core::document::{PageSetup, PaperSize, PlotSpec, Point, RegionKind, Size, Worksheet};
+use opencalc_core::document::{
+    LegendMode, Marker, PageSetup, PaperSize, PlotOptions, PlotSpec, Point, RegionKind, SeriesKind,
+    SeriesStyle, Size, Worksheet,
+};
 use opencalc_core::edit::Edit;
 use opencalc_core::persist::{
     load_bytes, save_bytes, LoadError, Repair, MAX_REGIONS, MAX_WORKSHEET_BYTES,
@@ -172,6 +175,35 @@ fn generated(seed: u64) -> Worksheet {
     w
 }
 
+/// The sample of format 2: format 1's, plus a plot with every kind of setting.
+fn sample_v2() -> Worksheet {
+    let mut w = sample();
+    let options = PlotOptions {
+        grid: false,
+        legend: LegendMode::Show,
+        x_log: true,
+        x_min: opencalc_core::document::MathRegion::new("0.1"),
+        y_max: opencalc_core::document::MathRegion::new("20 m"),
+        ..PlotOptions::default()
+    };
+    let spec = PlotSpec::default()
+        .with_x("f := 1, 2..10")
+        .with_series(0, "f ^ 2")
+        .with_series(1, "f ^ 3")
+        .with_options(options)
+        .with_style(
+            1,
+            SeriesStyle {
+                kind: SeriesKind::Stem,
+                marker: Marker::Square,
+                colour: Some(5),
+                name: "cubes".into(),
+            },
+        );
+    add(&mut w, RegionKind::Plot(spec), 300.0, 300.0);
+    w
+}
+
 // ---- committed fixtures -------------------------------------------------------
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -183,14 +215,14 @@ fn fixture(name: &str) -> std::path::PathBuf {
 #[test]
 #[ignore = "writes files; run by hand when the format version changes"]
 fn write_fixtures() {
-    let dir = fixture("v1");
+    let dir = fixture("v2");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("empty.ocx"),
         save_bytes(&Worksheet::new("Empty")).unwrap(),
     )
     .unwrap();
-    std::fs::write(dir.join("sample.ocx"), save_bytes(&sample()).unwrap()).unwrap();
+    std::fs::write(dir.join("sample.ocx"), save_bytes(&sample_v2()).unwrap()).unwrap();
 }
 
 #[test]
@@ -200,6 +232,72 @@ fn files_written_by_format_1_still_open() {
     let sheet = load_bytes(&std::fs::read(fixture("v1/sample.ocx")).unwrap()).unwrap();
     assert!(sheet.repairs.is_empty());
     assert_eq!(sheet.worksheet, sample());
+}
+
+#[test]
+fn files_written_by_format_2_still_open() {
+    let empty = load_bytes(&std::fs::read(fixture("v2/empty.ocx")).unwrap()).unwrap();
+    assert_eq!(empty.worksheet, Worksheet::new("Empty"));
+    let sheet = load_bytes(&std::fs::read(fixture("v2/sample.ocx")).unwrap()).unwrap();
+    assert!(sheet.repairs.is_empty());
+    assert_eq!(sheet.worksheet, sample_v2());
+}
+
+#[test]
+fn a_format_1_file_is_upgraded_to_2_when_saved_and_keeps_its_plots() {
+    let old = load_bytes(&std::fs::read(fixture("v1/sample.ocx")).unwrap()).unwrap();
+    let saved = save_bytes(&old.worksheet).unwrap();
+    let manifest = zip::ZipArchive::new(std::io::Cursor::new(saved.clone()))
+        .unwrap()
+        .by_name("manifest.json")
+        .map(|mut f| {
+            let mut s = String::new();
+            std::io::Read::read_to_string(&mut f, &mut s).unwrap();
+            s
+        })
+        .unwrap();
+    assert!(manifest.contains("\"format_version\":2"), "{manifest}");
+    assert_eq!(load_bytes(&saved).unwrap().worksheet, old.worksheet);
+}
+
+#[test]
+fn a_plain_plot_saves_without_any_of_the_new_fields() {
+    let mut w = Worksheet::new("p");
+    add(&mut w, RegionKind::Plot(PlotSpec::default()), 0.0, 0.0);
+    let bytes = save_bytes(&w).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    // The worksheet is deflated inside the archive, so check through a round trip.
+    let back = load_bytes(&bytes).unwrap().worksheet;
+    assert_eq!(back, w);
+    let RegionKind::Plot(p) = &back.regions()[0].kind else {
+        panic!()
+    };
+    assert!(p.options.is_default() && p.styles.is_empty());
+    drop(text);
+}
+
+#[test]
+fn a_plot_with_too_many_styles_or_a_bad_colour_is_repaired_not_refused() {
+    let json = r#"{"title":"t","regions":[{"id":1,"pos":{"x":0,"y":0},"size":{"w":260,"h":170},
+        "kind":{"Plot":{"x":{"source":"1"},"series":[{"source":"2"}],
+        "styles":[{"colour":9},{"kind":"bar"},{"kind":"stem"}]}}}],"next_id":2}"#;
+    let bytes = zip_of(&[
+        ("manifest.json", br#"{"format_version":2}"#),
+        ("worksheet.json", json.as_bytes()),
+    ]);
+    let loaded = load_bytes(&bytes).unwrap();
+    assert!(loaded
+        .repairs
+        .iter()
+        .any(|r| matches!(r, Repair::StylesFixed(_))));
+    let RegionKind::Plot(p) = &loaded.worksheet.regions()[0].kind else {
+        panic!()
+    };
+    assert_eq!(p.styles.len(), 1, "extra styles dropped");
+    assert_eq!(
+        p.styles[0].colour, None,
+        "a colour outside the palette is dropped"
+    );
 }
 
 // ---- hostile and damaged input ------------------------------------------------
@@ -322,7 +420,7 @@ fn unknown_entries_and_fields_are_ignored() {
 #[test]
 fn a_newer_format_is_refused_by_name() {
     let bytes = zip_of(&[
-        ("manifest.json", br#"{"format_version":2}"#),
+        ("manifest.json", br#"{"format_version":3}"#),
         ("worksheet.json", b"{}"),
     ]);
     let err = load_bytes(&bytes).unwrap_err();
@@ -330,8 +428,8 @@ fn a_newer_format_is_refused_by_name() {
         matches!(
             err,
             LoadError::TooNew {
-                found: 2,
-                supported: 1
+                found: 3,
+                supported: 2
             }
         ),
         "{err}"

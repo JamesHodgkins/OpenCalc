@@ -10,9 +10,16 @@ use super::LoadError;
 pub type Step = fn(Value) -> Result<Value, LoadError>;
 
 /// The steps for released versions. `STEPS[n - 1]` goes from version `n` to
-/// `n + 1`, so its length is `FORMAT_VERSION - 1`. Version 1 is the first, so
-/// there are none yet.
-pub const STEPS: &[Step] = &[];
+/// `n + 1`, so its length is `FORMAT_VERSION - 1`.
+pub const STEPS: &[Step] = &[v1_to_v2];
+
+/// Version 2 added plot options and series styles. Both are optional with
+/// defaults, so a version 1 worksheet reads unchanged; the version number moves so
+/// that a program that only knows version 1 refuses a version 2 file instead of
+/// quietly dropping the plot settings and losing them on its next save.
+fn v1_to_v2(value: Value) -> Result<Value, LoadError> {
+    Ok(value)
+}
 
 /// Bring `value` from `from` up to `to` using `steps`.
 pub fn run(steps: &[Step], from: u32, to: u32, mut value: Value) -> Result<Value, LoadError> {

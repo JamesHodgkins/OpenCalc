@@ -74,13 +74,13 @@ Depends on Phase 1 (inverse, boolean values). Builds the cancellation token that
 
 Extends `PlotSpec` (format bump with migration). TD-31 records the current plot decisions.
 
-- [ ] Plot options: axis bounds, grid, legend, markers, line styles/colours, log axes.
-- [ ] `f(x)`-style function plotting and parametric plots.
+- [x] Plot options and series styles (2026-11-08), **file format 2** (a real migration step; format 1 files open unchanged, fixtures of both are tested). Per plot: axis limits for x and y (math sources, so they carry units or read a variable; blank is automatic; a limit must have its axis's dimension and the minimum must be below the maximum), grid on or off, legend automatic, shown or hidden, and a logarithmic x or y axis (every value and limit on it must be positive, else an error naming the part). Per series: type (line, markers, line and markers, step, stem, bar), marker shape (circle, square, triangle, cross), a colour from the palette, and a legend name. Columns grow from zero, group side by side when there are several bar series, and leave room for half a column at each end; markers and stems get a little room too. Edited in the Plot window (a section per series, an Axes and grid section), searched and replaced by Find and Replace, painted identically by the PDF and PNG export. Not done: error bars, secondary axes, line width and dash styles, user-chosen tick marks.
+- [ ] `f(x)`-style function plotting and parametric plots (a range already gives function plots; parametric needs a per-series x).
 - [ ] Mixed units on an axis (per-series dimensions).
 - [ ] Plot types: bar/column, stem, scatter, polar, error bars, box.
 - [ ] Contour plot, then 3D (surface, curve, scatter) with rotate/pan/zoom.
 - [ ] Interactive plot view with hover readout, pan and zoom (revisit `egui_plot`, TD-31).
-- [ ] Export of plots in PDF/PNG covers every new type.
+- [x] Export of plots in PDF/PNG covers every type built so far: the export paints with the same code as the canvas, and rendering tests check the pixels of each series type and option.
 
 ## Phase 4: Data I/O (M to L)
 
@@ -133,6 +133,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 3.1: plot options and series styles (file format 2): axis limits, grid, legend, log axes, six series types, markers, colours, legend names; rendering tests on real pixels. |
 | 2026-11-08 | Phase 2.2: `odesolve` (adaptive RK45, mixed-unit states, table output), `col` / `row`; corpus `odes.calc`, `tests/ode.rs`. |
 | 2026-11-08 | Phase 1.1: per-element dimensions in matrices (TD-28 resolved); solver unknowns may now differ in dimension; corpus `mixed_units.calc`. |
 | 2026-11-08 | Phase 2.2: solve blocks Stage 1: `find`, `minerr`, `minimize`, `maximize`; corpus `solve.calc`, `tests/solve.rs`; `EvalError::OutOfBudget`. |

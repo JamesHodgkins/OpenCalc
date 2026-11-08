@@ -32,6 +32,10 @@ pub enum Field {
     PlotYLabel,
     PlotX,
     PlotSeries(usize),
+    /// The legend name of a series that has a style.
+    PlotSeriesName(usize),
+    /// One of the four axis limits: x min, x max, y min, y max.
+    PlotLimit(usize),
     /// The region's label (any kind of region has one).
     Label,
 }
@@ -68,6 +72,19 @@ fn kind_fields(kind: &RegionKind) -> Vec<(Field, &str)> {
                     .iter()
                     .enumerate()
                     .map(|(i, s)| (Field::PlotSeries(i), s.source())),
+            );
+            v.extend(
+                p.styles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, s)| (Field::PlotSeriesName(i), s.name.as_str())),
+            );
+            v.extend(
+                p.options
+                    .limits()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, m)| (Field::PlotLimit(i), m.source())),
             );
             v
         }
@@ -244,6 +261,24 @@ fn replace_in_plot(
             changed = true;
         }
     }
+    for (i, s) in p.styles.iter().enumerate() {
+        if let Some(t) = new_text(Field::PlotSeriesName(i), &s.name) {
+            spec.styles[i].name = t;
+            changed = true;
+        }
+    }
+    for (i, m) in p.options.limits().into_iter().enumerate() {
+        if let Some(t) = new_text(Field::PlotLimit(i), m.source()) {
+            let limit = MathRegion::new(&t);
+            match i {
+                0 => spec.options.x_min = limit,
+                1 => spec.options.x_max = limit,
+                2 => spec.options.y_min = limit,
+                _ => spec.options.y_max = limit,
+            }
+            changed = true;
+        }
+    }
     changed.then_some(spec)
 }
 
@@ -369,6 +404,49 @@ mod tests {
         assert_eq!((m[0].start, m[1].start), (0, 5));
         // Upper and lower case Greek match when case is ignored.
         assert_eq!(all(&w, "\u{3a3}").len(), 2);
+    }
+
+    #[test]
+    fn legend_names_and_axis_limits_are_searched_and_replaced() {
+        use crate::document::{PlotOptions, SeriesStyle};
+        let plot = PlotSpec::default()
+            .with_x("t")
+            .with_series(0, "F")
+            .with_style(
+                0,
+                SeriesStyle {
+                    name: "load F".into(),
+                    ..SeriesStyle::default()
+                },
+            )
+            .with_options(PlotOptions {
+                y_max: MathRegion::new("2 * F_max"),
+                ..PlotOptions::default()
+            });
+        let mut w = sheet(&[(RegionKind::Plot(plot), 0.0, 0.0)]);
+        let found: Vec<Field> = all(&w, "F").iter().map(|m| m.field).collect();
+        assert_eq!(
+            found,
+            [
+                Field::PlotSeries(0),
+                Field::PlotSeriesName(0),
+                Field::PlotLimit(3)
+            ]
+        );
+        let matches = all(&w, "F");
+        let edit = replace_edit(&w, &matches, "P").unwrap();
+        w.apply(edit).unwrap();
+        let RegionKind::Plot(p) = &w.regions()[0].kind else {
+            panic!()
+        };
+        assert_eq!(p.series[0].source(), "P");
+        assert_eq!(p.styles[0].name, "load P");
+        assert_eq!(p.options.y_max.source(), "2 * P_max");
+        assert_eq!(
+            p.options.x_max.source(),
+            "",
+            "the other limits are untouched"
+        );
     }
 
     #[test]

@@ -30,6 +30,7 @@ mod format;
 mod insert;
 mod instance;
 mod label;
+mod plots;
 mod text_edit;
 mod units;
 

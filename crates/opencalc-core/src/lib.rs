@@ -22,7 +22,7 @@ pub mod worker;
 
 /// Version of the on-disk document format. Increment with every breaking change
 /// and add a migration for each step.
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 /// Crate version, for display in About dialogs and the CLI.
 pub fn version() -> &'static str {
@@ -34,8 +34,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_version_is_one() {
-        assert_eq!(FORMAT_VERSION, 1);
+    fn format_version_is_two() {
+        assert_eq!(FORMAT_VERSION, 2);
     }
 
     #[test]
