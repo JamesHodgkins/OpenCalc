@@ -6,6 +6,7 @@
 //! [`complete`]; this file reads input, asks the `SourceLayout` where the caret
 //! goes, and draws.
 
+mod blink;
 mod complete;
 mod greek;
 mod popup;
@@ -235,13 +236,13 @@ pub(super) fn math(
     }
     lay.layout.paint(painter, text_origin, paper.text);
     let caret = lay.caret_rect(field.caret);
-    painter.line_segment(
-        [
+    if blink::caret_shown(ui, id) {
+        let line = [
             text_origin + caret.min.to_vec2(),
             text_origin + caret.max.to_vec2(),
-        ],
-        Stroke::new(1.5_f32, env.theme.accent),
-    );
+        ];
+        painter.line_segment(line, Stroke::new(1.5_f32, env.theme.accent));
+    }
     if field.clipped {
         super::overlay::clip_notice(painter, text_origin, lay.layout.h, zoom, env);
     }

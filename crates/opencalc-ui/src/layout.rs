@@ -417,6 +417,33 @@ mod tests {
     }
 
     #[test]
+    fn pi_reads_as_the_letter_when_shown_but_not_while_it_is_being_typed() {
+        with_fonts(|t| {
+            let shown = t.layout(&parsed("2 pi"), 16.0).w;
+            let letter = t.layout(&parsed("2 \u{3c0}"), 16.0).w;
+            assert!((shown - letter).abs() < 0.01, "{shown} against {letter}");
+            // A name that merely contains it is left alone.
+            let spi = t.layout(&parsed("spi"), 16.0).w;
+            assert!(spi > t.layout(&parsed("pi"), 16.0).w * 2.0);
+        });
+        // With the marks the editor needs, each typed letter keeps its own place.
+        let ctx = egui::Context::default();
+        let mut widths = (0.0, 0.0);
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
+            ctx.fonts(|fonts| {
+                let plain = Typesetter::new(fonts, Color32::WHITE);
+                let marked = Typesetter::new(fonts, Color32::WHITE).with_marks();
+                let pi = parsed("pi");
+                widths = (plain.layout(&pi, 16.0).w, marked.layout(&pi, 16.0).w);
+            });
+        });
+        assert!(
+            widths.1 > widths.0,
+            "p and i are wider than one pi: {widths:?}"
+        );
+    }
+
+    #[test]
     fn a_matrix_grows_with_its_rows_and_columns_and_has_brackets() {
         with_fonts(|t| {
             let one = t.layout(&parsed("[1]"), 16.0);

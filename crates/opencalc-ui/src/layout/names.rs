@@ -17,6 +17,11 @@ fn split(name: &str) -> Option<(&str, &str)> {
 impl Typesetter<'_> {
     /// A name, with its subscript lowered when it has one.
     pub(super) fn name(&self, name: &str, size: f32) -> Layout {
+        // The constant `pi` reads as the letter once the region is not being edited.
+        // (While editing, every typed character keeps its own place for the caret.)
+        if !self.marks && name == "pi" {
+            return self.text("\u{3c0}", size);
+        }
         let Some((base, sub)) = split(name) else {
             return self.text(name, size);
         };
