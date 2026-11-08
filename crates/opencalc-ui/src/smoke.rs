@@ -32,6 +32,7 @@ mod instance;
 mod label;
 mod plot_view;
 mod plots;
+mod tables;
 mod text_edit;
 mod units;
 

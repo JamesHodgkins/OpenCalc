@@ -12,7 +12,7 @@ mod history;
 
 use crate::document::{
     clean_label, FontStyle, PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat,
-    Size, Worksheet,
+    Size, TableSpec, Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -72,6 +72,11 @@ pub enum Edit {
         id: RegionId,
         spec: PlotSpec,
     },
+    /// Replace a table region's contents (name, columns and cells).
+    SetTable {
+        id: RegionId,
+        spec: Box<TableSpec>,
+    },
     /// Display results in another unit system. Does not change any value.
     SetUnitSystem(UnitSystem),
     /// Change the paper size, orientation or margins. Moves nothing; it only
@@ -117,11 +122,17 @@ pub struct Applied {
 /// or math or plot regions added (a plot has results to show, even with no math).
 fn touches_math(edit: &Edit) -> bool {
     match edit {
-        Edit::SetMathSource { .. } | Edit::SetPlot { .. } | Edit::SetCustomUnits(_) => true,
+        Edit::SetMathSource { .. }
+        | Edit::SetPlot { .. }
+        | Edit::SetTable { .. }
+        | Edit::SetCustomUnits(_) => true,
         Edit::Batch(edits) => edits.iter().any(touches_math),
-        Edit::InsertRegions { regions } => regions
-            .iter()
-            .any(|(_, r)| matches!(r.kind, RegionKind::Math(_) | RegionKind::Plot(_))),
+        // A table counts only when it defines something (a blank one does not).
+        Edit::InsertRegions { regions } => regions.iter().any(|(_, r)| match &r.kind {
+            RegionKind::Math(_) | RegionKind::Plot(_) => true,
+            RegionKind::Table(t) => t.expr().is_some(),
+            _ => false,
+        }),
         _ => false,
     }
 }
@@ -221,6 +232,15 @@ impl Worksheet {
                 };
                 let old = std::mem::replace(current, spec.clone());
                 Ok(Edit::SetPlot { id: *id, spec: old })
+            }
+            Edit::SetTable { id, spec } => {
+                self.unlocked(*id)?;
+                let region = self.region_mut(*id)?;
+                let RegionKind::Table(current) = &mut region.kind else {
+                    return Err(EditError::WrongKind(*id));
+                };
+                let old = std::mem::replace(current, Box::new((**spec).clone().repaired()));
+                Ok(Edit::SetTable { id: *id, spec: old })
             }
             Edit::SetRegionSize { id, size } => {
                 self.unlocked(*id)?;
@@ -470,7 +490,7 @@ mod tests {
             RegionKind::Text { text: "hi".into() },
             RegionKind::plot(),
             RegionKind::math("b := a + 1"),
-            RegionKind::Table,
+            RegionKind::table(),
         ]
         .into_iter()
         .enumerate()

@@ -89,7 +89,7 @@ Fills the Table and Picture placeholder regions. Design and open decisions:
 the decisions in `DATA_IO.md` section 7.
 
 - [x] CSV reader and writer module (own parser, bounded, tested; no UI yet).
-- [ ] Table region (editable grid, evaluates to a matrix).
+- [x] Table region (editable grid, evaluates to a matrix): `TableSpec`, `Edit::SetTable`, painting, a table window for editing; CSV import and export commands still to do.
 - [ ] ~~CSV/text read and write functions~~ proposed to be replaced by import and export commands (`DATA_IO.md` section 2); awaiting decision.
 - [ ] Picture region (PNG/JPG import, embedded in the `.ocx`).
 - [ ] CSV import and export in the Input/Output tab.
@@ -134,6 +134,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-08 | Phase 4: Table region (format 2, placeholder migration, evaluation as a matrix definition, painting, table window); CSV decimal-mark option. |
 | 2026-11-08 | Phase 4 started: design note `DATA_IO.md`; `opencalc-core::csv` (reader, writer, delimiter detection, number reading, header split, formula-safe output). |
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |

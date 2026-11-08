@@ -18,6 +18,7 @@ pub(crate) mod paint;
 pub mod plot;
 mod result;
 pub(crate) mod separate;
+mod table;
 pub mod text_style;
 pub mod view;
 

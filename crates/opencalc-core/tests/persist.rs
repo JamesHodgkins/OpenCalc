@@ -59,7 +59,7 @@ fn sample() -> Worksheet {
         .with_series(0, "x^2")
         .with_series(1, "x");
     add(&mut w, RegionKind::Plot(plot), 160.0, 20.0);
-    add(&mut w, RegionKind::Table, 200.0, 20.0);
+    add(&mut w, RegionKind::table(), 200.0, 20.0);
     add(&mut w, RegionKind::Picture, 240.0, 20.0);
     w.apply(Edit::SetUnitSystem(UnitSystem::Uscs)).unwrap();
     w.apply(Edit::SetPageSetup(PageSetup {
@@ -96,7 +96,10 @@ fn every_region_type_and_setting_round_trips_exactly() {
     let w = sample();
     let mut back = round_trip(&w);
     // Region numbers keep counting, so none is ever reused.
-    assert_eq!(back.new_region(RegionKind::Table, Point::default()).id.0, 8);
+    assert_eq!(
+        back.new_region(RegionKind::table(), Point::default()).id.0,
+        8
+    );
     assert!(round_trip(&Worksheet::new("")).regions().is_empty());
 }
 
@@ -166,7 +169,7 @@ fn generated(seed: u64) -> Worksheet {
                 title: text(&mut rng),
             },
             3 => RegionKind::Plot(PlotSpec::default().with_title(&text(&mut rng)).with_x("t")),
-            4 => RegionKind::Table,
+            4 => RegionKind::table(),
             _ => RegionKind::Picture,
         };
         let (x, y) = (rng.below(2000) as f32 / 8.0 - 50.0, i as f32 * 3.7);
@@ -607,7 +610,10 @@ fn a_next_number_that_is_too_low_is_repaired_and_reported() {
     let l = load_json(&sheet(&[region(5, m), region(9, m)], 2)).unwrap();
     assert_eq!(l.repairs, [Repair::NextIdRaised { from: 2, to: 10 }]);
     let mut ws = l.worksheet;
-    assert_eq!(ws.new_region(RegionKind::Table, Point::default()).id.0, 10);
+    assert_eq!(
+        ws.new_region(RegionKind::table(), Point::default()).id.0,
+        10
+    );
     assert!(l.repairs[0].to_string().contains("raised to 10"));
 }
 

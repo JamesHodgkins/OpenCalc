@@ -117,7 +117,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             },
         ),
         InsertPlot => insert(state, &mut fx, RegionKind::plot()),
-        InsertTable => insert(state, &mut fx, RegionKind::Table),
+        InsertTable => insert(state, &mut fx, RegionKind::table()),
         InsertPicture => insert(state, &mut fx, RegionKind::Picture),
         RegionDelete => with_eval_check(state, &mut fx, |s| {
             s.delete_selection();

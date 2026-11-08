@@ -96,7 +96,7 @@ mod tests {
         let mut ids = Vec::new();
         for (kind, y) in [
             (RegionKind::math("a := 1"), 300.0),
-            (RegionKind::Table, 100.0),
+            (RegionKind::table(), 100.0),
             (
                 RegionKind::Text {
                     text: "first line\nsecond".into(),

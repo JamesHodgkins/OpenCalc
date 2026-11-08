@@ -99,7 +99,7 @@ fn kind_fields(kind: &RegionKind) -> Vec<(Field, &str)> {
             );
             v
         }
-        RegionKind::Area { .. } | RegionKind::Table | RegionKind::Picture => Vec::new(),
+        RegionKind::Area { .. } | RegionKind::Table(_) | RegionKind::Picture => Vec::new(),
     }
 }
 
@@ -231,7 +231,7 @@ pub fn replace_edit(ws: &Worksheet, matches: &[Match], replacement: &str) -> Opt
                     edits.push(Edit::SetPlot { id, spec });
                 }
             }
-            RegionKind::Area { .. } | RegionKind::Table | RegionKind::Picture => {}
+            RegionKind::Area { .. } | RegionKind::Table(_) | RegionKind::Picture => {}
         }
         if let Some(label) = new_text(Field::Label, &region.label) {
             edits.push(Edit::SetLabel { id, label });
@@ -333,7 +333,7 @@ mod tests {
     fn labels_are_searched_and_replaced_like_other_text() {
         let mut w = sheet(&[
             (math("a := 1"), 0.0, 0.0),
-            (RegionKind::Table, 0.0, 50.0),
+            (RegionKind::table(), 0.0, 50.0),
             (math("b := 2"), 0.0, 100.0),
         ]);
         let ids: Vec<RegionId> = w.regions().iter().map(|r| r.id).collect();

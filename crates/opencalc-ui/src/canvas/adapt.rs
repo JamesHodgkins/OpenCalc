@@ -43,7 +43,7 @@ pub fn kind_icon(kind: &RegionKind) -> char {
         RegionKind::Text { .. } => icons::TEXT,
         RegionKind::Area { .. } => icons::AREA,
         RegionKind::Plot(_) => icons::PLOT,
-        RegionKind::Table => icons::TABLE,
+        RegionKind::Table(_) => icons::TABLE,
         RegionKind::Picture => icons::PICTURE,
     }
 }

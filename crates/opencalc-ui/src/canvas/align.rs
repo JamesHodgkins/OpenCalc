@@ -41,7 +41,7 @@ mod tests {
             id: RegionId(id),
             pos: Point::new(x, y),
             size: Size::new(50.0, 30.0),
-            kind: RegionKind::Table,
+            kind: RegionKind::table(),
             style: Default::default(),
             locked: false,
             label: String::new(),

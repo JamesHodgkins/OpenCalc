@@ -21,6 +21,24 @@ fn v1_to_v2(value: Value) -> Result<Value, LoadError> {
     Ok(value)
 }
 
+/// Before tables had content a Table region was saved as the bare string
+/// `"Table"`. Turn each into an empty table, so those files (and any version 2
+/// file made while the format was still changing) keep loading.
+fn fill_table_placeholders(value: &mut Value) {
+    let Some(regions) = value.get_mut("regions").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for r in regions {
+        if r.get("kind").and_then(Value::as_str) == Some("Table") {
+            r["kind"] = serde_json::json!({"Table": {
+                "name": "",
+                "columns": [{}, {}],
+                "rows": [["", ""], ["", ""], ["", ""]],
+            }});
+        }
+    }
+}
+
 /// Bring `value` from `from` up to `to` using `steps`.
 pub fn run(steps: &[Step], from: u32, to: u32, mut value: Value) -> Result<Value, LoadError> {
     for version in from..to {
@@ -34,7 +52,9 @@ pub fn run(steps: &[Step], from: u32, to: u32, mut value: Value) -> Result<Value
 
 /// Migrate a worksheet from format `from` to the current one.
 pub fn to_current(from: u32, value: Value) -> Result<Value, LoadError> {
-    run(STEPS, from, crate::FORMAT_VERSION, value)
+    let mut value = run(STEPS, from, crate::FORMAT_VERSION, value)?;
+    fill_table_placeholders(&mut value);
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -73,6 +93,21 @@ mod tests {
             run(&[], 1, 2, json!(1)),
             Err(LoadError::Migration(_))
         ));
+    }
+
+    #[test]
+    fn a_placeholder_table_becomes_an_empty_table() {
+        let old = json!({"regions": [
+            {"id": 1, "kind": "Table"},
+            {"id": 2, "kind": "Picture"},
+            {"id": 3, "kind": {"Text": {"text": "Table"}}},
+        ]});
+        let new = to_current(1, old).unwrap();
+        assert!(new["regions"][0]["kind"]["Table"]["rows"].is_array());
+        assert_eq!(new["regions"][1]["kind"], "Picture");
+        assert_eq!(new["regions"][2]["kind"]["Text"]["text"], "Table");
+        // already filled in: left alone
+        assert_eq!(to_current(2, new.clone()).unwrap(), new);
     }
 
     #[test]

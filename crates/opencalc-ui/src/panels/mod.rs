@@ -17,6 +17,7 @@ pub mod plot_view;
 pub mod plot_window;
 pub mod shortcuts;
 pub mod status;
+pub mod table_window;
 pub mod title;
 pub mod units;
 

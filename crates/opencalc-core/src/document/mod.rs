@@ -9,6 +9,7 @@ mod plot;
 mod plot_style;
 mod region;
 mod result_format;
+mod table;
 
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +23,7 @@ pub use region::{
     clean_label, FontStyle, MathRegion, Region, RegionId, RegionKind, MAX_LABEL_CHARS,
 };
 pub use result_format::{DisplayUnit, Notation, ResultFormat, MAX_DECIMALS};
+pub use table::{TableColumn, TableSpec, MAX_CELLS, MAX_COLUMNS, MAX_TEXT as MAX_TABLE_TEXT};
 
 use crate::expr::Expr;
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
@@ -183,12 +185,14 @@ impl Worksheet {
             .collect()
     }
 
-    /// Math regions in layout order, as the evaluator takes them.
+    /// Math regions in layout order, as the evaluator takes them. A table that
+    /// has a name and numbers is one too: it defines its name as a matrix.
     pub fn math_regions(&self) -> Vec<(RegionId, Expr)> {
         self.regions
             .iter()
             .filter_map(|r| match &r.kind {
                 RegionKind::Math(m) => Some((r.id, m.expr().clone())),
+                RegionKind::Table(t) => t.expr().map(|e| (r.id, e)),
                 _ => None,
             })
             .collect()
@@ -203,7 +207,7 @@ mod tests {
     fn new_regions_get_increasing_ids_even_if_never_inserted() {
         let mut w = Worksheet::new("t");
         let a = w.new_region(RegionKind::plot(), Point::default());
-        let b = w.new_region(RegionKind::Table, Point::default());
+        let b = w.new_region(RegionKind::table(), Point::default());
         assert_eq!((a.id, b.id), (RegionId(1), RegionId(2)));
         assert!(w.regions().is_empty(), "allocating an ID does not add it");
     }
@@ -260,7 +264,7 @@ mod tests {
                 120.0,
             ),
             (RegionKind::plot(), 160.0),
-            (RegionKind::Table, 200.0),
+            (RegionKind::table(), 200.0),
             (RegionKind::Picture, 240.0),
         ] {
             let r = w.new_region(kind, Point::new(x, 20.0));

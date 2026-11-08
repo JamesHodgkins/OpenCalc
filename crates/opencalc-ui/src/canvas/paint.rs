@@ -64,11 +64,11 @@ pub fn grid(painter: &Painter, rect: Rect, view: &CanvasView, origin: Pos2, them
 
 /// Where and how to draw one region.
 #[derive(Clone, Copy)]
-struct Place {
-    top_left: Pos2,
-    zoom: f32,
+pub(super) struct Place {
+    pub(super) top_left: Pos2,
+    pub(super) zoom: f32,
     /// Measure only: used while the region is being edited in place.
-    skip_content: bool,
+    pub(super) skip_content: bool,
 }
 
 fn plain(fonts: &eframe::egui::epaint::text::Fonts, s: &str, colour: Color32, size: f32) -> Layout {
@@ -135,7 +135,8 @@ pub fn region(
             }
             vec(r.size)
         }
-        RegionKind::Table | RegionKind::Picture => {
+        RegionKind::Table(spec) => super::table::paint(ui, painter, env, r, spec, place),
+        RegionKind::Picture => {
             if !skip_content {
                 placeholder(painter, env.paper, r, top_left, zoom);
             }

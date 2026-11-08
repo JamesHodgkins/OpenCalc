@@ -79,7 +79,7 @@ characters; omitted when empty):
 | Text | `{ "Text": { "text": "…" } }` | |
 | Area | `{ "Area": { "title": "…" } }` | A titled box. |
 | Plot | `{ "Plot": { "title": "", "x_label": "", "y_label": "", "x": { "source": "…" }, "series": [ { "source": "…" } ], "options": { … }, "styles": [ { … } ] } }` | At most 8 series, at least 1. Titles, labels, `options` and `styles` may be omitted; see section 3a. |
-| Table | `"Table"` | Not built yet; reserved. |
+| Table | `{ "Table": { "name": "loads", "columns": [ { "header": "x", "unit": "m" }, { "unit": "kN" } ], "rows": [ [ "1", "10" ], [ "2", "20" ] ] } }` | A grid of numbers that defines `name` as a matrix. Cells are the text typed; a column has one unit (blank for none). At least one row and column, at most 64 columns and 4096 cells; a file outside that is trimmed on opening. See section 3b. |
 | Picture | `"Picture"` | Not built yet; reserved. |
 
 **Math is saved as the text typed, not as a parsed tree.** The program parses it
@@ -89,6 +89,16 @@ never lost.
 
 Unknown fields are ignored on reading. A reader that writes a file back out should
 keep what it does not understand where it can, but is not required to.
+
+### 3b. Tables (version 2)
+
+A table is evaluated as `name := [row; row; ...]`, each cell followed by its column's
+unit, so it can be used by name like any other definition and its units are checked.
+A table with no name, or with every cell blank, defines nothing. A blank or
+non-number cell makes the table an error that names the row and column.
+
+Files from before tables had content hold the bare string `"Table"` as the kind.
+The reader turns that into an empty 3 by 2 table.
 
 ### 3a. Plot options and series styles (version 2)
 
@@ -154,7 +164,7 @@ A reader meeting a `kind` or `marker` it does not know must refuse the plot, not
         }
       }
     },
-    { "id": 6, "pos": { "x": 0.0, "y": 300.0 }, "size": { "w": 260.0, "h": 170.0 }, "kind": "Table" }
+    { "id": 6, "pos": { "x": 0.0, "y": 300.0 }, "size": { "w": 260.0, "h": 170.0 }, "kind": { "Table": { "name": "loads", "columns": [ { "header": "x", "unit": "m" }, { "unit": "kN" } ], "rows": [ [ "1", "10" ], [ "2", "20" ] ] } } }
   ],
   "next_id": 7,
   "unit_system": "Uscs",

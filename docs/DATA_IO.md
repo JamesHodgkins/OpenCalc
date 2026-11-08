@@ -1,6 +1,6 @@
 # Data in and out: design (Phase 4)
 
-Status: **proposal; only the CSV module (section 6, stage 1) is built.** Needs the
+Status: **CSV module and the Table region (stage 2, without CSV commands) are built; the rest is proposal.** Needs the
 decisions in section 7 before the Table and Picture regions. Written 2026-11-08.
 Roadmap context: `ROADMAP.md` Phase 4.
 
