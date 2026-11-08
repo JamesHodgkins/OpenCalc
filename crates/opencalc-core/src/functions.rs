@@ -41,6 +41,7 @@ macro_rules! function {
 
 use Arity::{AtLeast, Exactly};
 
+mod calculus;
 mod discrete;
 mod elementary;
 mod linalg;
@@ -239,6 +240,7 @@ pub fn category(name: &str) -> &'static str {
             "Statistics"
         }
         "factorial" | "combin" | "permut" | "isprime" => "Number theory",
+        "sum_over" | "product_over" | "integrate" | "derivative" | "limit" => "Calculus",
         _ => "Other",
     }
 }
@@ -251,6 +253,7 @@ pub fn all() -> impl Iterator<Item = &'static FunctionDef> + Clone {
         .chain(linalg::LINALG)
         .chain(lists::LISTS)
         .chain(discrete::DISCRETE)
+        .chain(calculus::CALCULUS)
 }
 
 pub fn lookup(name: &str) -> Option<&'static FunctionDef> {

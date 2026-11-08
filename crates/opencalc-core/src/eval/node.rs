@@ -23,7 +23,7 @@ impl Located {
     }
 
     /// The error came from child number `index` of the current node.
-    fn under(mut self, index: usize) -> Located {
+    pub(super) fn under(mut self, index: usize) -> Located {
         // Expressions have at most `MAX_SYMBOLS` symbols, far below `u16::MAX`.
         self.rev_path.push(u16::try_from(index).unwrap_or(u16::MAX));
         self
@@ -57,7 +57,7 @@ pub(super) fn eval_region(expr: &Expr, cx: &Cx) -> Evaluated {
 
 /// Evaluate one expression. The single choke point that rejects non-finite
 /// results, so they cannot reach a displayed value.
-fn eval(expr: &Expr, cx: &Cx) -> Evaluated {
+pub(super) fn eval(expr: &Expr, cx: &Cx) -> Evaluated {
     let v = eval_node(expr, cx)?;
     if v.is_finite() {
         Ok(v)
@@ -158,6 +158,7 @@ fn call_user(name: &str, f: &UserFn, args: &[Expr], cx: &Cx) -> Evaluated {
         units: cx.units,
         locals,
         depth: cx.depth + 1,
+        meter: cx.meter,
     };
     // An error in the body is reported at the call, with the function's name.
     eval(f.body, &inner).map_err(|l| {
@@ -248,7 +249,9 @@ fn conditional(cond: &Expr, then: &Expr, otherwise: &Expr, cx: &Cx) -> Evaluated
 /// imaginary unit `i`.
 #[inline(never)]
 fn name(n: &str, cx: &Cx) -> Evaluated {
-    if let Some((_, value)) = cx.locals.iter().find(|(p, _)| p == n) {
+    // The innermost binding wins: a bound variable of a sum or integral shadows
+    // an outer one of the same name.
+    if let Some((_, value)) = cx.locals.iter().rev().find(|(p, _)| p == n) {
         return Ok(value.clone());
     }
     match cx.env.get(n) {
@@ -305,6 +308,9 @@ fn apply(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
     if name == "if" {
         // The parser makes a Conditional from exactly three arguments.
         return Err(Located::here(EvalError::Arity("if".into(), 3)));
+    }
+    if crate::expr::is_binding_form(name) {
+        return super::calculus::evaluate(name, args, cx);
     }
     if functions::lookup(name).is_none() {
         if let Some(f) = cx.fns.get(name) {

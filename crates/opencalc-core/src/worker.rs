@@ -6,11 +6,13 @@
 //! if its revision is still current.
 
 use std::panic::AssertUnwindSafe;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use crate::document::PlotInput;
-use crate::eval::{all_failed, evaluate_all, Output, RegionId};
+use crate::eval::{all_failed, evaluate_cancellable, Output, RegionId};
 use crate::expr::Expr;
 use crate::registry::UnitRegistry;
 
@@ -36,6 +38,9 @@ pub struct EvalResult {
 
 pub struct Worker {
     tx: Sender<Request>,
+    /// Raised by every request, so a long calculation on a worksheet that has
+    /// since changed gives way. The worker lowers it when it starts the newest.
+    cancel: Arc<AtomicBool>,
     rx: Receiver<EvalResult>,
     handle: Option<JoinHandle<()>>,
 }
@@ -46,6 +51,8 @@ impl Worker {
     pub fn spawn(on_result: impl Fn() + Send + 'static) -> Worker {
         let (tx, req_rx) = mpsc::channel::<Request>();
         let (res_tx, rx) = mpsc::channel::<EvalResult>();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = Arc::clone(&cancel);
         // An explicit, generous stack: evaluation recurses over the expression
         // tree. If the thread cannot be created, the request channel is dropped
         // with the closure and `request` reports failure instead of panicking.
@@ -69,8 +76,9 @@ impl Worker {
                         } => {
                             // A panic in the evaluator must not end the worker thread: report
                             // it on every region and keep serving requests.
+                            worker_cancel.store(false, Ordering::SeqCst);
                             let output = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                                evaluate_all(&regions, &plots, &units)
+                                evaluate_cancellable(&regions, &plots, &units, Some(&worker_cancel))
                             }))
                             .unwrap_or_else(|_| all_failed(&regions, "the evaluator panicked"));
                             if res_tx.send(EvalResult { revision, output }).is_err() {
@@ -82,7 +90,12 @@ impl Worker {
                 }
             })
             .ok();
-        Worker { tx, rx, handle }
+        Worker {
+            tx,
+            cancel,
+            rx,
+            handle,
+        }
     }
 
     /// Queue a recalculation. Returns false if the worker has stopped.
@@ -108,6 +121,7 @@ impl Worker {
         plots: Vec<(RegionId, PlotInput)>,
         units: UnitRegistry,
     ) -> bool {
+        self.cancel.store(true, Ordering::SeqCst);
         self.tx
             .send(Request::Recalculate {
                 revision,
@@ -211,6 +225,38 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         assert_eq!(last, 50);
+    }
+
+    #[test]
+    fn a_newer_request_stops_a_long_calculation_and_its_result_arrives() {
+        use crate::eval::EvalError;
+        use crate::parser::parse;
+        let w = Worker::spawn(|| {});
+        // A long sum, then a quick edit. The sum is cut short (or skipped), and the
+        // answer for the newest revision always arrives.
+        let long = parse("sum_over(sin(k) + cos(k), k, 1, 900000)");
+        w.request(1, vec![(RegionId(1), long)]);
+        w.request(2, vec![(RegionId(1), Expr::define("x", Expr::num(3.0)))]);
+        let end = Instant::now() + Duration::from_secs(10);
+        loop {
+            let r = w.poll_for(2);
+            if let Some(r) = r {
+                assert_eq!(
+                    r.output.values[&RegionId(1)]
+                        .as_ref()
+                        .unwrap()
+                        .as_real()
+                        .unwrap()
+                        .si,
+                    3.0
+                );
+                break;
+            }
+            assert!(Instant::now() < end, "the newest result never arrived");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        // And a cancelled result never reads as a number.
+        let _ = EvalError::Cancelled;
     }
 
     #[test]

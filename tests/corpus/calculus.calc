@@ -1,0 +1,52 @@
+# source: original; sums and products by formula (n(n+1)/2, n!), integrals and derivatives worked by hand
+upper := 3
+outer := 5
+f(t) := t ^ 2 + 1
+total := sum_over(k, k, 1, 100)
+factorial_five := product_over(k, k, 1, 5)
+geometric := sum_over(0.5 ^ k, k, 0, 40)
+area := integrate(x ^ 2, x, 0, 3)
+area_to_upper := integrate(x, x, 0, upper)
+work := integrate(2 N / m * x, x, 0 m, 3 m)
+half_circle := integrate(sqrt(1 - x ^ 2), x, 0 - 1, 1)
+nested := integrate(integrate(x * y, y, 0, 1), x, 0, 2)
+shadowed := integrate(outer, outer, 0, 2)
+through_function := integrate(f(x), x, 0, 3)
+backwards := integrate(x, x, 2, 0)
+slope := derivative(x ^ 3, x, 2)
+slope_of_sine := derivative(sin(x), x, 0)
+speed := derivative(0.5 * 9.80665 m / s ^ 2 * t ^ 2, t, 2 s)
+sinc_limit := limit(sin(x) / x, x, 0)
+removable := limit((x ^ 2 - 1) / (x - 1), x, 1)
+pole := integrate(1 / x, x, 0 - 1, 2)
+bad_variable := integrate(x, 3, 0, 1)
+mixed_bounds := integrate(x, x, 0 m, 1 s)
+empty_range := sum_over(k, k, 5, 1)
+fractional_bound := sum_over(k, k, 1, 2.5)
+corner := derivative(abs(x), x, 0)
+jump := limit(abs(x) / x, x, 0)
+wrong_count := integrate(x, x, 0)
+=> total = 5050
+=> factorial_five = 120
+=> geometric ~1e-12 = 2
+=> area ~1e-9 = 9
+=> area_to_upper ~1e-9 = 4.5
+=> work ~1e-9 = 9 N * m
+=> half_circle ~1e-8 = 3.141592653589793 / 2
+=> nested ~1e-9 = 1
+=> shadowed ~1e-9 = 2
+=> through_function ~1e-9 = 12
+=> backwards ~1e-9 = 0 - 2
+=> slope ~1e-8 = 12
+=> slope_of_sine ~1e-8 = 1
+=> speed ~1e-8 = 19.6133 m / s
+=> sinc_limit ~1e-8 = 1
+=> removable ~1e-8 = 2
+!> pole : invalid
+!> bad_variable : invalid
+!> mixed_bounds : mismatch
+!> empty_range : invalid
+!> fractional_bound : invalid
+!> corner : invalid
+!> jump : invalid
+!> wrong_count : arity

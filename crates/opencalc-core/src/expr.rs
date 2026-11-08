@@ -35,6 +35,21 @@ pub enum AssignKind {
     Evaluate,
 }
 
+/// Functions whose second argument names a variable that exists only inside the
+/// call (`integrate(x ^ 2, x, 0, 1)`). The evaluator treats them specially, and
+/// that variable is not a name the worksheet has to define.
+pub const BINDING_FORMS: &[&str] = &[
+    "sum_over",
+    "product_over",
+    "integrate",
+    "derivative",
+    "limit",
+];
+
+pub fn is_binding_form(name: &str) -> bool {
+    BINDING_FORMS.contains(&name)
+}
+
 /// The name of the variable that sets where indexing starts, as in Mathcad.
 pub const ORIGIN: &str = "ORIGIN";
 
@@ -259,6 +274,26 @@ impl Expr {
             Expr::Binary { lhs, rhs, .. } => {
                 lhs.collect_names(out);
                 rhs.collect_names(out);
+            }
+            Expr::Call { name, args } if is_binding_form(name) => {
+                // The bound variable is local: the body does not read it from the
+                // worksheet, but the other arguments (the bounds) are outside it.
+                let var = match args.get(1) {
+                    Some(Expr::Name(v)) => Some(v),
+                    _ => None,
+                };
+                let mut inner = Vec::new();
+                if let Some(body) = args.first() {
+                    body.collect_names(&mut inner);
+                }
+                for n in inner {
+                    if Some(&n) != var && !out.contains(&n) {
+                        out.push(n);
+                    }
+                }
+                for a in args.iter().skip(2) {
+                    a.collect_names(out);
+                }
             }
             Expr::Call { args, .. } => args.iter().for_each(|a| a.collect_names(out)),
             Expr::Matrix { cells, .. } => cells.iter().for_each(|a| a.collect_names(out)),

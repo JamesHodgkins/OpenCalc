@@ -49,9 +49,11 @@ Extends `functions.rs`, `functions/stats.rs`, `units.rs`. No format change unles
 Depends on Phase 1 (inverse, boolean values). Builds the cancellation token that TD-20 is waiting for.
 
 **2.1 Numeric calculus**
-- [ ] Cancellation (`AtomicBool`) and an iteration/time budget in the evaluator (TD-20). **Do first.**
-- [ ] Definite integral, derivative, limit, summation and product operators (parser, typesetting, evaluator).
-- [ ] Units through integrals and derivatives (dimension of the result follows the operator).
+- [x] Cancellation and a step budget in the evaluator (TD-20), done 2026-11-08: every repeated evaluation is charged to a per-region `Meter` (1,000,000 steps, deterministic, shared by nested forms); the worker raises a cancel flag when a newer edit arrives, giving the new `EvalError::Cancelled`.
+- [x] Evaluator forms (2026-11-08): `integrate(f, x, a, b)` (adaptive Gauss-Kronrod 7/15, relative accuracy 1e-10, at most 400 pieces), `derivative(f, x, at)` (Ridders extrapolation, with a corner check), `limit(f, x, to)` (two-sided Richardson extrapolation, never evaluating f at the point), `sum_over(f, k, a, b)` and `product_over(f, k, a, b)` (whole-number bounds; an empty range is an error). The second argument is a variable local to the form, shadowing outer names, units and variables, and it is not a dependency of the worksheet. A form that cannot reach its tolerance (pole, jump, corner, oscillation) is an error, never a number.
+- [ ] Typeset notation for them (integral sign, d/dx, big sigma and pi, lim) and the parser/editor syntax for it: waits for the structured editor; today they are written as function calls.
+- [ ] Higher-order derivatives, limits at infinity, one-sided limits, improper integrals (infinite bounds).
+- [x] Units through integrals and derivatives: the result's dimension is the integrand's times the variable's (integral) or divided by it (derivative); the two bounds must share a dimension (write `0 m`, not `0`).
 
 **2.2 Solvers**
 - [ ] `root(f, x, a, b)` and `polyroots`.
@@ -128,6 +130,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 2.1: step budget and cancellation; `integrate`, `derivative`, `limit`, `sum_over`, `product_over`; corpus `calculus.calc`, integration tests `tests/calculus.rs`. |
 | 2026-11-08 | Phase 1.1: compound units shown by name or as numerator over denominator in the chosen unit system; corpus `compound_units.calc`. |
 | 2026-11-08 | Phase 1.1: angle units `rad` and `deg`, corpus `angles.calc`. |
 | 2026-11-08 | Phase 1.1: temperature units (`degC`, `degF`, `deltaC`, `deltaF`, `degR`), corpus `temperatures.calc`. |

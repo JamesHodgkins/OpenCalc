@@ -40,4 +40,8 @@ beside them (`crates/opencalc-ui/assets/fonts/`):
 2026-11-06: SPEC 4.11 decided on option 1. `opencalc-ui` is written from SPEC
 section 4 and does not copy `od-ui`. OpenDraft is consulted for design only.
 Algorithms (Tarjan SCC, Pratt parsing) are standard textbook techniques written
-from scratch.
+from scratch. The same holds for the Phase 2.1 numerical methods, written from
+their published descriptions: adaptive Gauss-Kronrod quadrature (the G7/K15
+nodes and weights are the standard published constants), Ridders' extrapolated
+central differences, and Richardson extrapolation. No code from QUADPACK,
+Numerical Recipes or any other library was copied.

@@ -6,8 +6,11 @@
 //! output order is already producers first, which is the evaluation order.
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 
+mod calculus;
 mod graph;
+mod meter;
 mod node;
 mod plot;
 mod undefined;
@@ -15,6 +18,7 @@ mod undefined;
 pub use plot::{PlotData, PlotSeries};
 
 use graph::tarjan;
+use meter::Meter;
 use node::{eval_region, Located};
 
 use crate::document::PlotInput;
@@ -51,6 +55,10 @@ pub enum EvalError {
     /// returned as a number: a silent NaN or infinity is a wrong answer.
     #[error("result is not a finite number")]
     NotFinite,
+    /// The calculation was stopped because a newer edit made it stale. The result
+    /// is never shown: it is replaced by the newer calculation's.
+    #[error("calculation cancelled")]
+    Cancelled,
     /// A bug in the evaluator was caught. The worker survives and reports this.
     #[error("internal error: {0}")]
     Internal(String),
@@ -93,6 +101,8 @@ struct Cx<'a> {
     /// shadow everything else.
     locals: Vec<(String, Value)>,
     depth: usize,
+    /// Counts repeated evaluations and watches for cancellation.
+    meter: &'a Meter<'a>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -146,6 +156,17 @@ pub fn evaluate_all(
     regions: &[(RegionId, Expr)],
     plots: &[(RegionId, PlotInput)],
     units: &UnitRegistry,
+) -> Output {
+    evaluate_cancellable(regions, plots, units, None)
+}
+
+/// [`evaluate_all`], stopping repeated evaluations (sums, integrals, ...) with
+/// [`EvalError::Cancelled`] once `cancel` is raised.
+pub fn evaluate_cancellable(
+    regions: &[(RegionId, Expr)],
+    plots: &[(RegionId, PlotInput)],
+    units: &UnitRegistry,
+    cancel: Option<&AtomicBool>,
 ) -> Output {
     let mut out = Output::default();
 
@@ -250,12 +271,15 @@ pub fn evaluate_all(
             let result = if cyclic {
                 Err(Located::here(EvalError::Cycle))
             } else {
+                // Each region has its own budget of repeated evaluations.
+                let meter = Meter::new(cancel);
                 let cx = Cx {
                     env: &env,
                     fns: &fns,
                     units,
                     locals: Vec::new(),
                     depth: 0,
+                    meter: &meter,
                 };
                 eval_region(expr, &cx)
             };
@@ -280,14 +304,16 @@ pub fn evaluate_all(
         }
     }
     // Plots define nothing, so they are evaluated last, against the final names.
-    let cx = Cx {
-        env: &env,
-        fns: &fns,
-        units,
-        locals: Vec::new(),
-        depth: 0,
-    };
     for (id, input) in plots {
+        let meter = Meter::new(cancel);
+        let cx = Cx {
+            env: &env,
+            fns: &fns,
+            units,
+            locals: Vec::new(),
+            depth: 0,
+            meter: &meter,
+        };
         out.plots.insert(*id, plot::evaluate_plot(input, &cx));
     }
     out
