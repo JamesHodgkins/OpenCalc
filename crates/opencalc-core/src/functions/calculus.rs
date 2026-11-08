@@ -84,4 +84,25 @@ pub(super) const CALCULUS: &[FunctionDef] = &[
         AtLeast(2),
         evaluated_elsewhere
     ),
+    function!(
+        "odesolve",
+        "odesolve(f, t, y, t0, y0, t1) or ..., n)",
+        "Solve dy/dt = f(t, y) from t0 to t1, with t and y the names f uses; the state is a number or a column vector (elements may differ in units). Gives the state at t1, or with n a table of n + 1 rows [t, y...]",
+        AtLeast(6),
+        evaluated_elsewhere
+    ),
+    function!(
+        "col",
+        "col(M, j)",
+        "Column j of a matrix, counting from ORIGIN, as a column vector",
+        Exactly(2),
+        evaluated_elsewhere
+    ),
+    function!(
+        "row",
+        "row(M, i)",
+        "Row i of a matrix, counting from ORIGIN, as a row vector",
+        Exactly(2),
+        evaluated_elsewhere
+    ),
 ];

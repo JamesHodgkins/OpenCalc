@@ -20,6 +20,18 @@ pub const BINDING_FORMS: &[&str] = &[
     "maximize",
 ];
 
+/// Every call the evaluator handles itself rather than through the function table:
+/// the binding forms, the solvers, `odesolve` (two bound names) and `col` / `row`
+/// (which count from `ORIGIN`).
+pub fn is_evaluator_form(name: &str) -> bool {
+    is_binding_form(name) || matches!(name, "odesolve" | "col" | "row")
+}
+
+/// Forms whose result depends on `ORIGIN`, so a region using one reads it.
+pub fn is_origin_form(name: &str) -> bool {
+    matches!(name, "col" | "row")
+}
+
 /// The solver forms: unknowns named in the call, constraints as comparisons.
 pub const SOLVER_FORMS: &[&str] = &["find", "minerr", "minimize", "maximize"];
 

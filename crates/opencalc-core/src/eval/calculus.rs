@@ -11,13 +11,14 @@
 //! kink, noise) the form is an error, never a number it does not trust. Every
 //! repeated evaluation is charged to the region's [`Meter`](super::meter::Meter).
 
-use super::node::{eval, Evaluated, Located};
+use super::node::{eval, origin, Evaluated, Located};
 use super::{Cx, EvalError};
 use crate::expr::Expr;
 use crate::numeric::{self, Complex64};
 use crate::units::{Dimension, UnitError};
-use crate::value::{Scalar, Value};
+use crate::value::{Matrix, Scalar, Value};
 
+mod ode;
 mod quadrature;
 mod ridders;
 mod roots;
@@ -34,6 +35,8 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
         "derivative" => derivative(args, cx),
         "limit" => limit(args, cx),
         "root" => root(args, cx),
+        "odesolve" => ode::odesolve(args, cx),
+        "col" | "row" => select(name, args, cx),
         "find" | "minerr" | "minimize" | "maximize" => solve::evaluate(name, args, cx),
         _ => Err(Located::here(EvalError::UnknownFunction(name.to_owned()))),
     }
@@ -177,6 +180,49 @@ impl<'c, 'a> Sampler<'c, 'a> {
     fn f_dim(&self) -> Dimension {
         self.f_dim.unwrap_or(Dimension::NONE)
     }
+}
+
+/// `col(M, j)` and `row(M, i)`: a column or a row of a matrix, counting from `ORIGIN`
+/// as indexing does. The elements keep their own units.
+fn select(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
+    if args.len() != 2 {
+        return Err(Located::here(EvalError::Arity(name.to_owned(), 2)));
+    }
+    let Value::Matrix(m) = eval(&args[0], cx).map_err(|l| l.under(0))? else {
+        return Err(invalid(format!("{name} needs a matrix")).under(0));
+    };
+    let (n, dim) = real_arg(args, 1, cx)?;
+    if dim != Dimension::NONE || n.fract() != 0.0 || n.abs() > 1e9 {
+        return Err(invalid(format!("the {name} number must be a whole number")).under(1));
+    }
+    let at = n as i64 - origin(cx)?;
+    let (count, along) = if name == "col" {
+        (m.cols(), m.rows())
+    } else {
+        (m.rows(), m.cols())
+    };
+    let Ok(at) = usize::try_from(at) else {
+        return Err(invalid(format!("{name} {n} is outside the matrix")).under(1));
+    };
+    if at >= count {
+        return Err(invalid(format!("{name} {n} is outside the matrix")).under(1));
+    }
+    let items = (0..along)
+        .map(|k| {
+            if name == "col" {
+                m.element(&[k, at])
+            } else {
+                m.element(&[at, k])
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Located::here)?;
+    let picked = if name == "col" {
+        Matrix::column(&items)
+    } else {
+        Matrix::from_scalars(1, items.len(), &items)
+    };
+    Ok(Value::Matrix(picked.map_err(Located::here)?))
 }
 
 /// `root(f, x, guess)` or `root(f, x, a, b)`: a real root of f.

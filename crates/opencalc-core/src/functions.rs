@@ -42,11 +42,14 @@ macro_rules! function {
 use Arity::{AtLeast, Exactly};
 
 mod calculus;
+mod categories;
 mod discrete;
 mod elementary;
 mod linalg;
 mod lists;
 mod polynomial;
+
+pub use categories::category;
 
 pub const FUNCTIONS: &[FunctionDef] = &[
     function!(
@@ -223,29 +226,6 @@ pub const FUNCTIONS: &[FunctionDef] = &[
         Ok(Value::dimensionless(matrix_arg("cols", a)?.cols() as f64))
     }),
 ];
-
-/// The group a function is listed under (the Functions window and its search).
-pub fn category(name: &str) -> &'static str {
-    match name {
-        "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "atan2" | "sinh" | "cosh" | "tanh"
-        | "asinh" | "acosh" | "atanh" => "Trigonometry",
-        "ln" | "exp" | "sqrt" | "log" => "Powers and logarithms",
-        "floor" | "ceil" | "trunc" | "round" | "sign" | "mod" | "gcd" | "lcm" => {
-            "Rounding and integers"
-        }
-        "abs" | "re" | "im" | "conj" | "arg" => "Complex numbers",
-        "vec" | "mat" | "transpose" | "det" | "norm" | "dot" | "rows" | "cols" | "identity"
-        | "tr" | "rank" | "cross" | "augment" | "stack" => "Vectors and matrices",
-        "sum" | "mean" | "stdev" | "stdev_sample" | "min" | "max" | "length" | "median"
-        | "mode" | "var" | "var_sample" | "sort" | "reverse" | "cumsum" | "cvar" | "corr" => {
-            "Statistics"
-        }
-        "factorial" | "combin" | "permut" | "isprime" => "Number theory",
-        "sum_over" | "product_over" | "integrate" | "derivative" | "limit" => "Calculus",
-        "root" | "polyroots" | "find" | "minerr" | "minimize" | "maximize" => "Solving",
-        _ => "Other",
-    }
-}
 
 /// Every built-in function: the core table, then the tables of each module.
 pub fn all() -> impl Iterator<Item = &'static FunctionDef> + Clone {

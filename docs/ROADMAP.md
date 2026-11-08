@@ -61,7 +61,8 @@ Depends on Phase 1 (inverse, boolean values). Builds the cancellation token that
 - [ ] Solve blocks, Stage 2: the `Given`/`Find` block as a new region kind (format version 2) that lowers to the Stage 1 call; named-variable assignment of a result (each variable keeps its own unit). Audit done: `RegionKind` appears in 24 production files.
 - [x] `minimize` / `maximize`: done in Stage 1 above. A choice of algorithm is not planned.
 
-- [ ] `odesolve` (fixed then adaptive step).
+- [x] `odesolve` (2026-11-08): `odesolve(f, t, y, t0, y0, t1)` solves dy/dt = f(t, y) and gives the state at `t1`; `odesolve(..., n)` gives a table of n + 1 rows `[t, y1, y2, ...]` with a unit per column. `t` and `y` are the names f uses; they are local to the call. The state is a number or a column vector whose elements may have different units (`vec(100 m, 0 m/s)`); f must return the same shape with the units of y per unit of t (checked at every evaluation). Adaptive Dormand-Prince 5(4) Runge-Kutta, relative tolerance 1e-9 with an absolute part scaled to the problem, reaching `t1` exactly, forward or backward in time. At most 100,000 steps, every evaluation metered and cancellable; a stiff or exploding equation is an error that says so. A stage where f cannot be evaluated only shortens the step. Not done: stiff solvers (Radau/BDF), events, the solution as a function of time, `pdesolve`, complex states.
+- [x] `col(M, j)` and `row(M, i)` (2026-11-08): a column or row of a matrix, counting from `ORIGIN` like indexing, keeping each element's unit. They are evaluator forms because plain functions cannot see `ORIGIN`; the same mechanism will serve `submatrix`.
 - [ ] Non-convergence diagnostics and error badges; MultiStart.
 - [ ] Linear-algebra extras: eigenvalues/eigenvectors, LU/QR/Cholesky/SVD.
 
@@ -132,6 +133,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 2.2: `odesolve` (adaptive RK45, mixed-unit states, table output), `col` / `row`; corpus `odes.calc`, `tests/ode.rs`. |
 | 2026-11-08 | Phase 1.1: per-element dimensions in matrices (TD-28 resolved); solver unknowns may now differ in dimension; corpus `mixed_units.calc`. |
 | 2026-11-08 | Phase 2.2: solve blocks Stage 1: `find`, `minerr`, `minimize`, `maximize`; corpus `solve.calc`, `tests/solve.rs`; `EvalError::OutOfBudget`. |
 | 2026-11-08 | Phase 2.2: solve-block audit and design (`SOLVE_BLOCKS.md`), no code. |

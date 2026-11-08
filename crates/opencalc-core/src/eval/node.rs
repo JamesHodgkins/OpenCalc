@@ -190,7 +190,7 @@ fn range(start: &Expr, step: Option<&Expr>, end: &Expr, cx: &Cx) -> Evaluated {
 }
 
 /// Where indexing starts: the worksheet's `ORIGIN` variable, 0 if it has none.
-fn origin(cx: &Cx) -> Result<i64, Located> {
+pub(super) fn origin(cx: &Cx) -> Result<i64, Located> {
     match cx.env.get(ORIGIN) {
         None => Ok(0),
         Some(Err(e)) => Err(Located::here(e.clone())),
@@ -309,7 +309,7 @@ fn apply(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
         // The parser makes a Conditional from exactly three arguments.
         return Err(Located::here(EvalError::Arity("if".into(), 3)));
     }
-    if crate::expr::is_binding_form(name) {
+    if crate::expr::is_evaluator_form(name) {
         return super::calculus::evaluate(name, args, cx);
     }
     if functions::lookup(name).is_none() {

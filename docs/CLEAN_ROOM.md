@@ -46,6 +46,8 @@ their published descriptions: adaptive Gauss-Kronrod quadrature (the G7/K15
 nodes and weights are the standard published constants), Ridders' extrapolated
 central differences, Richardson extrapolation, Brent's root-finding method,
 Aberth-Ehrlich simultaneous root iteration, Levenberg-Marquardt least squares,
-BFGS quasi-Newton minimisation with a backtracking line search, and the
-augmented-Lagrangian method for constraints. No code from QUADPACK,
+BFGS quasi-Newton minimisation with a backtracking line search, the
+augmented-Lagrangian method for constraints, and the Dormand-Prince 5(4)
+embedded Runge-Kutta pair (its coefficients are the standard published ones,
+checked by tests that they sum as the method requires). No code from QUADPACK,
 Numerical Recipes or any other library was copied.
