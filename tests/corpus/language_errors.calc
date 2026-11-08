@@ -6,7 +6,6 @@ matrix_needs_two := [1, 2; 3, 4][0]
 fraction_index := [1, 2][0.5]
 unit_index := [1, 2][1 m]
 ragged := [1, 2; 3]
-unit_mix := [1 m, 2 s]
 cell_matrix := [[1, 2], 3]
 cond_unit := if(1 m, 1, 2)
 cond_arity := if(1, 2)
@@ -20,7 +19,6 @@ cmp_matrix := [1, 2] == [1, 2]
 !> fraction_index : invalid
 !> unit_index : invalid
 !> #7 : invalid
-!> unit_mix : mismatch
 !> cell_matrix : value
 !> cond_unit : invalid
 !> cond_arity : arity

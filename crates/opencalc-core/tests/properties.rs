@@ -325,7 +325,7 @@ proptest! {
             let regions = vec![(RegionId(1), parse(&src))];
             match &evaluate(&regions).values[&RegionId(1)] {
                 Ok(q) => {
-                    prop_assert_eq!(i32::from(q.dim().length), want, "{}", src);
+                    prop_assert_eq!(i32::from(q.uniform_dim().unwrap().length), want, "{}", src);
                 }
                 Err(EvalError::Unit(UnitError::DimensionOverflow)) => {
                     prop_assert!(want.abs() > 127, "{} reported overflow for a representable exponent {}", src, want);
@@ -669,16 +669,21 @@ proptest! {
         prop_assert_eq!(out.values[&RegionId(2)].is_ok(), (r1, c1) == (r2, c2));
     }
 
-    /// A matrix keeps one dimension: scaling by a quantity multiplies it in, and
-    /// elements of different dimensions are rejected.
+    /// Every element keeps its own dimension: scaling by a quantity multiplies it
+    /// into each, a vector may mix dimensions, and adding vectors whose elements
+    /// differ in dimension is rejected.
     #[test]
     fn matrix_dimensions_follow_the_elements(n in 1usize..5, x in small()) {
         let items = vec![format!("{x} m"); n].join(", ");
         let v = value_of(&format!("vec({items}) * 2 kg"));
-        prop_assert_eq!(v.dim().length, 1);
-        prop_assert_eq!(v.dim().mass, 1);
-        let mixed = vec![(RegionId(1), parse("vec(1 m, 2 s)"))];
-        prop_assert!(evaluate(&mixed).values[&RegionId(1)].is_err());
+        prop_assert_eq!(v.uniform_dim().unwrap().length, 1);
+        prop_assert_eq!(v.uniform_dim().unwrap().mass, 1);
+        let mixed = value_of("vec(1 m, 2 s) * 3 kg");
+        let dims = mixed.dims();
+        prop_assert_eq!((dims[0].length, dims[0].mass, dims[0].time), (1, 1, 0));
+        prop_assert_eq!((dims[1].length, dims[1].mass, dims[1].time), (0, 1, 1));
+        let swapped = vec![(RegionId(1), parse("vec(1 m, 2 s) + vec(1 s, 2 m)"))];
+        prop_assert!(evaluate(&swapped).values[&RegionId(1)].is_err());
     }
 }
 

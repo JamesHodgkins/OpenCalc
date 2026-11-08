@@ -32,7 +32,7 @@ pub(super) const LINALG: &[FunctionDef] = &[
         "rank(A)",
         "Number of independent rows (relative tolerance: largest element x size x machine epsilon)",
         Exactly(1),
-        |a| Ok(Value::dimensionless(one("rank", a)?.rank() as f64))
+        |a| Ok(Value::dimensionless(one("rank", a)?.rank()? as f64))
     ),
     function!(
         "cross",

@@ -82,12 +82,24 @@ impl Value {
         }
     }
 
-    pub fn dim(&self) -> Dimension {
+    /// The dimension every element has, or `None` for a matrix whose elements
+    /// differ (a vector of a length and a time, say).
+    pub fn uniform_dim(&self) -> Option<Dimension> {
         match self {
-            Value::Scalar(s) => s.dim,
-            Value::Matrix(m) => m.dim,
-            Value::Series(r) => r.dim,
-            Value::Function { .. } => Dimension::NONE,
+            Value::Scalar(s) => Some(s.dim),
+            Value::Matrix(m) => m.uniform_dim(),
+            Value::Series(r) => Some(r.dim),
+            Value::Function { .. } => Some(Dimension::NONE),
+        }
+    }
+
+    /// The dimension of each element, in order.
+    pub fn dims(&self) -> Vec<Dimension> {
+        match self {
+            Value::Scalar(s) => vec![s.dim],
+            Value::Matrix(m) => (0..m.elements().len()).map(|i| m.dim_of(i)).collect(),
+            Value::Series(r) => vec![r.dim; r.len()],
+            Value::Function { .. } => Vec::new(),
         }
     }
 

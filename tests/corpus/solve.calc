@@ -6,6 +6,8 @@ b := 0 - 1
 side := 1 m
 other := 1 m
 slope := 0
+reaction := 1 N
+moment := 1 N * m
 intercept := 0
 u := 0
 v := 0
@@ -24,7 +26,8 @@ at_a_wall := minimize((u - 3) ^ 2, u, u <= 1)
 infeasible := find(a, a ^ 2 == 0 - 1)
 no_guess := find(never_defined, never_defined == 1)
 not_a_constraint := find(a, a + 1)
-mixed_kinds := find(side, a, side == 1 m, a == 2)
+mixed_unknowns := find(side, a, side == 3 m, a == 2)
+reactions := find(reaction, moment, reaction == 10 N, moment == 2 m * reaction)
 unit_mismatch := find(a, a == 1 m)
 no_constraints := find(a)
 listed_twice := find(a, a, a == 1)
@@ -34,6 +37,8 @@ listed_twice := find(a, a, a == 1)
 => negative_root ~1e-8 = 0 - 2
 => square_side ~1e-8 = 2 m
 => two_lengths ~1e-8 = vec(6 m, 4 m)
+=> mixed_unknowns ~1e-8 = vec(3 m, 2)
+=> reactions ~1e-8 = vec(10 N, 20 N * m)
 => fitted_line ~1e-6 = vec(1.5, 7 / 6)
 => bowl ~1e-5 = vec(3, 0 - 1)
 => hill ~1e-5 = 1
@@ -43,7 +48,6 @@ listed_twice := find(a, a, a == 1)
 !> infeasible : invalid
 !> no_guess : invalid
 !> not_a_constraint : invalid
-!> mixed_kinds : invalid
 !> unit_mismatch : mismatch
 !> no_constraints : invalid
 !> listed_twice : invalid

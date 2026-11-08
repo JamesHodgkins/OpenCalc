@@ -210,11 +210,11 @@ fn close(got: f64, want: f64, tol: f64) -> bool {
 /// Why `got` is not `want` within the relative tolerance, if it is not. Compares
 /// dimensions and, element by element, the real and imaginary parts in SI.
 fn differs(got: &Value, want: &Value, tol: f64) -> Option<String> {
-    if got.dim() != want.dim() {
+    if got.dims() != want.dims() {
         return Some(format!(
             "has dimension {:?}, expected {:?}",
-            got.dim(),
-            want.dim()
+            got.dims(),
+            want.dims()
         ));
     }
     let parts = |v: &Value| -> Vec<f64> {

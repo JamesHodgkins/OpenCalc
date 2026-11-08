@@ -39,7 +39,7 @@ material, **[decision]** a choice for this repository.
   exist (`integrate`, `root`, ... in `eval/calculus.rs`, `eval/meter.rs`). Bound names
   are excluded from a region's dependencies (`expr.rs`, `BINDING_FORMS`).
 - Matrices, complex numbers, units and a deterministic dependency-graph evaluator exist.
-- Missing: any solver for several unknowns; per-element dimensions in vectors (TD-28);
+- Missing at the time of writing: any solver for several unknowns; per-element dimensions in vectors (TD-28, since built);
   a region kind that holds several lines.
 
 ## 3. Recommendation: two stages
@@ -109,7 +109,7 @@ All arithmetic is on SI values; dimensions are checked, not scaled.
 | Tolerances | Constraints met to `1e-9` relative to their terms' size (plus a tiny absolute floor) **[decision]**; stricter than Mathcad's historic 0.001, and fixed (no user setting) like Prime 8.0 **[PTC, version 8.0]**. |
 | Limits | At most 200 iterations; every residual evaluation is charged to the region's step budget (shared with nested forms) and observes cancellation. Up to 16 unknowns and 64 constraints. |
 | Complex unknowns | Not in the baseline. A complex guess is an error. **[decision]** |
-| Units | Each unknown keeps its guess's dimension. **All unknowns of one call must share a dimension** until per-element dimensions exist (TD-28), else a clear error. |
+| Units | Each unknown keeps its guess's dimension; unknowns of different dimensions may be solved together (the result is a vector with a dimension per element). |
 
 ### 5.3 Errors
 
@@ -200,3 +200,7 @@ Differences from, and additions to, the proposal:
   that long does not parse.
 - **Optimising forms** return the unknowns only (not the objective's value); a function
   unbounded below is the error "did not converge".
+- **Mixed-dimension unknowns work.** Decision 3 was settled as "accept the restriction for
+  now", but per-element matrix dimensions (TD-28) were then built, so the restriction was
+  lifted: each unknown keeps its guess's dimension and the result vector carries one
+  dimension per element (`find(reaction, moment, ...)` gives a force and a moment).

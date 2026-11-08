@@ -33,7 +33,9 @@ impl PlotData {
 fn numbers(value: &Value) -> Result<(Vec<f64>, Dimension), EvalError> {
     let (items, dim) = match value {
         Value::Series(r) => (r.elements().to_vec(), r.dim),
-        Value::Matrix(m) if m.cols() == 1 || m.rows() == 1 => (m.elements().to_vec(), m.dim),
+        Value::Matrix(m) if m.cols() == 1 || m.rows() == 1 => {
+            (m.elements().to_vec(), m.common_dim()?)
+        }
         _ => {
             return Err(ValueError::Shape(
                 "a plot needs a list or vector of values, like a range".into(),

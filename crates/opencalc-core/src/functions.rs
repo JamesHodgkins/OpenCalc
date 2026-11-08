@@ -202,7 +202,7 @@ pub const FUNCTIONS: &[FunctionDef] = &[
         "norm(A)",
         "Euclidean norm of all elements",
         Exactly(1),
-        |a| { Ok(Value::Scalar(matrix_arg("norm", a)?.norm())) }
+        |a| { Ok(Value::Scalar(matrix_arg("norm", a)?.norm()?)) }
     ),
     function!(
         "dot",

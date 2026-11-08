@@ -4,7 +4,8 @@
 //! worksheet values of the same names, read outside the call. Inside the
 //! constraints and the objective the names are bound to the current trial point,
 //! as for `integrate`. Everything is calculated on SI values; the constraints'
-//! dimensions are checked, never scaled.
+//! dimensions are checked, never scaled. Each unknown keeps the dimension of its own
+//! guess, so a call may solve for a force and a moment together.
 //!
 //! * `find` and `minerr` run Levenberg-Marquardt on the equations and on the
 //!   violations of the inequalities. `find` then checks every constraint and
@@ -112,7 +113,8 @@ fn constraint(arg: usize, e: &Expr) -> Result<Constraint<'_>, Located> {
 struct Problem<'e, 'a> {
     inner: Cx<'a>,
     base: usize,
-    dim: Dimension,
+    /// The dimension of each unknown, from its guess.
+    dims: Vec<Dimension>,
     objective: Option<&'e Expr>,
     constraints: Vec<Constraint<'e>>,
 }
@@ -121,7 +123,7 @@ impl Problem<'_, '_> {
     fn set(&mut self, x: &[f64]) {
         for (i, v) in x.iter().enumerate() {
             self.inner.locals[self.base + i].1 =
-                Value::Scalar(Scalar::new(numeric::real(*v), self.dim));
+                Value::Scalar(Scalar::new(numeric::real(*v), self.dims[i]));
         }
     }
 
@@ -182,7 +184,7 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
     {
         return Err(invalid(format!("'{dup}' is listed twice")));
     }
-    let (x0, dim) = guesses(&parts.unknowns, cx)?;
+    let (x0, dims) = guesses(&parts.unknowns, cx)?;
     let constraints = parts
         .constraints
         .iter()
@@ -205,7 +207,7 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
             meter: cx.meter,
         },
         base,
-        dim,
+        dims: dims.clone(),
         objective: parts.objective,
         constraints,
     };
@@ -215,13 +217,13 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
         "minimize" => optimise(&mut problem, &x0, false)?,
         _ => optimise(&mut problem, &x0, true)?,
     };
-    answer(&x, dim)
+    answer(&x, &dims)
 }
 
 /// The starting values: the worksheet values of the unknowns' names.
-fn guesses(unknowns: &[(usize, &str)], cx: &Cx) -> Result<(Vec<f64>, Dimension), Located> {
+fn guesses(unknowns: &[(usize, &str)], cx: &Cx) -> Result<(Vec<f64>, Vec<Dimension>), Located> {
     let mut x0 = Vec::with_capacity(unknowns.len());
-    let mut dim: Option<Dimension> = None;
+    let mut dims = Vec::with_capacity(unknowns.len());
     for (arg, n) in unknowns {
         let v = eval(&Expr::Name((*n).to_owned()), cx).map_err(|l| match l.error {
             EvalError::Undefined(_) => {
@@ -237,30 +239,20 @@ fn guesses(unknowns: &[(usize, &str)], cx: &Cx) -> Result<(Vec<f64>, Dimension),
         if !numeric::is_real(s.z) {
             return Err(invalid("complex unknowns are not supported yet").under(*arg));
         }
-        match dim {
-            None => dim = Some(s.dim),
-            Some(d) if d != s.dim => {
-                return Err(invalid(format!(
-                    "the unknowns are different kinds of quantity ({d} and {}); until vectors can \
-                     mix units, solve for them in separate calls",
-                    s.dim
-                ))
-                .under(*arg));
-            }
-            Some(_) => {}
-        }
         x0.push(s.z.re);
+        dims.push(s.dim);
     }
-    Ok((x0, dim.unwrap_or(Dimension::NONE)))
+    Ok((x0, dims))
 }
 
-fn answer(x: &[f64], dim: Dimension) -> Evaluated {
-    if let [one] = x {
-        return Ok(Value::Scalar(Scalar::new(numeric::real(*one), dim)));
+fn answer(x: &[f64], dims: &[Dimension]) -> Evaluated {
+    if let ([one], [dim]) = (x, dims) {
+        return Ok(Value::Scalar(Scalar::new(numeric::real(*one), *dim)));
     }
     let items: Vec<Scalar> = x
         .iter()
-        .map(|v| Scalar::new(numeric::real(*v), dim))
+        .zip(dims)
+        .map(|(v, dim)| Scalar::new(numeric::real(*v), *dim))
         .collect();
     Ok(Value::Matrix(
         Matrix::column(&items).map_err(Located::here)?,

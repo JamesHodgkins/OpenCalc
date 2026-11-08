@@ -6,7 +6,7 @@ use opencalc_core::document::ResultFormat;
 use opencalc_core::numeric::Complex64;
 use opencalc_core::registry::UnitSystem;
 use opencalc_core::units::{builtin_unit, Dimension, Quantity};
-use opencalc_core::value::Value;
+use opencalc_core::value::{Scalar, Value};
 
 /// Units offered for automatic display in each unit system, smallest first
 /// within a dimension. Conversion is for display only; values stay in SI.
@@ -237,12 +237,33 @@ pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) ->
                 }
             }
         },
+        // Elements with different units each carry their own: `2x1 [3 m; 4 s]`.
+        Value::Matrix(m) if m.uniform_dim().is_none() => {
+            let mut rows = Vec::new();
+            let mut shown = 0;
+            'rows: for r in 0..m.rows() {
+                let mut row = Vec::new();
+                for c in 0..m.cols() {
+                    if shown == SHOWN {
+                        row.push("\u{2026}".to_owned());
+                        rows.push(row.join(", "));
+                        break 'rows;
+                    }
+                    let element = Scalar::new(m.at(r, c), m.dim_at(r, c));
+                    row.push(format_value_with(&Value::Scalar(element), system, format));
+                    shown += 1;
+                }
+                rows.push(row.join(", "));
+            }
+            format!("{}\u{00d7}{} [{}]", m.rows(), m.cols(), rows.join("; "))
+        }
         Value::Matrix(m) => {
             let peak = m
                 .elements()
                 .iter()
                 .fold(0.0_f64, |p, z| p.max(z.re.abs()).max(z.im.abs()));
-            let (label, scale) = unit_in(system, m.dim, peak, format);
+            let dim = m.uniform_dim().unwrap_or(Dimension::NONE);
+            let (label, scale) = unit_in(system, dim, peak, format);
             let mut rows = Vec::new();
             let mut shown = 0;
             'rows: for r in 0..m.rows() {
@@ -567,6 +588,16 @@ mod tests {
             format_quantity(Quantity::dimensionless(1.5), UnitSystem::Si),
             "1.5"
         );
+    }
+
+    #[test]
+    fn a_vector_of_mixed_units_shows_each_element_with_its_own_unit() {
+        assert_eq!(shown("vec(2 m, 3 s)"), "2\u{d7}1 [2 m; 3 s]");
+        assert_eq!(shown("vec(5 N, 7 N * m)"), "2\u{d7}1 [5 N; 7 J]");
+        // Each element picks its own display unit: 1500 N is 1.5 kN, 3 m stays 3 m.
+        assert_eq!(shown("vec(1500 N, 3 m)"), "2\u{d7}1 [1.5 kN; 3 m]");
+        // The same unit throughout keeps the single trailing unit as before.
+        assert_eq!(shown("vec(2 m, 3 m)"), "2\u{d7}1 [2; 3] m");
     }
 
     #[test]

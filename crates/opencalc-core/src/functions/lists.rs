@@ -195,8 +195,8 @@ fn covariance(name: &str, args: &[Value], correlation: bool) -> Result<Value> {
 /// A one-number function applied to every element of a matrix.
 pub(super) fn over_matrix(f: &FunctionDef, m: &Matrix) -> Result<Value> {
     let mut out = Vec::with_capacity(m.elements().len());
-    for z in m.elements() {
-        match (f.run)(&[Value::Scalar(Scalar::new(*z, m.dim))])? {
+    for element in m.scalars() {
+        match (f.run)(&[Value::Scalar(element)])? {
             Value::Scalar(s) => out.push(s),
             _ => return Err(EvalError::Internal(format!("'{}' left a number", f.name))),
         }
@@ -358,7 +358,7 @@ mod tests {
         let Value::Matrix(side) = call("sqrt", &[area]).unwrap() else {
             panic!()
         };
-        assert_eq!(side.dim, Dimension::LENGTH);
+        assert_eq!(side.uniform_dim(), Some(Dimension::LENGTH));
         assert!(call("sin", &[m]).is_ok());
     }
 }

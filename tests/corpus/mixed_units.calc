@@ -1,0 +1,37 @@
+# source: original; vectors whose elements have different units, worked by hand (a state of position and speed; a force and a moment; a torque r x F)
+state := vec(2 m, 3 m / s)
+later := vec(2 m, 3 m / s) + vec(1 m, 1 m / s)
+scaled_state := 2 * vec(2 m, 3 m / s)
+position := state[0]
+speed := state[1]
+force_and_moment := vec(5 N, 7 N * m)
+joined := stack(vec(1 m), vec(2 s))
+sideways := transpose(vec(1 m, 2 s))
+lever := vec(2 m, 0 m, 0 m)
+push := vec(0 N, 3 N, 0 N)
+torque := cross(lever, push)
+jacobian_row := mat(1, 2, 1 m, 1 s)
+rate := mat(2, 1, 4 / s, 5 / m)
+dotted := dot(vec(2 m, 3 s), vec(4 / m, 5 / s))
+sorted_mix := sort(vec(2 m, 3 s))
+invert_mix := mat(2, 2, 1 m, 2 s, 3 m, 4 s) ^ 2
+determinant_mix := det(mat(2, 2, 1 m, 2 s, 3 m, 4 s))
+sum_mismatch := vec(1 m, 2 s) + vec(1 s, 2 m)
+mean_mix := mean(vec(1 m, 2 s))
+norm_mix := norm(vec(1 m, 2 s))
+=> state = vec(2 m, 3 m / s)
+=> later = vec(3 m, 4 m / s)
+=> scaled_state = vec(4 m, 6 m / s)
+=> position = 2 m
+=> speed = 3 m / s
+=> force_and_moment = vec(5 N, 7 N * m)
+=> joined = vec(1 m, 2 s)
+=> sideways = mat(1, 2, 1 m, 2 s)
+=> torque = vec(0 N * m, 0 N * m, 6 N * m)
+=> dotted = 23
+!> sum_mismatch : mismatch
+!> mean_mix : mismatch
+!> norm_mix : mismatch
+!> invert_mix : mismatch
+!> determinant_mix : mismatch
+!> sorted_mix : mismatch

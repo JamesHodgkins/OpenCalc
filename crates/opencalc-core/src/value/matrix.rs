@@ -1,18 +1,53 @@
-//! Matrices and vectors: row-major flat storage, one dimension for all elements.
+//! Matrices and vectors: row-major flat storage. Each element has its own
+//! dimension, so a vector can hold a position and a time, a force and a moment.
+//!
+//! Almost every matrix has one dimension throughout, and that is stored once. The
+//! per-element list exists only while the dimensions actually differ and is never
+//! built when they all agree, so equal matrices are equal as values. Operations
+//! that only make sense with one dimension (determinant, inverse, powers, rank,
+//! trace, statistics) call [`Matrix::common_dim`] and refuse a mixed matrix with a
+//! unit-mismatch error.
 
 use super::{Scalar, ValueError};
 use crate::numeric::{self, Complex64};
 use crate::units::{Dimension, UnitError};
+use std::sync::Arc;
 
 /// Largest matrix accepted, so no input can ask for unbounded memory or time.
 pub const MAX_ELEMENTS: usize = 4096;
+
+/// The dimensions of the elements.
+#[derive(Clone, Debug, PartialEq)]
+enum Dims {
+    Uniform(Dimension),
+    /// One per element, row-major. Only when they are not all equal.
+    Each(Arc<Vec<Dimension>>),
+}
+
+impl Dims {
+    /// The canonical form: `Uniform` whenever the dimensions agree.
+    fn of(dims: Vec<Dimension>) -> Dims {
+        match dims.first() {
+            Some(first) if dims.iter().all(|d| d == first) => Dims::Uniform(*first),
+            Some(_) => Dims::Each(Arc::new(dims)),
+            None => Dims::Uniform(Dimension::NONE),
+        }
+    }
+
+    fn get(&self, i: usize) -> Dimension {
+        match self {
+            Dims::Uniform(d) => *d,
+            Dims::Each(v) => v[i],
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Matrix {
     rows: usize,
     cols: usize,
     data: Vec<Complex64>,
-    pub dim: Dimension,
+    dims: Dims,
 }
 
 mod ops;
@@ -22,11 +57,11 @@ fn shape_error(msg: &str) -> ValueError {
 }
 
 impl Matrix {
-    pub fn new(
+    fn build(
         rows: usize,
         cols: usize,
         data: Vec<Complex64>,
-        dim: Dimension,
+        dims: Dims,
     ) -> Result<Matrix, ValueError> {
         if rows == 0 || cols == 0 {
             return Err(shape_error("a matrix needs at least one row and column"));
@@ -43,22 +78,46 @@ impl Matrix {
             rows,
             cols,
             data,
-            dim,
+            dims,
         })
     }
 
-    /// A column vector from scalars of one dimension.
+    /// A matrix whose elements all have dimension `dim`.
+    pub fn new(
+        rows: usize,
+        cols: usize,
+        data: Vec<Complex64>,
+        dim: Dimension,
+    ) -> Result<Matrix, ValueError> {
+        Matrix::build(rows, cols, data, Dims::Uniform(dim))
+    }
+
+    /// A matrix with one dimension per element (row-major).
+    pub fn with_dims(
+        rows: usize,
+        cols: usize,
+        data: Vec<Complex64>,
+        dims: Vec<Dimension>,
+    ) -> Result<Matrix, ValueError> {
+        if dims.len() != data.len() {
+            return Err(shape_error("there must be one dimension per element"));
+        }
+        Matrix::build(rows, cols, data, Dims::of(dims))
+    }
+
+    /// A column vector from scalars, which may differ in dimension.
     pub fn column(items: &[Scalar]) -> Result<Matrix, ValueError> {
         Matrix::from_scalars(items.len(), 1, items)
     }
 
-    /// Row-major elements, all of the same dimension.
+    /// Row-major elements, which may differ in dimension.
     pub fn from_scalars(rows: usize, cols: usize, items: &[Scalar]) -> Result<Matrix, ValueError> {
-        let dim = items.first().map_or(Dimension::NONE, |s| s.dim);
-        if let Some(bad) = items.iter().find(|s| s.dim != dim) {
-            return Err(UnitError::Mismatch(dim, bad.dim).into());
-        }
-        Matrix::new(rows, cols, items.iter().map(|s| s.z).collect(), dim)
+        Matrix::with_dims(
+            rows,
+            cols,
+            items.iter().map(|s| s.z).collect(),
+            items.iter().map(|s| s.dim).collect(),
+        )
     }
 
     pub fn rows(&self) -> usize {
@@ -81,6 +140,44 @@ impl Matrix {
         &self.data
     }
 
+    /// The dimension of element `i` (row-major).
+    pub fn dim_of(&self, i: usize) -> Dimension {
+        self.dims.get(i)
+    }
+
+    pub fn dim_at(&self, r: usize, c: usize) -> Dimension {
+        self.dims.get(r * self.cols + c)
+    }
+
+    /// The dimension all elements share, or `None` if they differ.
+    pub fn uniform_dim(&self) -> Option<Dimension> {
+        match self.dims {
+            Dims::Uniform(d) => Some(d),
+            Dims::Each(_) => None,
+        }
+    }
+
+    /// The dimension all elements share. A mixed matrix is a unit mismatch: this is
+    /// how the operations that need one dimension refuse it.
+    pub fn common_dim(&self) -> Result<Dimension, ValueError> {
+        match &self.dims {
+            Dims::Uniform(d) => Ok(*d),
+            Dims::Each(v) => {
+                let first = v[0];
+                let other = v.iter().find(|d| **d != first).copied().unwrap_or(first);
+                Err(UnitError::Mismatch(first, other).into())
+            }
+        }
+    }
+
+    /// The elements with their dimensions.
+    pub fn scalars(&self) -> impl Iterator<Item = Scalar> + '_ {
+        self.data
+            .iter()
+            .enumerate()
+            .map(|(i, z)| Scalar::new(*z, self.dims.get(i)))
+    }
+
     /// Element at zero-based `indices`: one index for a vector, two for a matrix.
     pub fn element(&self, indices: &[usize]) -> Result<Scalar, ValueError> {
         let (r, c) = match *indices {
@@ -100,7 +197,7 @@ impl Matrix {
                 self.rows, self.cols
             )));
         }
-        Ok(Scalar::new(self.at(r, c), self.dim))
+        Ok(Scalar::new(self.at(r, c), self.dim_at(r, c)))
     }
 
     pub fn is_finite(&self) -> bool {
@@ -115,11 +212,15 @@ impl Matrix {
     }
 
     pub fn sum(&self, o: &Matrix, subtract: bool) -> Result<Matrix, ValueError> {
-        if self.dim != o.dim {
-            return Err(UnitError::Mismatch(self.dim, o.dim).into());
-        }
         if (self.rows, self.cols) != (o.rows, o.cols) {
             return Err(shape_error("matrices must have the same shape to add"));
+        }
+        // Element by element: a vector (1 m, 2 s) adds only to one with the same units.
+        for i in 0..self.data.len() {
+            let (a, b) = (self.dim_of(i), o.dim_of(i));
+            if a != b {
+                return Err(UnitError::Mismatch(a, b).into());
+            }
         }
         let data = self
             .data
@@ -127,19 +228,20 @@ impl Matrix {
             .zip(&o.data)
             .map(|(a, b)| if subtract { a - b } else { a + b })
             .collect();
-        Matrix::new(self.rows, self.cols, data, self.dim)
+        Matrix::build(self.rows, self.cols, data, self.dims.clone())
     }
 
     pub fn scaled(&self, s: Scalar) -> Result<Matrix, ValueError> {
-        let dim = self
-            .dim
-            .checked_times(s.dim)
-            .ok_or(UnitError::DimensionOverflow)?;
-        Matrix::new(
+        let scale = |d: &Dimension| d.checked_times(s.dim).ok_or(UnitError::DimensionOverflow);
+        let dims = match &self.dims {
+            Dims::Uniform(d) => Dims::Uniform(scale(d)?),
+            Dims::Each(v) => Dims::of(v.iter().map(scale).collect::<Result<Vec<_>, _>>()?),
+        };
+        Matrix::build(
             self.rows,
             self.cols,
             self.data.iter().map(|z| z * s.z).collect(),
-            dim,
+            dims,
         )
     }
 
@@ -150,31 +252,44 @@ impl Matrix {
                 self.rows, self.cols, o.rows, o.cols
             )));
         }
-        let dim = self
-            .dim
-            .checked_times(o.dim)
-            .ok_or(UnitError::DimensionOverflow)?;
         let mut data = Vec::with_capacity(self.rows * o.cols);
+        let mut dims = Vec::with_capacity(self.rows * o.cols);
         for r in 0..self.rows {
             for c in 0..o.cols {
+                // Every term of the sum must have the same dimension.
+                let term = |k: usize| {
+                    self.dim_at(r, k)
+                        .checked_times(o.dim_at(k, c))
+                        .ok_or(UnitError::DimensionOverflow)
+                };
+                let d = term(0)?;
+                for k in 1..self.cols {
+                    let other = term(k)?;
+                    if other != d {
+                        return Err(UnitError::Mismatch(d, other).into());
+                    }
+                }
+                dims.push(d);
                 data.push((0..self.cols).map(|k| self.at(r, k) * o.at(k, c)).sum());
             }
         }
-        Matrix::new(self.rows, o.cols, data, dim)
+        Matrix::build(self.rows, o.cols, data, Dims::of(dims))
     }
 
     pub fn transposed(&self) -> Matrix {
         let mut data = Vec::with_capacity(self.data.len());
+        let mut dims = Vec::with_capacity(self.data.len());
         for c in 0..self.cols {
             for r in 0..self.rows {
                 data.push(self.at(r, c));
+                dims.push(self.dim_at(r, c));
             }
         }
         Matrix {
             rows: self.cols,
             cols: self.rows,
             data,
-            dim: self.dim,
+            dims: Dims::of(dims),
         }
     }
 
@@ -183,10 +298,18 @@ impl Matrix {
         if !self.is_vector() || !o.is_vector() || self.rows != o.rows {
             return Err(shape_error("dot needs two vectors of the same length"));
         }
-        let dim = self
-            .dim
-            .checked_times(o.dim)
-            .ok_or(UnitError::DimensionOverflow)?;
+        let term = |i: usize| {
+            self.dim_of(i)
+                .checked_times(o.dim_of(i))
+                .ok_or(UnitError::DimensionOverflow)
+        };
+        let dim = term(0)?;
+        for i in 1..self.rows {
+            let other = term(i)?;
+            if other != dim {
+                return Err(UnitError::Mismatch(dim, other).into());
+            }
+        }
         let z = self.data.iter().zip(&o.data).map(|(a, b)| a * b).sum();
         Ok(Scalar::new(z, dim))
     }
@@ -197,9 +320,10 @@ impl Matrix {
             return Err(shape_error("the determinant needs a square matrix"));
         }
         let n = self.rows;
+        let common = self.common_dim()?;
         let dim = i8::try_from(n)
             .ok()
-            .and_then(|n| self.dim.checked_powi(n))
+            .and_then(|n| common.checked_powi(n))
             .ok_or(UnitError::DimensionOverflow)?;
         let mut a = self.data.clone();
         let mut det = Complex64::new(1.0, 0.0);
@@ -229,9 +353,13 @@ impl Matrix {
         Ok(Scalar::new(det, dim))
     }
 
-    /// Euclidean norm of every element, in this matrix's dimension.
-    pub fn norm(&self) -> Scalar {
+    /// Euclidean norm of every element, in the dimension all elements share.
+    pub fn norm(&self) -> Result<Scalar, ValueError> {
+        let dim = self.common_dim()?;
         let parts = self.data.iter().flat_map(|z| [z.re, z.im]);
-        Scalar::new(Complex64::new(numeric::length(parts), 0.0), self.dim)
+        Ok(Scalar::new(
+            Complex64::new(numeric::length(parts), 0.0),
+            dim,
+        ))
     }
 }
