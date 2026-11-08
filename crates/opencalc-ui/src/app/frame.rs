@@ -98,6 +98,7 @@ impl App {
             });
 
         panels::plot_window::show(ctx, &self.state, &mut panel_edits);
+        panels::picture_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         panels::table_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         panels::plot_view::show(ctx, &self.state);
         panels::units::show(ctx, &self.state, &mut cmds, &mut panel_edits);

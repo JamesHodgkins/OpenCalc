@@ -46,6 +46,7 @@ impl RunKey {
             Edit::SetLabel { id, .. } => Some(RunKey::Label(*id)),
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
+            | Edit::SetPicture { .. }
             | Edit::SetFontStyle { .. }
             | Edit::SetLocked { .. }
             | Edit::SetUnitSystem(_)

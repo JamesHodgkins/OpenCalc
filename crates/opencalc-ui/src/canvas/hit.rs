@@ -89,7 +89,7 @@ mod tests {
         let v = vec![
             region(1, 0.0, 0.0, RegionKind::plot()),
             region(2, 200.0, 100.0, RegionKind::table()),
-            region(3, 1000.0, 1000.0, RegionKind::Picture),
+            region(3, 1000.0, 1000.0, RegionKind::picture()),
         ];
         (v, RegionId(1), RegionId(2), RegionId(3))
     }

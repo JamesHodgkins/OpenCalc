@@ -99,7 +99,7 @@ fn kind_fields(kind: &RegionKind) -> Vec<(Field, &str)> {
             );
             v
         }
-        RegionKind::Area { .. } | RegionKind::Table(_) | RegionKind::Picture => Vec::new(),
+        RegionKind::Area { .. } | RegionKind::Table(_) | RegionKind::Picture(_) => Vec::new(),
     }
 }
 
@@ -231,7 +231,7 @@ pub fn replace_edit(ws: &Worksheet, matches: &[Match], replacement: &str) -> Opt
                     edits.push(Edit::SetPlot { id, spec });
                 }
             }
-            RegionKind::Area { .. } | RegionKind::Table(_) | RegionKind::Picture => {}
+            RegionKind::Area { .. } | RegionKind::Table(_) | RegionKind::Picture(_) => {}
         }
         if let Some(label) = new_text(Field::Label, &region.label) {
             edits.push(Edit::SetLabel { id, label });

@@ -5,6 +5,7 @@
 
 mod geometry;
 mod page;
+mod picture;
 mod plot;
 mod plot_style;
 mod region;
@@ -15,6 +16,10 @@ use serde::{Deserialize, Serialize};
 
 pub use geometry::{Point, Size};
 pub use page::{PageSetup, PaperSize, MARGIN_RANGE_MM, UNITS_PER_MM};
+pub use picture::{
+    PictureSpec, MAX_PICTURES, MAX_PICTURE_BYTES, MAX_PICTURE_PIXELS, MAX_PICTURE_SIDE,
+    MAX_PICTURE_TEXT,
+};
 pub use plot::{PlotInput, PlotSeriesInput, PlotSpec, MAX_SERIES};
 pub use plot_style::{
     LegendMode, Marker, PlotKind, PlotOptions, SeriesKind, SeriesStyle, YAxis, PALETTE_SIZE,
@@ -265,7 +270,7 @@ mod tests {
             ),
             (RegionKind::plot(), 160.0),
             (RegionKind::table(), 200.0),
-            (RegionKind::Picture, 240.0),
+            (RegionKind::picture(), 240.0),
         ] {
             let r = w.new_region(kind, Point::new(x, 20.0));
             w.regions.push(r);

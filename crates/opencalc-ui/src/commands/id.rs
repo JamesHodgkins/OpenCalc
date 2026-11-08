@@ -148,6 +148,7 @@ commands! {
     InsertArea: "insert.area", "Area", icons::AREA;
     InsertPlot: "insert.plot", "Plot", icons::PLOT;
     InsertTable: "insert.table", "Table", icons::TABLE;
+    PictureChoose: "picture.choose", "Choose image", icons::PICTURE;
     TableImportCsv: "table.import_csv", "Import CSV", icons::TABLE;
     TableExportCsv: "table.export_csv", "Export CSV", icons::TABLE;
     InsertPicture: "insert.picture", "Picture", icons::PICTURE;
@@ -266,13 +267,13 @@ impl CommandId {
             | MatrixClose | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext
             | WarnPrev | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo
             | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
-            | TableImportCsv | TableExportCsv | InsertPicture | CalcAll | ViewZoomIn
-            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
-            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral
-            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
-            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
-            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
-            | InsertGreek | InsertSymbol(_) => true,
+            | PictureChoose | TableImportCsv | TableExportCsv | InsertPicture | CalcAll
+            | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap
+            | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose
+            | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout
+            | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_)
+            | PageLandscape(_) | PageMarginMm(_) | DocPageSetup | DocPageSetupClose
+            | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => true,
             HelpGuide => false,
         }
     }

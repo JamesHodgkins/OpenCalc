@@ -1,6 +1,6 @@
 # Data in and out: design (Phase 4)
 
-Status: **CSV module and the Table region (stage 2, without CSV commands) are built; the rest is proposal.** Needs the
+Status: **The CSV module, the Table region with CSV import and export, and the Picture region (PNG only) are built; Excel, JPEG and image to matrix remain proposals.** Needs the
 decisions in section 7 before the Table and Picture regions. Written 2026-11-08.
 Roadmap context: `ROADMAP.md` Phase 4.
 
@@ -71,9 +71,11 @@ region is the model; its component-based Excel link is out of scope.
 
 ## 4. Picture region
 
-- **Stored** as a PNG inside the container (`assets/<content hash>.png`), referenced by
-  name from the region together with its natural size and an optional alt text. The
-  same image used twice is stored once. The original file name is a label only.
+- **Stored** as the original PNG bytes, in base64, inside the region in
+  `worksheet.json` (built this way instead of separate `assets/` entries: simpler, and
+  undo, copy and paste carry the image with no extra bookkeeping; the cost is about a
+  third more size, hence the 2 MB per image and 16 picture limits). The original file
+  name is a label only.
 - **Import:** a command (and drag and drop of an image file) copies the file in. PNG
   uses the `png` crate already in the build. **JPEG needs a new dependency** (section 7).
 - **Limits** (hostile files): the file at most 10 MB, at most 16 million pixels

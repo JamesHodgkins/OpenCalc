@@ -11,8 +11,8 @@
 mod history;
 
 use crate::document::{
-    clean_label, FontStyle, PageSetup, PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat,
-    Size, TableSpec, Worksheet,
+    clean_label, FontStyle, PageSetup, PictureSpec, PlotSpec, Point, Region, RegionId, RegionKind,
+    ResultFormat, Size, TableSpec, Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -76,6 +76,11 @@ pub enum Edit {
     SetTable {
         id: RegionId,
         spec: Box<TableSpec>,
+    },
+    /// Replace a picture region's image and description.
+    SetPicture {
+        id: RegionId,
+        spec: Box<PictureSpec>,
     },
     /// Display results in another unit system. Does not change any value.
     SetUnitSystem(UnitSystem),
@@ -241,6 +246,15 @@ impl Worksheet {
                 };
                 let old = std::mem::replace(current, Box::new((**spec).clone().repaired()));
                 Ok(Edit::SetTable { id: *id, spec: old })
+            }
+            Edit::SetPicture { id, spec } => {
+                self.unlocked(*id)?;
+                let region = self.region_mut(*id)?;
+                let RegionKind::Picture(current) = &mut region.kind else {
+                    return Err(EditError::WrongKind(*id));
+                };
+                let old = std::mem::replace(current, spec.clone());
+                Ok(Edit::SetPicture { id: *id, spec: old })
             }
             Edit::SetRegionSize { id, size } => {
                 self.unlocked(*id)?;
@@ -631,7 +645,7 @@ mod tests {
             ids: vec![ids[1], ids[3]],
         });
         let mut w = w;
-        let extra = w.new_region(RegionKind::Picture, Point::default());
+        let extra = w.new_region(RegionKind::picture(), Point::default());
         round_trips_on(
             w,
             Edit::InsertRegions {

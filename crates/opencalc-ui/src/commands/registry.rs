@@ -93,6 +93,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | InsertArea
             | InsertPlot
             | InsertTable
+            | PictureChoose
             | TableImportCsv
             | TableExportCsv
             | InsertPicture

@@ -203,6 +203,7 @@ impl App {
                 Effect::Paste => self.paste(),
                 Effect::Export(kind) => self.export_active(kind),
                 Effect::ImportCsv => self.import_csv(),
+                Effect::ChoosePicture => self.choose_picture(),
                 Effect::ExportCsv => self.export_csv(),
                 Effect::Restore(r) => self.restore(r),
                 Effect::DeleteFile(path) => {

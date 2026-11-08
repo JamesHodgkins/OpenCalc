@@ -44,7 +44,7 @@ pub fn kind_icon(kind: &RegionKind) -> char {
         RegionKind::Area { .. } => icons::AREA,
         RegionKind::Plot(_) => icons::PLOT,
         RegionKind::Table(_) => icons::TABLE,
-        RegionKind::Picture => icons::PICTURE,
+        RegionKind::Picture(_) => icons::PICTURE,
     }
 }
 

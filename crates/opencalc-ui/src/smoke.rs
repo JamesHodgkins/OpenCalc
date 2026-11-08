@@ -30,6 +30,7 @@ mod format;
 mod insert;
 mod instance;
 mod label;
+mod pictures;
 mod plot_view;
 mod plots;
 mod tables;
@@ -45,6 +46,10 @@ impl crate::app::Files for NoFiles {
     }
 
     fn pick_save(&mut self, _: &str, _: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
+        None
+    }
+
+    fn pick_image_open(&mut self, _: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
         None
     }
 

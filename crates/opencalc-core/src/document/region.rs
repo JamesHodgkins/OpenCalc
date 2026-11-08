@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::geometry::{Point, Size};
+use super::picture::PictureSpec;
 use super::plot::PlotSpec;
 use super::result_format::ResultFormat;
 use super::table::TableSpec;
@@ -97,7 +98,8 @@ pub enum RegionKind {
     Plot(PlotSpec),
     /// Boxed, like a plot's options, to keep every region small.
     Table(Box<TableSpec>),
-    Picture,
+    /// Boxed for the same reason as the table.
+    Picture(Box<PictureSpec>),
 }
 
 impl RegionKind {
@@ -108,6 +110,11 @@ impl RegionKind {
     /// An empty X-Y plot.
     pub fn plot() -> RegionKind {
         RegionKind::Plot(PlotSpec::default())
+    }
+
+    /// A picture with no image yet.
+    pub fn picture() -> RegionKind {
+        RegionKind::Picture(Box::default())
     }
 
     /// A blank table.
@@ -123,7 +130,7 @@ impl RegionKind {
             RegionKind::Area { .. } => "Area",
             RegionKind::Plot(_) => "Plot",
             RegionKind::Table(_) => "Table",
-            RegionKind::Picture => "Picture",
+            RegionKind::Picture(_) => "Picture",
         }
     }
 
@@ -133,7 +140,7 @@ impl RegionKind {
             RegionKind::Math(_) => Size::new(160.0, 32.0),
             RegionKind::Text { .. } => Size::new(240.0, 40.0),
             RegionKind::Area { .. } => Size::new(320.0, 200.0),
-            RegionKind::Plot(_) | RegionKind::Table(_) | RegionKind::Picture => {
+            RegionKind::Plot(_) | RegionKind::Table(_) | RegionKind::Picture(_) => {
                 Size::new(260.0, 170.0)
             }
         }

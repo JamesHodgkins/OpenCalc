@@ -390,6 +390,7 @@ mod tests {
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog
+            CommandId::PictureChoose,      // the Picture window
             CommandId::TableImportCsv,     // the Table window
             CommandId::TableExportCsv,     // the Table window
         ]);

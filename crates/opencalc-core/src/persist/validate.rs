@@ -3,6 +3,7 @@
 //! file with a reason. The same checks run before saving, so the app can never
 //! write a file it would not load.
 
+use crate::document::{MAX_PICTURES, MAX_PICTURE_BYTES};
 use std::collections::HashSet;
 use std::fmt;
 
@@ -90,7 +91,17 @@ fn check_text(r: &Region) -> Result<(), LoadError> {
             .flatten()
             .chain(t.columns.iter().flat_map(|c| [&c.header, &c.unit]))
             .try_for_each(|s| too_long("a table cell", s)),
-        RegionKind::Picture => Ok(()),
+        RegionKind::Picture(p) => {
+            too_long("a picture name", &p.name)?;
+            too_long("a picture description", &p.alt)?;
+            if p.png().len() > MAX_PICTURE_BYTES {
+                return Err(LoadError::TooLong {
+                    what: "a picture (bytes)",
+                    limit: MAX_PICTURE_BYTES,
+                });
+            }
+            Ok(())
+        }
     }
 }
 
@@ -166,6 +177,17 @@ pub fn check(ws: &mut Worksheet) -> Result<Vec<Repair>, LoadError> {
         return Err(LoadError::TooMany {
             what: "custom units",
             limit: MAX_CUSTOM_UNITS,
+        });
+    }
+    let pictures = ws
+        .regions
+        .iter()
+        .filter(|r| matches!(&r.kind, RegionKind::Picture(p) if !p.is_empty()))
+        .count();
+    if pictures > MAX_PICTURES {
+        return Err(LoadError::TooMany {
+            what: "pictures",
+            limit: MAX_PICTURES,
         });
     }
     too_long("the title", &ws.title)?;

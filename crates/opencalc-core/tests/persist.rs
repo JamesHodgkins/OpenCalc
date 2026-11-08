@@ -60,7 +60,7 @@ fn sample() -> Worksheet {
         .with_series(1, "x");
     add(&mut w, RegionKind::Plot(plot), 160.0, 20.0);
     add(&mut w, RegionKind::table(), 200.0, 20.0);
-    add(&mut w, RegionKind::Picture, 240.0, 20.0);
+    add(&mut w, RegionKind::picture(), 240.0, 20.0);
     w.apply(Edit::SetUnitSystem(UnitSystem::Uscs)).unwrap();
     w.apply(Edit::SetPageSetup(PageSetup {
         paper: PaperSize::Letter,
@@ -170,7 +170,7 @@ fn generated(seed: u64) -> Worksheet {
             },
             3 => RegionKind::Plot(PlotSpec::default().with_title(&text(&mut rng)).with_x("t")),
             4 => RegionKind::table(),
-            _ => RegionKind::Picture,
+            _ => RegionKind::picture(),
         };
         let (x, y) = (rng.below(2000) as f32 / 8.0 - 50.0, i as f32 * 3.7);
         add(&mut w, kind, x, y);

@@ -80,7 +80,7 @@ characters; omitted when empty):
 | Area | `{ "Area": { "title": "…" } }` | A titled box. |
 | Plot | `{ "Plot": { "title": "", "x_label": "", "y_label": "", "x": { "source": "…" }, "series": [ { "source": "…" } ], "options": { … }, "styles": [ { … } ] } }` | At most 8 series, at least 1. Titles, labels, `options` and `styles` may be omitted; see section 3a. |
 | Table | `{ "Table": { "name": "loads", "columns": [ { "header": "x", "unit": "m" }, { "unit": "kN" } ], "rows": [ [ "1", "10" ], [ "2", "20" ] ] } }` | A grid of numbers that defines `name` as a matrix. Cells are the text typed; a column has one unit (blank for none). At least one row and column, at most 64 columns and 4096 cells; a file outside that is trimmed on opening. See section 3b. |
-| Picture | `"Picture"` | Not built yet; reserved. |
+| Picture | `{ "Picture": { "name": "beam.png", "alt": "…", "data": "<base64>" } }` | A PNG image kept inside the worksheet. `data` is the PNG file as base64 text (empty: no image yet); `name` is a label only. At most 2 MB per image, 8192 pixels on a side and 16 million pixels, and 16 pictures per worksheet. See section 3c. |
 
 **Math is saved as the text typed, not as a parsed tree.** The program parses it
 again on opening. This keeps the file independent of the program's internals: a
@@ -99,6 +99,16 @@ non-number cell makes the table an error that names the row and column.
 
 Files from before tables had content hold the bare string `"Table"` as the kind.
 The reader turns that into an empty 3 by 2 table.
+
+### 3c. Pictures (version 2)
+
+The image is stored in `worksheet.json` as the original PNG file's bytes in base64,
+so saving never re-encodes it and opening never loses a pixel. (Separate files in the
+container were considered and left for later: the container allows at most 8 entries,
+and one JSON file keeps undo, copy and paste, and saving simple.) Text in `data` that
+is not valid base64 opens as a picture with no image. The picture is drawn to fit its
+box without stretching. Files from before pictures had content hold the bare string
+`"Picture"`; the reader turns it into a picture with no image.
 
 ### 3a. Plot options and series styles (version 2)
 

@@ -136,12 +136,7 @@ pub fn region(
             vec(r.size)
         }
         RegionKind::Table(spec) => super::table::paint(ui, painter, env, r, spec, place),
-        RegionKind::Picture => {
-            if !skip_content {
-                placeholder(painter, env.paper, r, top_left, zoom);
-            }
-            vec(r.size)
-        }
+        RegionKind::Picture(spec) => super::picture::paint(ui, painter, env, r, spec, place),
     }
 }
 
@@ -293,7 +288,7 @@ fn area(painter: &Painter, theme: &Theme, r: &Region, title: &str, top_left: Pos
     );
 }
 
-fn placeholder(painter: &Painter, theme: &Theme, r: &Region, top_left: Pos2, zoom: f32) {
+pub(super) fn placeholder(painter: &Painter, theme: &Theme, r: &Region, top_left: Pos2, zoom: f32) {
     let rect = Rect::from_min_size(top_left, vec(r.size) * zoom);
     let radius = CornerRadius::same(metrics::RADIUS);
     painter.rect_filled(rect, radius, theme.surface);
