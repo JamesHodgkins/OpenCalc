@@ -333,4 +333,12 @@ fn plot_editor(
         );
     }
     axes(ui, state, id, spec, out);
+    ui.add_space(4.0);
+    if ui
+        .button("Explore this plot\u{2026}")
+        .on_hover_text("A larger window: hover for values, scroll to zoom, drag to pan")
+        .clicked()
+    {
+        super::plot_view::open(ui.ctx(), id);
+    }
 }

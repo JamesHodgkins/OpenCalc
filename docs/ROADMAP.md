@@ -79,7 +79,7 @@ Extends `PlotSpec` (format bump with migration). TD-31 records the current plot 
 - [x] Mixed units (2026-11-08): a second, right-hand y axis. A series is set to the left or right axis; the series on one axis share a dimension, the two axes may differ (a displacement and a force on one plot). The right axis has its own unit, limits, log setting, ticks, caption and baseline for bars and stems; the legend marks `(right)` series; the evaluator checks units per axis and reports the part (`series 3`, `right axis max`). A series asking for the right axis with none on the left is drawn on the left; right-axis limits are ignored while nothing uses it. Not done: more than two axes, and x axes of different kinds.
 - [ ] Plot types: bar/column, stem, scatter, polar, error bars, box.
 - [ ] Contour plot, then 3D (surface, curve, scatter) with rotate/pan/zoom.
-- [ ] Interactive plot view with hover readout, pan and zoom (revisit `egui_plot`, TD-31).
+- [x] Interactive plot view (2026-11-08), without `egui_plot`: the Plot window's "Explore this plot" button opens a resizable Plot view window with the same painter as the canvas. Hover shows a crosshair and, near a data point (within 14 px), a ring round it and a readout of its series and values in the units of its axis (`load (right): x = 3 s, y = 12.5 N`); the pointer's own values are shown in a status line, also for the right axis. Scroll or pinch zooms about the pointer on every axis (the data under the pointer stays put), drag pans, double-click or Reset view goes back to the plot's own view. The view (a range per axis in SI) lives in the window's own memory: it is never saved, has no undo, and does not mark the worksheet changed. Pure, tested pieces: axis zoom/pan/inverse mapping (linear and log, with limits on how far it goes), nearest-point search, readout text. Not done: box zoom, zoom of one axis only, a trace that follows a series, copying the readout.
 - [x] Export of plots in PDF/PNG covers every type built so far: the export paints with the same code as the canvas, and rendering tests check the pixels of each series type and option.
 
 ## Phase 4: Data I/O (M to L)
@@ -133,6 +133,7 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 |---|---|
 | 2026-11-08 | Roadmap created from the audit of `private/mathcad_features.md`. |
 | 2026-11-08 | Phase 0 done: `TECH_DEBT.md` refreshed, `HelpGuide` left paused on purpose. |
+| 2026-11-08 | Phase 3.3: interactive plot view window (hover readout, zoom, pan, reset); the painter takes a `PlotCtx` and a `View` and reports its `Geometry`. |
 | 2026-11-08 | Phase 3.2: parametric plots (a series' own x values) and a second y axis; scales, legend and frame split into `canvas/plot/` modules. |
 | 2026-11-08 | Phase 3.1: plot options and series styles (file format 2): axis limits, grid, legend, log axes, six series types, markers, colours, legend names; rendering tests on real pixels. |
 | 2026-11-08 | Phase 2.2: `odesolve` (adaptive RK45, mixed-unit states, table output), `col` / `row`; corpus `odes.calc`, `tests/ode.rs`. |

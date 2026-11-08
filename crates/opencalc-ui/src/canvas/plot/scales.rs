@@ -5,13 +5,15 @@ use opencalc_core::document::{SeriesKind, SeriesStyle};
 use opencalc_core::eval::PlotData;
 use opencalc_core::units::Dimension;
 
+use super::geometry::View;
 use super::marks;
 use super::ticks::Axis;
-use crate::canvas::Env;
+use super::PlotCtx;
 use crate::format::axis_unit;
 
 /// The x axis, the left y axis and, when a series is on it, the right y axis, each
 /// with the unit its numbers are written in and the SI value of one such unit.
+#[derive(Clone)]
 pub struct Scales {
     pub x: Axis,
     pub y: Axis,
@@ -31,11 +33,12 @@ fn extent(values: impl Iterator<Item = f64>) -> (f64, f64) {
 }
 
 impl Scales {
-    /// `styles[k]` is the style of `data.series[k]`.
-    pub fn new(env: &Env, data: &PlotData, styles: &[SeriesStyle]) -> Scales {
+    /// `styles[k]` is the style of `data.series[k]`. A range in `view` replaces the
+    /// plot's own limit (and the data's range) for that axis.
+    pub fn new(ctx: &PlotCtx, data: &PlotData, styles: &[SeriesStyle], view: &View) -> Scales {
         let points = || data.series.iter().flat_map(|s| s.points.iter());
         let x_peak = points().fold(0.0_f64, |m, p| m.max(p.0.abs()));
-        let (x_unit, x_scale) = axis_unit(env.units, data.x_dim, x_peak);
+        let (x_unit, x_scale) = axis_unit(ctx.units, data.x_dim, x_peak);
 
         let kind_of = |k: usize| styles[k].kind;
         let has_bars = (0..styles.len()).any(|k| kind_of(k) == SeriesKind::Bar);
@@ -55,7 +58,16 @@ impl Scales {
             x_lo -= half;
             x_hi += half;
         }
-        let limit = |i: usize, scale: f64| data.limits[i].map(|v| v / scale);
+        // The user's view of an axis wins over the plot's own limit.
+        let limit = |i: usize, scale: f64| {
+            let moved = match i {
+                0 | 1 => view.x,
+                2 | 3 => view.y,
+                _ => view.y2,
+            }
+            .map(|(lo, hi)| if i.is_multiple_of(2) { lo } else { hi });
+            moved.or(data.limits[i]).map(|v| v / scale)
+        };
         let x = Axis::new(
             x_lo,
             x_hi,
@@ -71,7 +83,7 @@ impl Scales {
             let peak = on()
                 .flat_map(|s| s.points.iter())
                 .fold(0.0_f64, |m, p| m.max(p.1.abs()));
-            let (unit, scale) = axis_unit(env.units, dim, peak);
+            let (unit, scale) = axis_unit(ctx.units, dim, peak);
             let (mut y_lo, mut y_hi) =
                 extent(on().flat_map(|s| s.points.iter()).map(|p| p.1 / scale));
             // Stems and bars grow from zero, so zero is kept in view.

@@ -111,6 +111,67 @@ impl Axis {
         }
     }
 
+    /// The value at a fraction along the axis (the inverse of [`Axis::fraction`]).
+    pub fn value_at(&self, fraction: f64) -> f64 {
+        if self.log {
+            (self.lo.ln() + fraction * (self.hi.ln() - self.lo.ln())).exp()
+        } else {
+            self.lo + fraction * (self.hi - self.lo)
+        }
+    }
+
+    /// The range after zooming by `factor` (below 1 zooms in) about the value at
+    /// `anchor`, a fraction along the axis, which stays where it is. A log axis
+    /// zooms in log space. A zoom that would leave a range too small or too large
+    /// to mean anything leaves it as it was.
+    pub fn zoomed(&self, anchor: f64, factor: f64) -> (f64, f64) {
+        let (lo, hi) = self.domain();
+        let new_lo = lo + (hi - lo) * anchor * (1.0 - factor);
+        let new_hi = new_lo + (hi - lo) * factor;
+        self.checked(new_lo, new_hi)
+    }
+
+    /// The range after moving the view by `fraction` of its length (positive moves
+    /// towards larger values).
+    pub fn panned(&self, fraction: f64) -> (f64, f64) {
+        let (lo, hi) = self.domain();
+        let shift = (hi - lo) * fraction;
+        self.checked(lo + shift, hi + shift)
+    }
+
+    /// The axis ends in the space the scale is linear in (the logarithms, for a log axis).
+    fn domain(&self) -> (f64, f64) {
+        if self.log {
+            (self.lo.ln(), self.hi.ln())
+        } else {
+            (self.lo, self.hi)
+        }
+    }
+
+    /// A range given in `domain` space, converted back and refused when it is
+    /// degenerate or absurd.
+    fn checked(&self, lo: f64, hi: f64) -> (f64, f64) {
+        let span = hi - lo;
+        let scale = lo.abs().max(hi.abs());
+        let sane = lo.is_finite()
+            && hi.is_finite()
+            && span > 0.0
+            && if self.log {
+                // Between a hundred-millionth of a decade and 600 e-folds.
+                (1e-8..600.0).contains(&span)
+            } else {
+                span > 1e-12 * scale.max(f64::MIN_POSITIVE) && span < 1e300
+            };
+        if !sane {
+            return (self.lo, self.hi);
+        }
+        if self.log {
+            (lo.exp(), hi.exp())
+        } else {
+            (lo, hi)
+        }
+    }
+
     /// Tick values (about `target` of them) and, for a linear axis, their spacing.
     /// On a log axis the ticks are powers of ten (every few decades if there are
     /// many); an axis covering less than a decade falls back to round values.
@@ -303,6 +364,105 @@ mod tests {
             .values
             .iter()
             .all(|v| *v >= 2.0 - 1e-9 && *v <= 8.0 + 1e-9));
+    }
+
+    #[test]
+    fn value_at_is_the_inverse_of_fraction() {
+        for axis in [
+            Axis::new(-3.0, 9.0, 0.0, false, None, None),
+            Axis::new(0.5, 5000.0, 0.0, true, None, None),
+        ] {
+            for f in [0.0, 0.25, 0.5, 1.0] {
+                let v = axis.value_at(f);
+                assert!((axis.fraction(v) - f).abs() < 1e-12, "{axis:?} {f}");
+            }
+        }
+    }
+
+    #[test]
+    fn zooming_keeps_the_value_under_the_cursor_where_it_is() {
+        let axis = Axis::new(0.0, 10.0, 0.0, false, None, None);
+        for anchor in [0.0, 0.3, 0.5, 1.0] {
+            let before = axis.value_at(anchor);
+            let (lo, hi) = axis.zoomed(anchor, 0.5);
+            assert!((hi - lo - 5.0).abs() < 1e-12, "half the span");
+            let after = Axis { lo, hi, log: false }.value_at(anchor);
+            assert!(
+                (after - before).abs() < 1e-12,
+                "anchor {anchor}: {before} became {after}"
+            );
+        }
+    }
+
+    #[test]
+    fn zooming_in_then_out_by_the_same_factor_returns_to_the_start() {
+        for axis in [
+            Axis::new(2.0, 12.0, 0.0, false, None, None),
+            Axis::new(1.0, 1e4, 0.0, true, None, None),
+        ] {
+            let (lo, hi) = axis.zoomed(0.4, 0.7);
+            let back = Axis {
+                lo,
+                hi,
+                log: axis.log,
+            }
+            .zoomed(0.4, 1.0 / 0.7);
+            assert!(
+                (back.0 - axis.lo).abs() < 1e-9 * axis.lo.abs().max(1.0),
+                "{back:?}"
+            );
+            assert!(
+                (back.1 - axis.hi).abs() < 1e-9 * axis.hi.abs().max(1.0),
+                "{back:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_log_axis_zooms_by_ratios_and_stays_positive() {
+        let axis = Axis::new(1.0, 1e4, 0.0, true, None, None);
+        let (lo, hi) = axis.zoomed(0.5, 0.5);
+        assert!(
+            (lo - 10.0).abs() < 1e-9 && (hi - 1000.0).abs() < 1e-6,
+            "{lo} {hi}"
+        );
+        let (lo, hi) = axis.panned(0.25);
+        assert!(
+            (lo - 10.0).abs() < 1e-9 && (hi - 1e5).abs() < 1e-3,
+            "one decade up: {lo} {hi}"
+        );
+        assert!(lo > 0.0);
+    }
+
+    #[test]
+    fn panning_moves_the_view_by_a_fraction_of_its_length() {
+        let axis = Axis::new(0.0, 10.0, 0.0, false, None, None);
+        assert_eq!(axis.panned(0.5), (5.0, 15.0));
+        assert_eq!(axis.panned(-0.1), (-1.0, 9.0));
+    }
+
+    #[test]
+    fn absurd_zooms_and_pans_change_nothing() {
+        let axis = Axis::new(0.0, 10.0, 0.0, false, None, None);
+        let same = (axis.lo, axis.hi);
+        assert_eq!(axis.zoomed(0.5, 0.0), same, "a zero-size range");
+        assert_eq!(axis.zoomed(0.5, -1.0), same);
+        assert_eq!(axis.zoomed(0.5, f64::NAN), same);
+        assert_eq!(axis.zoomed(0.5, f64::INFINITY), same);
+        assert_eq!(axis.panned(f64::NAN), same);
+        // Zooming in without end stops where the numbers can no longer tell the ends apart.
+        let mut a = Axis::new(1.0, 2.0, 0.0, false, None, None);
+        for _ in 0..200 {
+            let (lo, hi) = a.zoomed(0.5, 0.5);
+            a = Axis { lo, hi, log: false };
+        }
+        assert!(a.hi > a.lo, "{a:?}");
+        let mut a = Axis::new(1.0, 1e3, 0.0, true, None, None);
+        for _ in 0..200 {
+            let (lo, hi) = a.zoomed(0.5, 4.0);
+            a = Axis { lo, hi, log: true };
+        }
+        assert!(a.hi > a.lo && a.lo > 0.0 && a.hi.is_finite(), "{a:?}");
     }
 
     #[test]

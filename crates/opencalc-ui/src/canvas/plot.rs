@@ -4,36 +4,54 @@
 //! canvas zoom and takes no input of its own (dragging a plot moves the region, as
 //! for any other).
 
+mod context;
+mod geometry;
 mod legend;
 mod marks;
 mod scales;
 mod ticks;
 
 use eframe::egui::{Align2, Color32, FontId, Painter, Pos2, Rect, Stroke, StrokeKind};
-use opencalc_core::document::{LegendMode, PlotSpec, Region, SeriesKind, SeriesStyle};
+use opencalc_core::document::{LegendMode, PlotSpec, Region, RegionId, SeriesKind, SeriesStyle};
 use opencalc_core::eval::PlotData;
 
 use super::adapt::vec;
 use super::Env;
 use crate::theme::{metrics, type_size};
+pub use geometry::{Geometry, View};
 use legend::Entry;
 use marks::{Frame, Look};
 use scales::Scales;
 
-/// Below this on-screen text size, text is left out rather than drawn as noise.
-const MIN_TEXT: f32 = 5.0;
+pub use context::PlotCtx;
+use context::{caption, series_name, used_series, MIN_TEXT};
 
-/// The positions in `spec.series` of the series that have data. A blank series
-/// is not evaluated, so the k-th series drawn is `used_series(spec)[k]` of the spec.
-fn used_series(spec: &PlotSpec) -> Vec<usize> {
-    (0..spec.series.len())
-        .filter(|k| spec.has_data(*k))
-        .collect()
+/// Paint the plot region `r` on the canvas.
+pub fn paint(painter: &Painter, env: &Env, r: &Region, spec: &PlotSpec, top_left: Pos2, zoom: f32) {
+    let rect = Rect::from_min_size(top_left, vec(r.size) * zoom);
+    paint_in(
+        painter,
+        &env.into(),
+        r.id,
+        spec,
+        rect,
+        zoom,
+        &View::default(),
+    );
 }
 
-pub fn paint(painter: &Painter, env: &Env, r: &Region, spec: &PlotSpec, top_left: Pos2, zoom: f32) {
-    let theme = env.paper;
-    let rect = Rect::from_min_size(top_left, vec(r.size) * zoom);
+/// Paint plot `id` into `rect`, showing the part of it that `view` asks for. Gives
+/// back where things went, if a chart was drawn (not for an error or an empty plot).
+pub fn paint_in(
+    painter: &Painter,
+    ctx: &PlotCtx,
+    id: RegionId,
+    spec: &PlotSpec,
+    rect: Rect,
+    zoom: f32,
+    view: &View,
+) -> Option<Geometry> {
+    let theme = ctx.paper;
     let radius = eframe::egui::CornerRadius::same(metrics::RADIUS);
     painter.rect_filled(rect, radius, theme.surface);
     painter.rect_stroke(
@@ -71,37 +89,50 @@ pub fn paint(painter: &Painter, env: &Env, r: &Region, spec: &PlotSpec, top_left
             painter.galley(at, galley, colour);
         }
     };
-    match env.output.plots.get(&r.id) {
+    match ctx.output.plots.get(&id) {
         None => note("\u{2026}", theme.text_weak),
         Some(Err(e)) => note(&format!("{} {e}", crate::icons::WARNING), theme.error),
         Some(Ok(data)) if data.is_empty() => note(
             "Choose the x values and the series to plot in the Plot window.",
             theme.text_weak,
         ),
-        Some(Ok(data)) => chart(painter, env, spec, data, rect, top, zoom),
+        Some(Ok(data)) => {
+            let c = Chart {
+                spec,
+                data,
+                rect,
+                top,
+                zoom,
+                view,
+            };
+            return chart(painter, ctx, &c);
+        }
     }
+    None
 }
 
-/// `a [unit]`, or whichever of the two there is.
-fn caption(user: &str, unit: &str) -> String {
-    match (user.is_empty(), unit.is_empty()) {
-        (true, true) => String::new(),
-        (true, false) => unit.to_owned(),
-        (false, true) => user.to_owned(),
-        (false, false) => format!("{user} [{unit}]"),
-    }
-}
-
-fn chart(
-    painter: &Painter,
-    env: &Env,
-    spec: &PlotSpec,
-    data: &PlotData,
+/// What `chart` draws: the plot, its data, where it goes and how it is looked at.
+#[derive(Clone, Copy)]
+struct Chart<'a> {
+    spec: &'a PlotSpec,
+    data: &'a PlotData,
     rect: Rect,
+    /// Where the plotting area starts (below any title).
     top: f32,
     zoom: f32,
-) {
-    let theme = env.paper;
+    view: &'a View,
+}
+
+fn chart(painter: &Painter, ctx: &PlotCtx, c: &Chart) -> Option<Geometry> {
+    let Chart {
+        spec,
+        data,
+        rect,
+        top,
+        zoom,
+        view,
+    } = *c;
+    let theme = ctx.paper;
     let size = |base: f32| base * zoom;
     let text_ok = size(type_size::SMALL) >= MIN_TEXT;
     let font = FontId::proportional(size(type_size::SMALL));
@@ -110,7 +141,7 @@ fn chart(
     let styles: Vec<SeriesStyle> = (0..data.series.len())
         .map(|k| spec.style(used.get(k).copied().unwrap_or(k)))
         .collect();
-    let scales = Scales::new(env, data, &styles);
+    let scales = Scales::new(ctx, data, &styles, view);
     let has_right = scales.y2.is_some();
 
     // The plotting area leaves room for tick labels and the axis captions.
@@ -127,7 +158,7 @@ fn chart(
         Pos2::new(rect.max.x - right, rect.max.y - bottom),
     );
     if area.width() < 4.0 || area.height() < 4.0 {
-        return;
+        return None;
     }
     // A position from values already in the axes' units, on the left or right axis.
     let to_screen = |x: f64, y: f64, on_right: bool| {
@@ -240,7 +271,7 @@ fn chart(
     let bar_width = (0.8 * slot / bar_series.len().max(1) as f32).max(1.0);
     for (k, line) in screen.iter().enumerate() {
         let style = &styles[k];
-        let colour = env.paper.series[style.colour.map_or(k, usize::from) % 8];
+        let colour = ctx.paper.series[style.colour.map_or(k, usize::from) % 8];
         let place = bar_series.iter().position(|b| *b == k).unwrap_or(0);
         let frame = Frame {
             baseline: baseline(data.series[k].right),
@@ -290,23 +321,43 @@ fn chart(
                 .enumerate()
                 .map(|(k, style)| {
                     let at = used.get(k).copied().unwrap_or(k);
-                    let base = if style.name.trim().is_empty() {
-                        spec.series.get(at).map_or("", |s| s.source())
-                    } else {
-                        style.name.as_str()
-                    };
+                    let base = series_name(spec, at, style);
                     Entry {
                         name: if has_right && data.series[k].right {
                             format!("{base} (right)")
                         } else {
-                            base.to_owned()
+                            base
                         },
                         style,
-                        colour: env.paper.series[style.colour.map_or(k, usize::from) % 8],
+                        colour: ctx.paper.series[style.colour.map_or(k, usize::from) % 8],
                     }
                 })
                 .collect();
-            legend::draw(painter, env, &entries, area, &font, zoom);
+            legend::draw(painter, ctx, &entries, area, &font, zoom);
         }
     }
+    let values = data
+        .series
+        .iter()
+        .map(|s| {
+            let (_, y_scale) = scales.vertical(s.right);
+            s.points
+                .iter()
+                .map(|p| (p.0 / scales.x_scale, p.1 / y_scale))
+                .collect()
+        })
+        .collect();
+    let names = styles
+        .iter()
+        .enumerate()
+        .map(|(k, style)| series_name(spec, used.get(k).copied().unwrap_or(k), style))
+        .collect();
+    Some(Geometry {
+        area,
+        scales,
+        screen,
+        values,
+        names,
+        right: data.series.iter().map(|s| s.right).collect(),
+    })
 }

@@ -15,7 +15,7 @@ pub mod hit;
 mod overlay;
 pub(crate) mod page;
 pub(crate) mod paint;
-mod plot;
+pub mod plot;
 mod result;
 pub(crate) mod separate;
 pub mod text_style;
