@@ -1,0 +1,35 @@
+# source: original; roots worked by hand (sqrt 2, the fixed point of cosine 0.7390851332151607, (x-1)(x-2)(x-3) = x^3 - 6x^2 + 11x - 6, x^2 + 1 = 0)
+sqrt_two := root(x ^ 2 - 2, x, 0, 2)
+sqrt_two_reversed := root(x ^ 2 - 2, x, 2, 0)
+fixed_point := root(cos(x) - x, x, 1)
+negative_side := root(x ^ 2 - 2, x, 0 - 1)
+exponential := root(exp(x) - 1000, x, 0)
+side_length := root(x ^ 2 - 4 m ^ 2, x, 0 m, 5 m)
+time_to_fall := root(0.5 * 9.80665 m / s ^ 2 * t ^ 2 - 100 m, t, 1 s)
+cubic := polyroots(vec(0 - 6, 11, 0 - 6, 1))
+unit_circle := polyroots(vec(1, 0, 1))
+with_zero_root := polyroots(vec(0, 0 - 1, 0, 1))
+no_sign_change := root(x ^ 2 + 1, x, 0 - 1, 1)
+no_root_near := root(x ^ 2 + 1, x, 0)
+at_a_pole := root(1 / (x - 0.3), x, 0, 1)
+mixed_bounds := root(x, x, 0 m, 1 s)
+complex_function := root(x * i, x, 0 - 1, 1)
+constant_polynomial := polyroots(vec(5))
+wrong_count := root(x, x)
+=> sqrt_two ~1e-12 = sqrt(2)
+=> sqrt_two_reversed ~1e-12 = sqrt(2)
+=> fixed_point ~1e-9 = 0.7390851332151607
+=> negative_side ~1e-9 = 0 - sqrt(2)
+=> exponential ~1e-9 = ln(1000)
+=> side_length ~1e-12 = 2 m
+=> time_to_fall ~1e-9 = sqrt(2 * 100 / 9.80665) * s
+=> cubic ~1e-9 = vec(1, 2, 3)
+=> unit_circle ~1e-9 = vec(0 - i, i)
+=> with_zero_root ~1e-9 = vec(0 - 1, 0, 1)
+!> no_sign_change : invalid
+!> no_root_near : invalid
+!> at_a_pole : invalid
+!> mixed_bounds : mismatch
+!> complex_function : invalid
+!> constant_polynomial : invalid
+!> wrong_count : invalid

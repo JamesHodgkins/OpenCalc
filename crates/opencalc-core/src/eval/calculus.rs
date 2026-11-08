@@ -20,6 +20,7 @@ use crate::value::{Scalar, Value};
 
 mod quadrature;
 mod ridders;
+mod roots;
 
 /// Most terms a sum or product may have.
 const MAX_BOUND: f64 = 1e9;
@@ -31,6 +32,7 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
         "integrate" => integrate(args, cx),
         "derivative" => derivative(args, cx),
         "limit" => limit(args, cx),
+        "root" => root(args, cx),
         _ => Err(Located::here(EvalError::UnknownFunction(name.to_owned()))),
     }
 }
@@ -39,10 +41,21 @@ fn invalid(message: impl Into<String>) -> Located {
     Located::here(EvalError::Invalid(message.into()))
 }
 
-/// The body and the bound variable's name; checks the argument count.
-fn target<'a>(name: &str, args: &'a [Expr], count: usize) -> Result<(&'a Expr, &'a str), Located> {
-    if args.len() != count {
-        return Err(Located::here(EvalError::Arity(name.to_owned(), count)));
+/// The body and the bound variable's name; checks the argument count, which
+/// must be one of `counts`.
+fn target<'a>(
+    name: &str,
+    args: &'a [Expr],
+    counts: &[usize],
+) -> Result<(&'a Expr, &'a str), Located> {
+    if !counts.contains(&args.len()) {
+        return Err(match counts {
+            [one] => Located::here(EvalError::Arity(name.to_owned(), *one)),
+            _ => invalid(format!(
+                "{name} takes {} or {} arguments",
+                counts[0], counts[1]
+            )),
+        });
     }
     match &args[1] {
         Expr::Name(v) => Ok((&args[0], v)),
@@ -104,7 +117,7 @@ fn whole_arg(args: &[Expr], index: usize, cx: &Cx) -> Result<i64, Located> {
 
 /// `sum_over(f, k, a, b)` and `product_over(f, k, a, b)`: k from a to b in steps of 1.
 fn fold(name: &str, args: &[Expr], cx: &Cx, product: bool) -> Evaluated {
-    let (body, var) = target(name, args, 4)?;
+    let (body, var) = target(name, args, &[4])?;
     let (from, to) = (whole_arg(args, 2, cx)?, whole_arg(args, 3, cx)?);
     if to < from {
         // An empty sum would be a bare 0 with no dimension to add to anything.
@@ -164,6 +177,30 @@ impl<'c, 'a> Sampler<'c, 'a> {
     }
 }
 
+/// `root(f, x, guess)` or `root(f, x, a, b)`: a real root of f.
+fn root(args: &[Expr], cx: &Cx) -> Evaluated {
+    let (body, var) = target("root", args, &[3, 4])?;
+    let (a, da) = real_arg(args, 2, cx)?;
+    let mut s = Sampler::new(cx, body, var, da);
+    let mut real = |x: f64| -> Result<f64, Located> {
+        let z = s.sample(x)?;
+        if z.im != 0.0 {
+            return Err(invalid("root needs a function with real values").under(0));
+        }
+        Ok(z.re)
+    };
+    let x = if args.len() == 4 {
+        let (b, db) = real_arg(args, 3, cx)?;
+        if da != db {
+            return Err(Located::here(UnitError::Mismatch(da, db)).under(3));
+        }
+        roots::bracketed(&mut real, a, b)?
+    } else {
+        roots::from_guess(&mut real, a)?
+    };
+    Ok(Value::Scalar(Scalar::new(numeric::real(x), da)))
+}
+
 fn scalar_result(z: Complex64, dim: Option<Dimension>) -> Result<Value, Located> {
     Ok(Value::Scalar(Scalar::new(
         z,
@@ -173,7 +210,7 @@ fn scalar_result(z: Complex64, dim: Option<Dimension>) -> Result<Value, Located>
 
 /// `integrate(f, x, a, b)`: the definite integral by adaptive Gauss-Kronrod.
 fn integrate(args: &[Expr], cx: &Cx) -> Evaluated {
-    let (body, var) = target("integrate", args, 4)?;
+    let (body, var) = target("integrate", args, &[4])?;
     let ((a, da), (b, db)) = (real_arg(args, 2, cx)?, real_arg(args, 3, cx)?);
     if da != db {
         return Err(Located::here(UnitError::Mismatch(da, db)).under(3));
@@ -190,7 +227,7 @@ fn integrate(args: &[Expr], cx: &Cx) -> Evaluated {
 
 /// `derivative(f, x, at)`: the first derivative by Ridders' method.
 fn derivative(args: &[Expr], cx: &Cx) -> Evaluated {
-    let (body, var) = target("derivative", args, 3)?;
+    let (body, var) = target("derivative", args, &[3])?;
     let (x0, dx) = real_arg(args, 2, cx)?;
     let mut s = Sampler::new(cx, body, var, dx);
     let d = ridders::derivative(&mut |x| s.sample(x), x0)?;
@@ -204,7 +241,7 @@ fn derivative(args: &[Expr], cx: &Cx) -> Evaluated {
 
 /// `limit(f, x, to)`: the two-sided limit by Richardson extrapolation.
 fn limit(args: &[Expr], cx: &Cx) -> Evaluated {
-    let (body, var) = target("limit", args, 3)?;
+    let (body, var) = target("limit", args, &[3])?;
     let (x0, dx) = real_arg(args, 2, cx)?;
     let mut s = Sampler::new(cx, body, var, dx);
     let value = ridders::limit(&mut |x| s.sample(x), x0)?;

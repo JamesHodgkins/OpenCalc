@@ -11,7 +11,7 @@ use crate::canvas::CanvasCmd;
 use crate::theme::type_size;
 
 /// Group order in the window.
-const GROUPS: [&str; 8] = [
+const GROUPS: [&str; 9] = [
     "Powers and logarithms",
     "Trigonometry",
     "Rounding and integers",
@@ -20,6 +20,7 @@ const GROUPS: [&str; 8] = [
     "Statistics",
     "Number theory",
     "Calculus",
+    "Solving",
 ];
 
 /// Whether `f` matches what was typed in the search box: every word must appear in

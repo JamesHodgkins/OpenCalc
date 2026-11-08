@@ -44,6 +44,7 @@ pub const BINDING_FORMS: &[&str] = &[
     "integrate",
     "derivative",
     "limit",
+    "root",
 ];
 
 pub fn is_binding_form(name: &str) -> bool {

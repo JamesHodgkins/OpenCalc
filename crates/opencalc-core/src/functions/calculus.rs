@@ -3,7 +3,7 @@
 //! evaluated by `eval::calculus`, because their first argument is an expression to
 //! evaluate repeatedly, not a value.
 
-use super::Arity::Exactly;
+use super::Arity::{AtLeast, Exactly};
 use super::FunctionDef;
 use crate::eval::EvalError;
 
@@ -47,6 +47,13 @@ pub(super) const CALCULUS: &[FunctionDef] = &[
         "limit(f, x, to)",
         "Two-sided limit of f as x approaches a point, never evaluating f there (numerical)",
         Exactly(3),
+        evaluated_elsewhere
+    ),
+    function!(
+        "root",
+        "root(f, x, guess) or root(f, x, a, b)",
+        "A real root of f: from a guess, stepping outward to a sign change; or inside a bracket [a, b] where f changes sign",
+        AtLeast(3),
         evaluated_elsewhere
     ),
 ];

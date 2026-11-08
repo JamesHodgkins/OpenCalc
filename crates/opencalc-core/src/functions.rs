@@ -46,6 +46,7 @@ mod discrete;
 mod elementary;
 mod linalg;
 mod lists;
+mod polynomial;
 
 pub const FUNCTIONS: &[FunctionDef] = &[
     function!(
@@ -241,6 +242,7 @@ pub fn category(name: &str) -> &'static str {
         }
         "factorial" | "combin" | "permut" | "isprime" => "Number theory",
         "sum_over" | "product_over" | "integrate" | "derivative" | "limit" => "Calculus",
+        "root" | "polyroots" => "Solving",
         _ => "Other",
     }
 }
@@ -254,6 +256,7 @@ pub fn all() -> impl Iterator<Item = &'static FunctionDef> + Clone {
         .chain(lists::LISTS)
         .chain(discrete::DISCRETE)
         .chain(calculus::CALCULUS)
+        .chain(polynomial::POLYNOMIAL)
 }
 
 pub fn lookup(name: &str) -> Option<&'static FunctionDef> {

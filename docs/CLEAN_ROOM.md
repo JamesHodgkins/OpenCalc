@@ -43,5 +43,6 @@ Algorithms (Tarjan SCC, Pratt parsing) are standard textbook techniques written
 from scratch. The same holds for the Phase 2.1 numerical methods, written from
 their published descriptions: adaptive Gauss-Kronrod quadrature (the G7/K15
 nodes and weights are the standard published constants), Ridders' extrapolated
-central differences, and Richardson extrapolation. No code from QUADPACK,
+central differences, Richardson extrapolation, Brent's root-finding method and
+Aberth-Ehrlich simultaneous root iteration. No code from QUADPACK,
 Numerical Recipes or any other library was copied.
