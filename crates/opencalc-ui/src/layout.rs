@@ -186,6 +186,7 @@ impl<'a> Typesetter<'a> {
                     self.layout(value, size),
                 ])
             }
+            Expr::Given(g) => self.given(g, size),
             Expr::Program(statements) => self.program(statements, size),
             Expr::LocalAssign { .. }
             | Expr::IndexAssign { .. }

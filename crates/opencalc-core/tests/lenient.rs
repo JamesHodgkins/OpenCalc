@@ -272,3 +272,26 @@ fn complete_programs_parse_the_same_leniently_as_strictly() {
         }
     }
 }
+
+#[test]
+fn every_prefix_of_a_given_block_has_consistent_spans() {
+    for src in [
+        "r := given\n    x + y == 10\n    x - y == 2\nfind(x, y)",
+        "given\n    a ^ 2 == 9\nfind(a)",
+        "m := given\n    a >= 5\nminimize((a - 3)^2, a)",
+        "p := program\n    r \u{2190} given\n        a == 1\n    find(a)\n    r",
+    ] {
+        let chars: Vec<char> = src.chars().collect();
+        for n in 0..=chars.len() {
+            let prefix: String = chars[..n].iter().collect();
+            checked(&prefix);
+        }
+        assert_eq!(parse(src), checked(src), "{src:?}");
+    }
+}
+
+#[test]
+fn the_closing_line_of_a_given_block_being_typed_is_a_box() {
+    let e = checked("r := given\n    a == 1\n");
+    assert_eq!(holes(&e), 1, "{e:?}");
+}

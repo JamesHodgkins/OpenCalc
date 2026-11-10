@@ -116,7 +116,7 @@ impl Field {
     /// breaks are text here, where in a formula the display does the spacing.
     pub fn in_program(&self) -> bool {
         let text = self.text();
-        text.contains('\n') || ends_with_word(&text, "program")
+        text.contains('\n') || ends_with_word(&text, "program") || ends_with_word(&text, "given")
     }
 
     /// The offset where the line holding `at` starts.
@@ -144,7 +144,8 @@ impl Field {
         let opens = ["if ", "for ", "while ", "else", "try", "on error"]
             .iter()
             .any(|w| body.starts_with(w))
-            || ends_with_word(body, "program");
+            || ends_with_word(body, "program")
+            || ends_with_word(body, "given");
         let extra = if opens { 4 } else { 0 };
         self.insert(&format!("\n{}", " ".repeat(indent + extra)));
     }

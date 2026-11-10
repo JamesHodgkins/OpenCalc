@@ -89,6 +89,16 @@ fn sexp(e: &Expr) -> String {
                 sexp(body)
             )
         }
+        Expr::Given(g) => {
+            let args: Vec<String> = g.args.iter().map(sexp).collect();
+            let constraints: Vec<String> = g.constraints.iter().map(sexp).collect();
+            format!(
+                "(given {} ({}) {})",
+                g.solver,
+                args.join(" "),
+                constraints.join(" ")
+            )
+        }
         Expr::Program(statements) => {
             let all: Vec<String> = statements.iter().map(sexp).collect();
             format!("(program {})", all.join(" "))

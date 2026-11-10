@@ -332,6 +332,9 @@ impl Parser {
             Some(Tok::Ident(name)) if name == "program" && self.peek() == Some(&Tok::Line) => {
                 self.program(first)
             }
+            Some(Tok::Ident(name)) if name == "given" && self.peek() == Some(&Tok::Line) => {
+                self.given(first)
+            }
             Some(Tok::Ident(name)) => {
                 let e = if self.eat(&Tok::LParen) {
                     let args = self.args()?;

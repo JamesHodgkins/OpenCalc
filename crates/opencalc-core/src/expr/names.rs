@@ -176,6 +176,7 @@ impl Expr {
             }
             // What a program assigns (and the variable of each `for`) is its own,
             // wherever in the program it is used; the rest is a dependency.
+            Expr::Given(g) => g.lowered().collect_names(out),
             Expr::Program(statements) => {
                 let mut inner = Vec::new();
                 for s in statements {

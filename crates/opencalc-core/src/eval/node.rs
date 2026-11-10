@@ -99,6 +99,7 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
             then,
             otherwise,
         } => conditional(cond, then, otherwise, cx),
+        Expr::Given(g) => given(g, cx),
         Expr::Program(statements) => super::program::run(statements, cx),
         Expr::LocalAssign { .. }
         | Expr::IndexAssign { .. }
@@ -122,6 +123,22 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
             "unexpected '{text}'"
         )))),
     }
+}
+
+/// A `given` block is the solver call it lowers to. The call's arguments are the
+/// closing line's, then the constraints; the block's children are the other way
+/// round (the order of the text), so the step into the call is renumbered.
+#[inline(never)]
+fn given(block: &crate::expr::GivenBlock, cx: &Cx) -> Evaluated {
+    eval(&block.lowered(), cx).map_err(|mut l| {
+        let (args, constraints) = (block.args.len(), block.constraints.len());
+        if let Some(step) = l.rev_path.last_mut() {
+            let k = usize::from(*step);
+            let child = if k < args { constraints + k } else { k - args };
+            *step = u16::try_from(child).unwrap_or(u16::MAX);
+        }
+        l
+    })
 }
 
 /// Kept out of `eval_node` so that its frame, which every nesting level pays for,

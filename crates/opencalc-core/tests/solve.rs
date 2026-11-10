@@ -142,3 +142,104 @@ fn minerr_always_returns_a_point_and_find_does_not() {
     );
     assert!(matches!(error(&out, 3), EvalError::Invalid(m) if m.contains("no solution")));
 }
+
+// ---- the Given / Find block ----
+
+#[test]
+fn a_given_block_is_the_find_call_it_stands_for() {
+    let out = run(
+        &[
+            "x := 1",
+            "y := 1",
+            "r := given\n    x + y == 10\n    x - y == 2\nfind(x, y)",
+            "s := find(x, y, x + y == 10, x - y == 2)",
+            "r[0]",
+            "r[1]",
+            "s[0]",
+        ],
+        None,
+    );
+    assert!((number(&out, 5) - 6.0).abs() < 1e-7);
+    assert!((number(&out, 6) - 4.0).abs() < 1e-7);
+    assert_eq!(
+        number(&out, 5),
+        number(&out, 7),
+        "the same numbers, exactly"
+    );
+}
+
+#[test]
+fn a_given_block_may_minimize_and_may_have_no_constraints() {
+    let out = run(
+        &[
+            "a := 1",
+            "m := given\nminimize((a - 3)^2, a)",
+            "m =",
+            "n := given\n    a >= 5\nminimize((a - 3)^2, a)",
+            "n =",
+        ],
+        None,
+    );
+    assert!((number(&out, 3) - 3.0).abs() < 1e-4);
+    assert!((number(&out, 5) - 5.0).abs() < 1e-4);
+}
+
+#[test]
+fn a_given_blocks_guess_is_a_dependency_and_its_unknown_is_not_a_result_name() {
+    // `a` is defined below the block; the block waits for it.
+    let out = run(
+        &["r := given\n    a ^ 2 == 9\nfind(a)", "a := 2", "r ="],
+        None,
+    );
+    assert!((number(&out, 3) - 3.0).abs() < 1e-7);
+}
+
+#[test]
+fn a_given_block_without_its_closing_line_is_an_error_that_says_so() {
+    for src in [
+        "r := given\n    a == 1",
+        "r := given\n    a == 1\n    find(a)",
+        "r := given\n    a == 1\nsolve(a)",
+        "r := given\n    a == 1\nfind(a) + 1",
+    ] {
+        match opencalc_core::parser::parse(src) {
+            opencalc_core::expr::Expr::Error(e) => {
+                assert!(
+                    e.message.contains("'given' block ends with"),
+                    "{src:?}: {}",
+                    e.message
+                )
+            }
+            other => panic!("{src:?} parsed as {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn a_given_block_prints_and_reads_back_and_has_consistent_spans() {
+    let src = "r := given\n    a ^ 2 == 9\n    a > 0\nfind(a)";
+    let e = opencalc_core::parser::parse(src);
+    assert!(!matches!(e, opencalc_core::expr::Expr::Error(_)), "{e:?}");
+    assert_eq!(e.to_string(), src);
+    let (_, spans) = opencalc_core::parser::parse_with_spans(src);
+    let chars: Vec<char> = src.chars().collect();
+    // The block is the value (child 0); its children are the two constraints and
+    // then `a` (the closing line's argument), in the order of the text.
+    let block = spans.at_path(&[0]).expect("the block");
+    assert_eq!(block.kids.len(), 3);
+    let text = |s: &opencalc_core::parser::SpanNode| -> String {
+        chars[s.inner.start..s.inner.end].iter().collect()
+    };
+    assert_eq!(text(&block.kids[0]), "a ^ 2 == 9");
+    assert_eq!(text(&block.kids[1]), "a > 0");
+    assert_eq!(text(&block.kids[2]), "a");
+}
+
+#[test]
+fn an_error_in_a_constraint_is_located_in_that_line() {
+    let out = run(&["a := 1", "r := given\n    a == nothing\nfind(a)"], None);
+    // The definition's value is child 0; the block's children are the constraint
+    // (0) and then the unknown `a` (1); the bad name is the constraint's right side (1).
+    let path = &out.error_paths[&RegionId(2)];
+    assert_eq!(path[..3], [0, 0, 1], "{path:?}");
+}

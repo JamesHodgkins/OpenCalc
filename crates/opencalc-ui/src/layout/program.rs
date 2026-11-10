@@ -41,6 +41,29 @@ impl Typesetter<'_> {
         out
     }
 
+    /// A `given` block: `Given`, the constraints beside a bar, then the solver line.
+    pub(super) fn given(&self, g: &opencalc_core::expr::GivenBlock, size: f32) -> Layout {
+        let word = |s: &str| self.text(s, size);
+        let mut lines = vec![(0.0, word("Given"))];
+        if !g.constraints.is_empty() {
+            lines.push((size * INDENT, self.program(&g.constraints, size)));
+        }
+        let mut name = g.solver.clone();
+        if let Some(first) = name.get_mut(..1) {
+            first.make_ascii_uppercase();
+        }
+        let mut closing = vec![word(&name), word("(")];
+        for (k, a) in g.args.iter().enumerate() {
+            if k > 0 {
+                closing.push(word(", "));
+            }
+            closing.push(self.layout(a, size));
+        }
+        closing.push(word(")"));
+        lines.push((0.0, self.row(closing)));
+        self.stack(lines, size * LINE_GAP)
+    }
+
     /// A block of statements with a bar down its left side.
     pub(super) fn program(&self, statements: &[Expr], size: f32) -> Layout {
         let lines = statements

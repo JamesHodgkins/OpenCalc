@@ -488,11 +488,23 @@ mod tests {
 
     /// Programs, as they are typed (several lines).
     const PROGRAMS: &[&str] = &[
+        "r := given\n    x + y == 10\n    x - y == 2\nfind(x, y)",
+        "given\n    a ^ 2 == 9\n    a > 0\nfind(a)",
+        "m := given\nminimize((a - 3)^2, a)",
+        "p := program\n    q \u{2190} given\n        a == 1\n    find(a)\n    q",
         "f(n) := program\n    s \u{2190} 0\n    for i in 1..n\n        s \u{2190} s + i\n    return s",
         "g := program\n    if x > 1\n        a \u{2190} 1\n    else\n        a \u{2190} 2\n    v[1, 2] \u{2190} a\n    a",
         "h := program\n    try\n        a \u{2190} 1 / 0\n    on error e\n        a \u{2190} e\n    while 1\n        break\n    return \"done\"",
         "k := program\n    x \u{2190} 1\n  y \u{2190} 2\n        z \u{2190} 3\n    for i in\n    x +\n    ",
     ];
+
+    /// The program with a `for` loop in it.
+    fn the_loop_program() -> &'static str {
+        PROGRAMS
+            .iter()
+            .find(|s| s.starts_with("f(n)"))
+            .expect("the loop program")
+    }
 
     fn everything() -> Vec<String> {
         let mut sources = corpus_sources();
@@ -505,7 +517,7 @@ mod tests {
     #[test]
     fn a_program_is_edited_in_its_typeset_form_with_a_caret_on_every_line() {
         with_fonts(|fonts| {
-            let src = PROGRAMS[0];
+            let src = the_loop_program();
             let l = lay(fonts, src);
             let chars: Vec<char> = src.chars().collect();
             // Typeset: much taller than the plain text of one line would be, with
@@ -557,8 +569,8 @@ mod tests {
     #[test]
     fn clicking_in_a_program_finds_the_line_that_was_clicked() {
         with_fonts(|fonts| {
-            let l = lay(fonts, PROGRAMS[0]);
-            let chars = PROGRAMS[0].chars().count();
+            let l = lay(fonts, the_loop_program());
+            let chars = the_loop_program().chars().count();
             for o in 0..=chars {
                 let c = l.caret_rect(o);
                 let found = l.offset_at(c.center());

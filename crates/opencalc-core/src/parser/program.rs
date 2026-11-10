@@ -7,7 +7,10 @@
 
 use super::lexer::Tok;
 use super::{Parser, MAX_BLOCK_DEPTH};
-use crate::expr::Expr;
+use crate::expr::{is_solver_form, Expr, GivenBlock};
+
+const CLOSING: &str =
+    "a 'given' block ends with a line that starts find, minerr, minimize or maximize";
 
 impl Parser {
     /// The columns of whitespace at the start of the line token `tok` is on.
@@ -33,6 +36,86 @@ impl Parser {
         let from = self.start_of(first);
         let base = self.line_indent(first);
         self.block(base, Some(from))
+    }
+
+    /// `given` (the token `first`, already consumed), its constraint lines, and the
+    /// `find`, `minerr`, `minimize` or `maximize` line at the same indent as the line
+    /// `given` is on. The node's children are the constraints, then the closing
+    /// line's arguments, as in the text.
+    pub(super) fn given(&mut self, first: usize) -> Result<Expr, String> {
+        let from = self.start_of(first);
+        let base = self.line_indent(first);
+        let mut constraints = Vec::new();
+        while self.peek() == Some(&Tok::Line) {
+            let blank_last = self.pos + 1 >= self.toks.len();
+            let here = if blank_last {
+                self.trailing_indent()
+            } else {
+                self.line_indent(self.pos + 1)
+            };
+            if here <= base {
+                break;
+            }
+            self.pos += 1;
+            if blank_last {
+                let hole = self.hole();
+                constraints.push(hole);
+                break;
+            }
+            let (line, mark) = (self.pos, self.log.len());
+            match self.expr(0) {
+                Ok(e) if self.lenient && !self.at_statement_end() => {
+                    let kept = self.garbage_to_line_end(e);
+                    constraints.push(kept);
+                }
+                Ok(e) => constraints.push(e),
+                Err(message) if !self.lenient => return Err(message),
+                Err(_) => {
+                    self.log.truncate(mark);
+                    self.pos = line;
+                    let kept = self.garbage_line();
+                    constraints.push(kept);
+                }
+            }
+        }
+        let closes = self.peek() == Some(&Tok::Line)
+            && self.pos + 1 < self.toks.len()
+            && self.line_indent(self.pos + 1) == base
+            && matches!(self.toks.get(self.pos + 1), Some(Tok::Ident(n)) if is_solver_form(n))
+            && self.toks.get(self.pos + 2) == Some(&Tok::LParen);
+        let (solver, args) = if closes {
+            self.pos += 1;
+            match self.expr(0)? {
+                Expr::Call { name, args } => {
+                    // The call's own entry: the block is not a call.
+                    self.log.pop();
+                    (name, args)
+                }
+                other if self.lenient => ("find".to_owned(), vec![other]),
+                _ => return Err(CLOSING.into()),
+            }
+        } else if self.lenient {
+            // The closing line is not written yet, or not finished being typed.
+            let more = self.peek() == Some(&Tok::Line) && self.pos + 1 < self.toks.len();
+            if self.peek() == Some(&Tok::Line) {
+                self.pos += 1;
+            }
+            let placeholder = if more {
+                self.garbage_line()
+            } else {
+                self.hole()
+            };
+            ("find".to_owned(), vec![placeholder])
+        } else {
+            return Err(CLOSING.into());
+        };
+        let end = self.close_end();
+        self.done(from, end);
+        Ok(Expr::Given(Box::new(GivenBlock {
+            solver,
+            args,
+            constraints,
+        })))
     }
 
     /// The indented block that follows, whose lines are indented further than

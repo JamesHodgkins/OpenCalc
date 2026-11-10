@@ -72,6 +72,27 @@ impl std::fmt::Display for ParseError {
     }
 }
 
+/// The parts of a `given` block.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GivenBlock {
+    /// `find`, `minerr`, `minimize` or `maximize`.
+    pub solver: String,
+    /// What the closing line names: the unknowns (and the objective, for the
+    /// optimising forms).
+    pub args: Vec<Expr>,
+    pub constraints: Vec<Expr>,
+}
+
+impl GivenBlock {
+    /// The call this block means.
+    pub fn lowered(&self) -> Expr {
+        Expr::Call {
+            name: self.solver.clone(),
+            args: self.args.iter().chain(&self.constraints).cloned().collect(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expr {
     Number(f64),
@@ -156,6 +177,11 @@ pub enum Expr {
         head: Option<Box<Expr>>,
         text: String,
     },
+    /// A `given` block (docs/SOLVE_BLOCKS.md): constraints on indented lines, then a
+    /// `find`, `minerr`, `minimize` or `maximize` line. It means the same as the
+    /// call `solver(args..., constraints...)`. Its children are in the order of the
+    /// text: the constraints, then the closing line's arguments.
+    Given(Box<GivenBlock>),
     // Programs (docs/PROGRAMMING.md). A `Program` is a list of statements, and is
     // both `program` itself and every indented block inside one. The rest are the
     // statements. Names assigned in a program are local to it, all through it.
@@ -266,6 +292,7 @@ impl Expr {
             Expr::Assign { value, .. } => vec![value],
             Expr::FunctionDef { body, .. } => vec![body],
             Expr::Garbage { head, .. } => head.as_deref().into_iter().collect(),
+            Expr::Given(g) => g.constraints.iter().chain(&g.args).collect(),
             Expr::Program(statements) => statements.iter().collect(),
             Expr::LocalAssign { value, .. } => vec![value],
             Expr::IndexAssign { indices, value, .. } => {

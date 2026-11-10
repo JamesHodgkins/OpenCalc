@@ -1,6 +1,6 @@
 # Solve blocks: design (Phase 2.2)
 
-Status: **Stage 1 built (2026-11-08); Stage 2 not started.** The decisions in section 7 were
+Status: **Stage 1 built (2026-11-08); Stage 2 built (2026-11-10), differently from section 6: see section 10.** The decisions in section 7 were
 settled as recommended (staged approach, the syntax below, strict tolerance, `find` is an
 error on failure, mixed-dimension unknowns refused for now). Section 9 records where the
 build differs from, or adds to, the proposal.
@@ -204,3 +204,47 @@ Differences from, and additions to, the proposal:
   now", but per-element matrix dimensions (TD-28) were then built, so the restriction was
   lifted: each unknown keeps its guess's dimension and the result vector carries one
   dimension per element (`find(reaction, moment, ...)` gives a force and a moment).
+
+## 10. Stage 2 as built
+
+Section 6 proposed a new region kind. Programs (Phase 6) made that unnecessary: a block
+of indented lines can live in an ordinary math region, so the file format, the 24
+production files that match on `RegionKind`, clipboard, labels, search and export all
+work unchanged, and a block can be the value of a definition, a function body or a line
+of a program.
+
+```
+r := given
+    x + y == 10
+    x - y == 2
+find(x, y)
+```
+
+- **Syntax.** `given` is a keyword when a line break follows it. Lines indented deeper
+  than the line it is on are constraints (any expression; comparisons as in Stage 1).
+  The block ends with a line at the *same* indent as the `given` line that starts with
+  `find`, `minerr`, `minimize` or `maximize` and a bracket: its arguments are the Stage 1
+  call's (unknowns, or the objective then the unknowns). A block without that line is a
+  parse error that says so.
+- **Meaning.** `Expr::Given` lowers to the call `solver(args..., constraints...)`
+  (`GivenBlock::lowered`) and evaluates it, so results, tolerances, budgets,
+  cancellation and errors are exactly Stage 1's (a test checks the block and the call
+  give identical numbers). Dependencies are the lowered call's: the guesses are
+  worksheet variables, found wherever they are defined.
+- **Tree and spans.** The block's children are in the order of the text (constraints,
+  then the closing line's arguments), which the span checks require; an error path from
+  the call is renumbered into that order (`eval/node.rs`, `given`).
+- **Editing.** Typed like a program (Enter keeps the indent, Shift+Tab back out for the
+  closing line, Enter on a blank last line ends it). The lenient parse keeps unfinished
+  blocks: a missing closing line is a box, a line that does not parse is kept as typed.
+- **Typesetting.** `Given`, the constraints beside a bar, then `Find(x, y)`.
+
+**Not done: naming the result.** The roadmap item was "named-variable assignment of a
+result (each variable keeps its own unit)", i.e. something like `[x; y] := given ...`. It
+cannot work as it reads: the unknowns' guesses are worksheet variables of the same names,
+so a region that defines `x` and reads `x` as its guess is a circular reference. Two ways
+out, to decide: guesses written inside the block (`x := 1` as a line, local to it), so the
+region reads nothing it defines; or leave it as it is and index the result (`r[0]`,
+`r[1]`), or copy it out in a program (`x ← r[0]`). The first needs a multi-name
+definition (a region defining several names, with one unit each), which touches the
+evaluator's definition handling.

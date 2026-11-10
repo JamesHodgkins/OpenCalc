@@ -1681,3 +1681,40 @@ fn a_program_is_typed_with_spaces_lines_and_indentation_and_a_blank_line_ends_it
         "editing ended"
     );
 }
+
+#[test]
+fn a_given_block_is_typed_like_a_program_and_solves() {
+    let mut h = Harness::new();
+    h.settle();
+    h.command(CommandId::InsertMath);
+    h.frame();
+    let id = *h.sheet().canvas.selection.first().expect("selected");
+    let type_text = |h: &mut Harness, text: &str| {
+        for ch in text.chars() {
+            h.frame_with(vec![Event::Text(ch.to_string())]);
+        }
+    };
+    type_text(&mut h, "r:=given");
+    h.key(Key::Enter, Modifiers::NONE);
+    type_text(&mut h, "x+y==10");
+    h.key(Key::Enter, Modifiers::NONE);
+    type_text(&mut h, "x-y==2");
+    h.key(Key::Enter, Modifiers::NONE);
+    // Back out to the indent of the line `given` is on, for the closing line.
+    h.key(Key::Tab, Modifiers::SHIFT);
+    type_text(&mut h, "find(x,y)");
+    h.key(Key::Enter, Modifiers::NONE);
+    h.key(Key::Enter, Modifiers::NONE);
+    let source = match &h.sheet().doc.region(id).expect("region").kind {
+        RegionKind::Math(m) => m.source().to_owned(),
+        _ => panic!("math region"),
+    };
+    assert_eq!(source, "r:=given\n    x+y==10\n    x-y==2\nfind(x,y)");
+    assert!(
+        !matches!(
+            opencalc_core::parser::parse(&source),
+            opencalc_core::expr::Expr::Error(_)
+        ),
+        "what was typed parses"
+    );
+}

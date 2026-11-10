@@ -171,6 +171,20 @@ impl std::fmt::Display for Expr {
                 }
                 write!(f, ") := {body}")
             }
+            Expr::Given(g) => {
+                f.write_str("given")?;
+                for constraint in &g.constraints {
+                    write!(f, "\n    {constraint}")?;
+                }
+                write!(f, "\n{}(", g.solver)?;
+                for (k, a) in g.args.iter().enumerate() {
+                    if k > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{a}")?;
+                }
+                f.write_str(")")
+            }
             Expr::Program(_) => {
                 f.write_str("program")?;
                 write_block(f, self, 4)
