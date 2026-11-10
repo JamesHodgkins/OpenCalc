@@ -218,3 +218,57 @@ fn a_greek_name_being_entered_is_one_piece() {
     // The strict parse still refuses it.
     assert!(matches!(parse(r"\alpha"), Expr::Error(_)));
 }
+
+/// Programs being typed: whatever has been written so far, the lenient parse gives
+/// a tree with consistent spans (bad lines kept as text, a new line as a hole).
+const PROGRAMS: &[&str] = &[
+    "f(n) := program\n    s \u{2190} 0\n    for i in 1..n\n        s \u{2190} s + i\n    return s",
+    "g := program\n    if x > 1\n        a \u{2190} 1\n    else if x < 0\n        a \u{2190} 2\n    else\n        a \u{2190} 3\n    a",
+    "h := program\n    try\n        v[0] \u{2190} 1 / 0\n    on error e\n        v[1] \u{2190} e\n    while 1\n        break\n    return v",
+    "k := program\n    x \u{2190} 1\n  y \u{2190} 2\n        z \u{2190} 3\n    x +",
+];
+
+#[test]
+fn every_prefix_of_a_program_has_consistent_spans() {
+    for src in PROGRAMS {
+        let chars: Vec<char> = src.chars().collect();
+        for n in 0..=chars.len() {
+            let prefix: String = chars[..n].iter().collect();
+            checked(&prefix);
+        }
+    }
+}
+
+#[test]
+fn a_new_line_in_a_program_is_a_hole_where_it_will_be_typed() {
+    let src = "f := program\n    s \u{2190} 0\n    ";
+    let e = checked(src);
+    assert_eq!(holes(&e), 1, "{e:?}");
+    let (_, spans) = parse_lenient(src);
+    let len = src.chars().count();
+    // The hole sits at the very end, after the indent.
+    let last_statement = spans.at_path(&[0, 1]).expect("the hole");
+    assert_eq!(
+        (last_statement.inner.start, last_statement.inner.end),
+        (len, len)
+    );
+}
+
+#[test]
+fn a_line_that_does_not_parse_is_kept_as_typed_and_the_rest_still_parses() {
+    let src = "f := program\n    for i in\n        s \u{2190} 1\n    else\n    return 2";
+    let e = checked(src);
+    assert!(has_garbage(&e), "{e:?}");
+    // The lines after the bad ones are still statements.
+    assert!(e.to_string().contains("return 2"), "{e}");
+}
+
+#[test]
+fn complete_programs_parse_the_same_leniently_as_strictly() {
+    for src in PROGRAMS {
+        let strict = parse(src);
+        if !matches!(strict, Expr::Error(_)) {
+            assert_eq!(strict, checked(src), "{src:?}");
+        }
+    }
+}

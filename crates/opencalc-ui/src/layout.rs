@@ -29,6 +29,21 @@ pub struct Layout {
     pub ops: Vec<Op>,
     /// Where each expression node was drawn; only filled when the typesetter marks.
     pub marks: Vec<Mark>,
+    /// The height of the first line when the layout is several lines tall (a
+    /// program, a statement with a block under it); 0 when it is one line. A caret
+    /// at the start of such a node is one line tall, not as tall as the whole.
+    pub first_line: f32,
+}
+
+impl Layout {
+    /// The height a caret at the start of this layout is drawn.
+    pub fn caret_height(&self) -> f32 {
+        if self.first_line > 0.0 {
+            self.first_line
+        } else {
+            self.h
+        }
+    }
 }
 
 /// Scale of a script (exponent) relative to its base.
@@ -227,6 +242,7 @@ impl<'a> Typesetter<'a> {
                 galley,
             }],
             marks: Vec::new(),
+            first_line: 0.0,
         }
     }
 
@@ -237,6 +253,7 @@ impl<'a> Typesetter<'a> {
             baseline: 0.0,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         }
     }
 
@@ -250,10 +267,16 @@ impl<'a> Typesetter<'a> {
             baseline: above,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
+        let mut first_line = 0.0_f32;
         for p in parts {
             let at = Vec2::new(out.w, above - p.baseline);
+            first_line = first_line.max(at.y + p.caret_height());
             out.absorb(p, at, true);
+        }
+        if first_line < out.h {
+            out.first_line = first_line;
         }
         out
     }
@@ -272,6 +295,7 @@ impl<'a> Typesetter<'a> {
             baseline: bar_y + size * AXIS,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
         out.absorb(n, Vec2::new((w - nw) / 2.0, 0.0), false);
         out.absorb(d, Vec2::new((w - dw) / 2.0, bar_y + size * 0.08), false);
@@ -299,6 +323,7 @@ impl<'a> Typesetter<'a> {
             baseline,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
         out.absorb(b, Vec2::new(0.0, base_y), false);
         out.absorb(e, Vec2::new(bw, exp_y), false);
@@ -318,6 +343,7 @@ impl<'a> Typesetter<'a> {
             baseline,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
         let (rw, bottom) = (r.w, h);
         out.absorb(r, Vec2::new(tick, top), false);

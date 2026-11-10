@@ -52,27 +52,123 @@ impl Parser {
         let mut statements = Vec::new();
         let mut indent: Option<usize> = None;
         let mut start = from;
-        while self.peek() == Some(&Tok::Line) && self.pos + 1 < self.toks.len() {
-            let here = self.line_indent(self.pos + 1);
+        while self.peek() == Some(&Tok::Line) {
+            // A line break with nothing after it: only the lenient parse keeps it,
+            // for the line being typed.
+            let blank_last = self.pos + 1 >= self.toks.len();
+            let here = if blank_last {
+                self.trailing_indent()
+            } else {
+                self.line_indent(self.pos + 1)
+            };
             match indent {
                 None if here <= parent => break,
                 None => indent = Some(here),
                 Some(k) if here < k => break,
-                Some(k) if here > k => {
+                // (Being typed, a line may sit deeper than the one above it.)
+                Some(k) if here > k && !self.lenient => {
                     self.pos += 1;
                     return Err("this line is indented more than the lines above it".into());
                 }
                 Some(_) => {}
             }
             self.pos += 1;
+            if blank_last {
+                start.get_or_insert(self.next_char());
+                let hole = self.hole();
+                statements.push(hole);
+                break;
+            }
             start.get_or_insert(self.start_of(self.pos));
-            statements.push(self.statement(here)?);
+            let (line, mark) = (self.pos, self.log.len());
+            match self.statement(here) {
+                Ok(s) if self.lenient && !self.at_statement_end() => {
+                    let kept = self.garbage_to_line_end(s);
+                    statements.push(kept);
+                }
+                Ok(s) => statements.push(s),
+                Err(message) if !self.lenient => return Err(message),
+                Err(_) => {
+                    // A line that does not parse is kept as it was typed.
+                    self.log.truncate(mark);
+                    self.pos = line;
+                    let kept = self.garbage_line();
+                    statements.push(kept);
+                }
+            }
         }
         if statements.is_empty() {
-            return Err("expected an indented line here".into());
+            if !self.lenient {
+                return Err("expected an indented line here".into());
+            }
+            if self.peek() == Some(&Tok::Line) && self.pos + 1 >= self.toks.len() {
+                self.pos += 1;
+            }
+            start.get_or_insert(self.next_char());
+            let hole = self.hole();
+            statements.push(hole);
         }
         self.done(start.unwrap_or(0), self.last_node().end);
         Ok(Expr::Program(statements))
+    }
+
+    /// Where the next token starts, or the end of the source.
+    fn next_char(&self) -> usize {
+        self.spans.get(self.pos).map_or(self.end, |s| s.start)
+    }
+
+    /// The columns of whitespace after the last line break of the source.
+    fn trailing_indent(&self) -> usize {
+        let mut columns = 0;
+        for c in self.text.iter().rev() {
+            match c {
+                ' ' => columns += 1,
+                '\t' => columns += 4,
+                _ => break,
+            }
+        }
+        columns
+    }
+
+    /// The tokens from here to the end of the line, as `(first, after_last)`.
+    fn rest_of_line(&self) -> (usize, usize) {
+        let first = self.pos;
+        let mut after = first;
+        while after < self.toks.len() && self.toks[after] != Tok::Line {
+            after += 1;
+        }
+        (first, after)
+    }
+
+    /// The rest of the line, as typed, kept as text (lenient parse).
+    fn garbage_line(&mut self) -> Expr {
+        let (first, after) = self.rest_of_line();
+        let start = self.start_of(first);
+        let end = if after > first {
+            self.spans[after - 1].end
+        } else {
+            start
+        };
+        self.pos = after;
+        self.done(start, end);
+        Expr::Garbage {
+            head: None,
+            text: self.text[start..end].iter().collect(),
+        }
+    }
+
+    /// `head`, then whatever else is on its line, kept as text (lenient parse).
+    fn garbage_to_line_end(&mut self, head: Expr) -> Expr {
+        let from = self.last_node().start;
+        let (first, after) = self.rest_of_line();
+        let start = self.start_of(first);
+        let end = self.spans[after - 1].end;
+        self.pos = after;
+        self.done(from, end);
+        Expr::Garbage {
+            head: Some(Box::new(head)),
+            text: self.text[start..end].iter().collect(),
+        }
     }
 
     /// Where a statement may end: at a line break, the end, or a bracket or comma

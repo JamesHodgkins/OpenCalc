@@ -99,6 +99,7 @@ fn wrapped(
             galley,
         }],
         marks: Vec::new(),
+        first_line: 0.0,
     }
 }
 

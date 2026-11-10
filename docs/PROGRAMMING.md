@@ -1,6 +1,6 @@
 # Programming: design (Phase 6)
 
-Status: built are sections 1, 3.3, 3.4, 3.5 and the language and editor of section 7.
+Status: built; section 7 is what exists.
 Decisions the owner must make are in section 6.
 
 ## 1. Number literals in other bases (built)
@@ -129,9 +129,15 @@ Syntax and evaluator are as section 3 proposed, with these particulars.
   rather than a fall-back to a worksheet variable. `Cx.locals` is a `RefCell` for this.
 - **Value.** `return`, else the last line if it is an expression. A program that ends on
   a statement is an error.
-- **Editing.** While a region holds a program it is edited as monospace text (the
-  carets come from the text itself, not from node positions) and typeset when
-  editing ends. In a program, spaces and line breaks are text. Enter is a new line even
+- **Editing.** A program is edited in its typeset form, like a formula. The lenient
+  parse (`parse_lenient`) keeps what is typed so far: a line that does not parse is kept
+  as text (`Garbage`), and a new empty line is a `Hole` (a box where it will be typed);
+  the strict parse is unchanged. Carets come from node spans as for formulas, with two
+  additions: a layout knows the height of its first line (`Layout::first_line`), so the
+  caret at the start of a statement with a block under it, or of the `f(n) :=` row that
+  holds a program, is one line tall; and the spaces that start a line map to where its
+  text starts. (Only if the lenient parse cannot make a tree of it at all is it shown as
+  typed, in monospace.) In a program, spaces and line breaks are text. Enter is a new line even
   with the completion list open (Tab accepts a completion); Enter on a blank last line
   ends editing.
 - **Element assignment.** `v[i] ← x` and `m[i, j] ← x` (`Expr::IndexAssign`; its
@@ -146,7 +152,12 @@ Syntax and evaluator are as section 3 proposed, with these particulars.
   `the_deepest_recursion_of_the_deepest_functions_fits_in_the_evaluation_stack` runs it
   64 levels deep in half of `EVAL_STACK` (64 MB). Anything that evaluates a worksheet
   must do it on a thread with that stack (`worker` does; `check` now does).
-- **Still to do.** The typeset form while editing. The `Given`/`Find` solve block is a separate roadmap item.
+- **Text and `on error`.** `"text"` is a value (minimal: `+` joins, `==` / `!=` compare;
+  see the roadmap for what is missing). `on error e` binds the error's message to `e`
+  in the handler; `e` is a local of the program like any other, given a value only when
+  there was an error.
+- **Still to do.** Nothing in this note. The `Given`/`Find` solve block is a separate
+  roadmap item.
 
 ## 4. Order of work
 

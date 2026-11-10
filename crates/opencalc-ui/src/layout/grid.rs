@@ -39,6 +39,7 @@ impl Typesetter<'_> {
             baseline: h / 2.0 + size * AXIS,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
         let (mut y, mut slots) = (size * 0.1, Vec::new());
         for r in 0..rows {
@@ -83,6 +84,7 @@ impl Typesetter<'_> {
             baseline: bb,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
         out.absorb(b, Vec2::ZERO, false);
         out.absorb(sub, Vec2::new(bw, sub_top), false);

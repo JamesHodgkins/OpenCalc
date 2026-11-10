@@ -34,6 +34,7 @@ impl Typesetter<'_> {
             baseline: bb,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
         out.absorb(base, Vec2::ZERO, false);
         out.absorb(sub, Vec2::new(bw, sub_top), false);

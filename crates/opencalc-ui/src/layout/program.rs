@@ -22,11 +22,13 @@ impl Typesetter<'_> {
             baseline: 0.0,
             ops: Vec::new(),
             marks: Vec::new(),
+            first_line: 0.0,
         };
         let mut y = 0.0;
         for (i, (x, line)) in lines.into_iter().enumerate() {
             if i == 0 {
                 out.baseline = line.baseline;
+                out.first_line = line.caret_height();
             } else {
                 y += gap;
             }

@@ -261,7 +261,7 @@ pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usiz
         }
     }
     // A line break at the end ends nothing.
-    while toks.last() == Some(&Tok::Line) {
+    while !lenient && toks.last() == Some(&Tok::Line) {
         toks.pop();
         spans.pop();
     }

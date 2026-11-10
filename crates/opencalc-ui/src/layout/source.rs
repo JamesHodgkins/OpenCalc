@@ -50,7 +50,7 @@ impl Mark {
     pub fn of(e: &Expr, layout: &Layout, kind: MarkKind) -> Mark {
         Mark {
             key: key_of(e),
-            rect: Rect::from_min_size(Pos2::ZERO, Vec2::new(layout.w, layout.h)),
+            rect: Rect::from_min_size(Pos2::ZERO, Vec2::new(layout.w, layout.caret_height())),
             kind,
         }
     }
@@ -110,10 +110,12 @@ impl SourceLayout {
         size: f32,
         select: impl for<'e> Fn(&'e Expr) -> &'e Expr,
     ) -> SourceLayout {
-        if src.contains('\n') {
-            return SourceLayout::program(fonts, colour, src, size);
-        }
         let (expr, spans) = parse_lenient(src);
+        // A program the lenient parse could not make a tree of (it does not fail on
+        // lines, only on something like a source that is too long) is shown as typed.
+        if src.contains('\n') && matches!(expr, Expr::Garbage { head: None, .. }) {
+            return SourceLayout::as_typed(fonts, colour, src, size);
+        }
         let shown = select(&expr);
         let shown_spans = if std::ptr::eq(shown, &expr) {
             &spans
@@ -131,7 +133,8 @@ impl SourceLayout {
         collect(shown, shown_spans, &mut spans_of);
         let stops = stops(&layout, &spans_of);
         let chars = src.chars().count();
-        let carets = (0..=chars).map(|o| caret_at(&stops, o, layout.h)).collect();
+        let mut carets: Vec<Stop> = (0..=chars).map(|o| caret_at(&stops, o, layout.h)).collect();
+        indent_carets(src, &mut carets);
         SourceLayout {
             layout,
             carets,
@@ -139,11 +142,10 @@ impl SourceLayout {
         }
     }
 
-    /// A program being edited: its lines as typed, in a fixed-width face so the
-    /// indentation lines up. It is typeset (bars and all) once editing ends. Every
-    /// offset has a caret from the text itself, so none of the node bookkeeping the
-    /// formulas need is involved.
-    fn program(fonts: &Fonts, colour: Color32, src: &str, size: f32) -> SourceLayout {
+    /// Lines of text as typed, in a fixed-width face so the indentation lines up.
+    /// Every offset has a caret from the text itself, so none of the node
+    /// bookkeeping the formulas need is involved.
+    fn as_typed(fonts: &Fonts, colour: Color32, src: &str, size: f32) -> SourceLayout {
         let galley = fonts.layout_no_wrap(src.to_owned(), FontId::monospace(size), colour);
         let chars = src.chars().count();
         let carets = (0..=chars)
@@ -167,6 +169,7 @@ impl SourceLayout {
                 galley,
             }],
             marks: Vec::new(),
+            first_line: 0.0,
         };
         SourceLayout {
             layout,
@@ -338,6 +341,36 @@ fn stops(layout: &Layout, spans: &HashMap<usize, (Span, Span)>) -> Vec<Stop> {
     out.into_iter().map(|(s, _)| s).collect()
 }
 
+/// In a program, the spaces that start a line are not drawn: a caret among them is
+/// where the line's text starts (not out at the end of the line above, which is
+/// nearer in the source).
+fn indent_carets(src: &str, carets: &mut [Stop]) {
+    let chars: Vec<char> = src.chars().collect();
+    let mut line_start = 0;
+    while line_start <= chars.len() {
+        let text_start = line_start
+            + chars[line_start..]
+                .iter()
+                .take_while(|c| **c == ' ')
+                .count();
+        if text_start > line_start && line_start > 0 {
+            let at = carets[text_start];
+            for (offset, caret) in carets
+                .iter_mut()
+                .enumerate()
+                .take(text_start)
+                .skip(line_start)
+            {
+                *caret = Stop { offset, ..at };
+            }
+        }
+        match chars[line_start..].iter().position(|c| *c == '\n') {
+            Some(i) => line_start += i + 1,
+            None => break,
+        }
+    }
+}
+
 /// Two stops are on one line if their vertical extents overlap substantially.
 fn same_line(a: &Stop, b: &Stop) -> bool {
     let overlap = a.bottom.min(b.bottom) - a.top.max(b.top);
@@ -453,11 +486,90 @@ mod tests {
         "",
     ];
 
+    /// Programs, as they are typed (several lines).
+    const PROGRAMS: &[&str] = &[
+        "f(n) := program\n    s \u{2190} 0\n    for i in 1..n\n        s \u{2190} s + i\n    return s",
+        "g := program\n    if x > 1\n        a \u{2190} 1\n    else\n        a \u{2190} 2\n    v[1, 2] \u{2190} a\n    a",
+        "h := program\n    try\n        a \u{2190} 1 / 0\n    on error e\n        a \u{2190} e\n    while 1\n        break\n    return \"done\"",
+        "k := program\n    x \u{2190} 1\n  y \u{2190} 2\n        z \u{2190} 3\n    for i in\n    x +\n    ",
+    ];
+
     fn everything() -> Vec<String> {
         let mut sources = corpus_sources();
         assert!(sources.len() > 300, "{} corpus lines", sources.len());
         sources.extend(SHAPES.iter().map(|s| (*s).to_owned()));
+        sources.extend(PROGRAMS.iter().map(|s| (*s).to_owned()));
         sources
+    }
+
+    #[test]
+    fn a_program_is_edited_in_its_typeset_form_with_a_caret_on_every_line() {
+        with_fonts(|fonts| {
+            let src = PROGRAMS[0];
+            let l = lay(fonts, src);
+            let chars: Vec<char> = src.chars().collect();
+            // Typeset: much taller than the plain text of one line would be, with
+            // the bars of its blocks drawn.
+            assert!(l.layout.h > 3.0 * 16.0, "{}", l.layout.h);
+            let bars = l
+                .layout
+                .ops
+                .iter()
+                .filter(|op| matches!(op, Op::Line { a, b } if a.x == b.x))
+                .count();
+            assert_eq!(bars, 2);
+            // The caret at the start of each line is on a lower line than the
+            // line above it, and one line tall (not the height of the whole).
+            let mut line_starts = vec![0];
+            for (i, c) in chars.iter().enumerate() {
+                if *c == '\n' {
+                    line_starts.push(i + 1);
+                }
+            }
+            let tops: Vec<f32> = line_starts.iter().map(|o| l.caret_rect(*o).min.y).collect();
+            // (The first line of the body is level with `f(n) :=`.)
+            assert_eq!(tops[0], tops[1], "{tops:?}");
+            for pair in tops[1..].windows(2) {
+                assert!(pair[1] > pair[0], "{tops:?}");
+            }
+            for o in &line_starts {
+                assert!(
+                    l.caret_rect(*o).height() < 2.0 * 16.0 * 1.5,
+                    "offset {o}: {:?}",
+                    l.caret_rect(*o)
+                );
+            }
+        });
+    }
+
+    #[test]
+    fn a_new_line_being_typed_has_its_caret_on_a_line_of_its_own() {
+        with_fonts(|fonts| {
+            let before = lay(fonts, "f := program\n    s \u{2190} 0");
+            let after = lay(fonts, "f := program\n    s \u{2190} 0\n    ");
+            let at = "f := program\n    s \u{2190} 0\n    ".chars().count();
+            let (old_end, new) = (before.caret_rect(before.chars()), after.caret_rect(at));
+            assert!(new.min.y > old_end.min.y, "{new:?} against {old_end:?}");
+            assert!(after.layout.h > before.layout.h);
+        });
+    }
+
+    #[test]
+    fn clicking_in_a_program_finds_the_line_that_was_clicked() {
+        with_fonts(|fonts| {
+            let l = lay(fonts, PROGRAMS[0]);
+            let chars = PROGRAMS[0].chars().count();
+            for o in 0..=chars {
+                let c = l.caret_rect(o);
+                let found = l.offset_at(c.center());
+                let back = l.caret_rect(found);
+                assert!(
+                    (back.center().y - c.center().y).abs() < 1.0,
+                    "offset {o} clicked at {:?} found {found} on another line",
+                    c.center()
+                );
+            }
+        });
     }
 
     /// Every offset of `src` has a caret inside the layout.
