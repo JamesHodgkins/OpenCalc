@@ -264,4 +264,4 @@ find(force, moment)
   vector.
 - Still circular, correctly: `[x; y] := find(x, y, ...)` with the guesses taken from the
   worksheet, since the region would read what it defines.
-- Not done: an Insert command for the block (type `given`).
+- Math > Programming > Solve block inserts a working template (also reachable by typing `given`).

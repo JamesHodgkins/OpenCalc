@@ -112,6 +112,8 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | ViewLabels
             | InsertMatrix
             | InsertRange
+            | InsertSolveBlock
+            | InsertProgram
             | WarnNext
             | WarnPrev
             | FormatBorder

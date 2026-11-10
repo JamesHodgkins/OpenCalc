@@ -14,6 +14,7 @@ reasonable grouping, not a copy. See `UI_ALIGNMENT.md` and `CLEAN_ROOM.md`.
 | Tab | Panels | Contents |
 |---|---|---|
 | **Math** | Regions | Math region (large), Text region (large) |
+| | Programming | Solve block (large), Program (large) |
 | | Clipboard | Paste (split), Cut, Copy |
 | | Edit | Find, Replace |
 | | Region | Delete, Lock, Tag |
@@ -48,6 +49,7 @@ reasonable grouping, not a copy. See `UI_ALIGNMENT.md` and `CLEAN_ROOM.md`.
 | Find, Replace | Home | Math > Edit |
 | Delete, Lock, Tag | Home | Math > Region |
 | Math region, Text region | Insert | Math > Regions |
+| Solve block, Program | Insert | Math > Programming |
 | Greek letters | Insert | Math > Symbols |
 | Area, Picture | Insert | Document > Insert |
 | Plot | Insert | Plots > Insert |

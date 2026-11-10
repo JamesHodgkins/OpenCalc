@@ -55,6 +55,13 @@ fn math() -> Tab {
                 ],
             ),
             panel(
+                "Programming",
+                vec![
+                    Column::Large(it(CommandId::InsertSolveBlock)),
+                    Column::Large(it(CommandId::InsertProgram)),
+                ],
+            ),
+            panel(
                 "Clipboard",
                 vec![
                     Column::LargeSplit(Split {
@@ -317,6 +324,7 @@ mod tests {
             panel_titles("Math"),
             [
                 "Regions",
+                "Programming",
                 "Clipboard",
                 "Edit",
                 "Region",

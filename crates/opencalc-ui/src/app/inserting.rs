@@ -32,6 +32,22 @@ fn range_source() -> (String, (usize, usize)) {
     ("1..10".to_owned(), (0, 1))
 }
 
+/// A solve block that works as it stands (it finds 2), the name selected.
+fn solve_block_source() -> (String, (usize, usize)) {
+    (
+        "answer := given\n    x := 1\n    x ^ 2 == 4\nfind(x)".to_owned(),
+        (0, 6),
+    )
+}
+
+/// A program that works as it stands, the name selected.
+fn program_source() -> (String, (usize, usize)) {
+    (
+        "double(x) := program\n    y \u{2190} x * 2\n    return y".to_owned(),
+        (0, 6),
+    )
+}
+
 /// Write `text` in, with the characters `select` (relative to its start) selected.
 fn insert_source(state: &mut AppState, text: &str, select: (usize, usize)) -> Vec<Effect> {
     let Some(i) = state.active else {
@@ -67,6 +83,14 @@ pub fn dispatch_insert(state: &mut AppState, command: CommandId) -> Option<Vec<E
         CommandId::InsertMatrixSize(rows, cols) => {
             state.matrix_open = false;
             let (text, select) = matrix_source(rows, cols);
+            return Some(insert_source(state, &text, select));
+        }
+        CommandId::InsertSolveBlock => {
+            let (text, select) = solve_block_source();
+            return Some(insert_source(state, &text, select));
+        }
+        CommandId::InsertProgram => {
+            let (text, select) = program_source();
             return Some(insert_source(state, &text, select));
         }
         CommandId::InsertRange => {
@@ -111,5 +135,33 @@ mod tests {
             matrix_source(200, 1).0.matches(';').count(),
             usize::from(MAX_SIDE) - 1
         );
+    }
+}
+
+#[cfg(test)]
+mod block_tests {
+    use super::*;
+    use opencalc_core::eval::{evaluate, RegionId};
+    use opencalc_core::parser::parse;
+
+    /// Evaluate the template, then a region that reads what it defines.
+    fn value_of(template: &str, then: &str) -> f64 {
+        let out = evaluate(&[(RegionId(1), parse(template)), (RegionId(2), parse(then))]);
+        out.values[&RegionId(2)]
+            .as_ref()
+            .unwrap_or_else(|e| panic!("{template:?}: {e}"))
+            .as_real()
+            .unwrap()
+            .si
+    }
+
+    #[test]
+    fn the_solve_block_and_program_templates_work_as_they_stand() {
+        let (solve, (a, b)) = solve_block_source();
+        assert_eq!(&solve[a..b], "answer");
+        assert!((value_of(&solve, "answer =") - 2.0).abs() < 1e-7);
+        let (program, (a, b)) = program_source();
+        assert_eq!(&program[a..b], "double");
+        assert_eq!(value_of(&program, "double(21)"), 42.0);
     }
 }

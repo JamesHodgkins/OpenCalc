@@ -193,7 +193,10 @@ impl Field {
     pub fn insert(&mut self, s: &str) {
         let (a, b) = self.selection();
         let room = MAX_CHARS.saturating_sub(self.chars.len() - (b - a));
-        let lines = self.in_program() || s.contains("program\n") || s.contains("program\r\n");
+        let lines = self.in_program()
+            || ["program", "given"]
+                .iter()
+                .any(|w| s.contains(&format!("{w}\n")) || s.contains(&format!("{w}\r\n")));
         let new: Vec<char> = s
             .chars()
             .filter(|c| !(lines && *c == '\r'))

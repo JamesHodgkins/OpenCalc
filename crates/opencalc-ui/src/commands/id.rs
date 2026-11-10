@@ -157,6 +157,8 @@ commands! {
     InsertGreek: "insert.greek", "Greek letters", icons::GREEK;
     InsertMatrix: "insert.matrix", "Matrix", icons::TABLE;
     InsertRange: "insert.range", "Range", icons::LIST;
+    InsertSolveBlock: "insert.solve_block", "Solve block", icons::ENGINEERING;
+    InsertProgram: "insert.program", "Program", icons::PROPERTIES;
     MatrixClose: "insert.matrix_close", "Close Matrix", icons::CLOSE;
     // Format.
     FormatBorder: "format.border", "Border", icons::AREA;
@@ -269,16 +271,18 @@ impl CommandId {
             | FileSaveAsTemplate | FileOpen | FileSave | FileSaveAs | DialogSave
             | DialogDiscard | DialogCancel | DialogOk | DialogRestore | DialogDropRecovery
             | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..) | MatrixClose
-            | InsertMatrix | InsertRange | CheckClose | CalcCheck | WarnNext | WarnPrev
-            | FileClose | FileExample | AppQuit | TabHome | EditUndo | EditRedo | RegionDelete
-            | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable | PictureChoose
-            | TableImportCsv | TableExportCsv | InsertPicture | CalcAll | ViewZoomIn
-            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
-            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose | ThemeNeutral
-            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
-            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
-            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
-            | InsertGreek | InsertSymbol(_) => true,
+            | InsertMatrix | InsertRange | InsertSolveBlock | InsertProgram | CheckClose
+            | CalcCheck | WarnNext | WarnPrev | FileClose | FileExample | AppQuit | TabHome
+            | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea
+            | InsertPlot | InsertTable | PictureChoose | TableImportCsv | TableExportCsv
+            | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
+            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
+            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
+            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
+            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
+                true
+            }
             HelpGuide => false,
         }
     }

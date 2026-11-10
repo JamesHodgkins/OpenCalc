@@ -1312,12 +1312,12 @@ fn clicking_a_flyout_that_floats_over_the_canvas_does_not_end_editing() {
     let id = h.new_math();
     h.type_text("x:=");
     // The Greek flyout (Math tab, Symbols panel) hangs below the ribbon, over the page.
-    h.app.ribbon_state.open_panel = Some((0, 4));
+    h.app.ribbon_state.open_panel = Some((0, 5));
     h.frame();
     h.frame();
     let flyout = h
         .ctx
-        .memory(|m| m.area_rect(egui::Id::new(("ribbon-flyout", (0usize, 4usize)))))
+        .memory(|m| m.area_rect(egui::Id::new(("ribbon-flyout", (0usize, 5usize)))))
         .expect("the flyout is open");
     assert!(
         flyout.max.y > 100.0,

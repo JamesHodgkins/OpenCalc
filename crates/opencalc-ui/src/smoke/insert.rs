@@ -69,7 +69,12 @@ fn a_matrix_with_nothing_being_edited_makes_a_new_region_and_undo_removes_it() {
 fn the_insert_commands_need_a_worksheet_and_the_window_follows_the_page() {
     let mut h = Harness::new();
     h.settle();
-    for c in [CommandId::InsertMatrix, CommandId::InsertRange] {
+    for c in [
+        CommandId::InsertMatrix,
+        CommandId::InsertRange,
+        CommandId::InsertSolveBlock,
+        CommandId::InsertProgram,
+    ] {
         assert!(h.app.registry().allows(c), "{c:?}");
     }
     h.command(CommandId::InsertMatrix);
@@ -79,7 +84,38 @@ fn the_insert_commands_need_a_worksheet_and_the_window_follows_the_page() {
     h.command(CommandId::TabHome);
     h.frame();
     assert!(!h.app.state.matrix_open, "closes itself on the Home page");
-    for c in [CommandId::InsertMatrix, CommandId::InsertRange] {
+    for c in [
+        CommandId::InsertMatrix,
+        CommandId::InsertRange,
+        CommandId::InsertSolveBlock,
+        CommandId::InsertProgram,
+    ] {
         assert!(!h.app.registry().allows(c), "{c:?}");
+    }
+}
+
+#[test]
+fn inserting_a_solve_block_or_a_program_makes_a_region_that_solves_or_runs() {
+    for (command, expected) in [
+        (CommandId::InsertSolveBlock, "answer := given"),
+        (CommandId::InsertProgram, "double(x) := program"),
+    ] {
+        let mut h = Harness::new();
+        h.settle();
+        let before = h.sheet().doc.regions().len();
+        h.command(command);
+        h.settle();
+        assert_eq!(h.sheet().doc.regions().len(), before + 1);
+        let region = h.sheet().doc.regions().last().expect("the new region");
+        let RegionKind::Math(m) = &region.kind else {
+            panic!("a math region");
+        };
+        assert!(m.source().starts_with(expected), "{}", m.source());
+        assert!(
+            !matches!(m.expr(), opencalc_core::expr::Expr::Error(_)),
+            "the template parses"
+        );
+        h.command(CommandId::EditUndo);
+        assert_eq!(h.sheet().doc.regions().len(), before, "one undo removes it");
     }
 }
