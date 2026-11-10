@@ -21,6 +21,7 @@ use crate::expr::{solver_parts, BinaryOp, Expr};
 use crate::numeric;
 use crate::units::{Dimension, UnitError};
 use crate::value::{Matrix, Scalar, Value};
+use std::cell::RefCell;
 
 mod bfgs;
 mod lm;
@@ -122,7 +123,7 @@ struct Problem<'e, 'a> {
 impl Problem<'_, '_> {
     fn set(&mut self, x: &[f64]) {
         for (i, v) in x.iter().enumerate() {
-            self.inner.locals[self.base + i].1 =
+            self.inner.locals.get_mut()[self.base + i].1 =
                 Value::Scalar(Scalar::new(numeric::real(*v), self.dims[i]));
         }
     }
@@ -190,7 +191,7 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
         .iter()
         .map(|(arg, e)| constraint(*arg, e))
         .collect::<Result<Vec<_>, _>>()?;
-    let mut locals = cx.locals.clone();
+    let mut locals = cx.locals.borrow().clone();
     let base = locals.len();
     locals.extend(
         names
@@ -202,7 +203,7 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
             env: cx.env,
             fns: cx.fns,
             units: cx.units,
-            locals,
+            locals: RefCell::new(locals),
             depth: cx.depth,
             meter: cx.meter,
         },

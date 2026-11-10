@@ -46,6 +46,8 @@ pub struct Env<'a> {
     pub headers: &'a opencalc_core::document::HeaderFooter,
     pub title: &'a str,
     pub output: &'a Output,
+    /// Manual calculation and the results are out of date: draw them dimmed.
+    pub stale: bool,
     pub units: UnitSystem,
     pub show_grid: bool,
     pub snap: bool,

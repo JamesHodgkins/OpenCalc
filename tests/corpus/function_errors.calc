@@ -1,4 +1,5 @@
-# source: original; each line is meant to fail in a particular, reportable way
+# source: original; each line is meant to fail in a particular, reportable way,
+# except the recursive and mutually recursive functions, which are allowed (Phase 6)
 bad_body(x) := x + nope
 use_bad := bad_body(1)
 area(w, h) := w * h
@@ -19,10 +20,6 @@ list_arity := area(0..2)
 !> use_bad : undefined
 !> arity : arity
 !> mismatch : mismatch
-!> recursive : cycle
-!> use_recursive : cycle
-!> mutual_a : cycle
-!> mutual_b : cycle
 !> sin : invalid
 !> #12 : invalid
 !> #13 : invalid

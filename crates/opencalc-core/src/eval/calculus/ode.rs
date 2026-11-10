@@ -17,6 +17,7 @@ use crate::expr::Expr;
 use crate::numeric::{self, Complex64};
 use crate::units::{Dimension, UnitError};
 use crate::value::{Matrix, Scalar, Value, MAX_ELEMENTS};
+use std::cell::RefCell;
 
 mod rk45;
 
@@ -81,7 +82,7 @@ pub(super) fn odesolve(args: &[Expr], cx: &Cx) -> Evaluated {
         .collect::<Result<_, _>>()
         .map_err(Located::here)?;
 
-    let mut locals = cx.locals.clone();
+    let mut locals = cx.locals.borrow().clone();
     let base = locals.len();
     locals.push((time.clone(), Value::dimensionless(0.0)));
     locals.push((state.clone(), Value::dimensionless(0.0)));
@@ -89,15 +90,15 @@ pub(super) fn odesolve(args: &[Expr], cx: &Cx) -> Evaluated {
         env: cx.env,
         fns: cx.fns,
         units: cx.units,
-        locals,
+        locals: RefCell::new(locals),
         depth: cx.depth,
         meter: cx.meter,
     };
     let body = &args[0];
     let mut rhs = |t: f64, y: &[f64]| -> Result<Vec<f64>, Located> {
         inner.meter.charge().map_err(Located::here)?;
-        inner.locals[base].1 = Value::Scalar(Scalar::new(numeric::real(t), dt));
-        inner.locals[base + 1].1 = value_of(shape, y, &dims)?;
+        inner.locals.get_mut()[base].1 = Value::Scalar(Scalar::new(numeric::real(t), dt));
+        inner.locals.get_mut()[base + 1].1 = value_of(shape, y, &dims)?;
         let v = eval(body, &inner).map_err(|l| l.under(0))?;
         let items: Vec<Scalar> = match (shape, v) {
             (Shape::Number, Value::Scalar(s)) => vec![s],

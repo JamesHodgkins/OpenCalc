@@ -147,6 +147,10 @@ pub(super) fn math(
         for event in events {
             let (start, list) = complete::for_field(field, &defined);
             match event {
+                // In a program a space is text; see `Field::typed`.
+                Event::Text(s) if s == " " && field.in_program() && !field.has_selection() => {
+                    field.typed(&s, greek_by_name);
+                }
                 Event::Text(s) if s == " " => {
                     // Space finishes a Greek name, else grows the selection.
                     if field.has_selection() || !field.expand_greek(greek_by_name) {
@@ -298,6 +302,17 @@ fn key_down(
     let len = field.len();
     let listing = !list.is_empty();
     match key {
+        // In a program Enter is always a new line (or, on a blank last line, done),
+        // even with the completion list open: Tab accepts a completion there, and
+        // at the start of a line it indents.
+        Key::Enter if field.in_program() && field.at_blank_last_line() => {
+            field.trim_end();
+            return true;
+        }
+        Key::Enter if field.in_program() => field.new_line(),
+        Key::Tab if field.in_program() && (shift || (field.in_line_indent() && !listing)) => {
+            field.indent(shift);
+        }
         // A name typed in full that is the top choice: Enter is just "done".
         Key::Enter if listing && is_complete(field, &list[field.pick.min(list.len() - 1)]) => {
             return true;

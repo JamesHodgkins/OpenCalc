@@ -14,6 +14,7 @@
 mod forms;
 mod lenient;
 mod lexer;
+mod program;
 mod spans;
 
 pub use lenient::parse_lenient;
@@ -33,7 +34,12 @@ use crate::expr::{AssignKind, BinaryOp, Expr, UnaryOp};
 /// are far shorter. Raise it only together with the stack-margin test below.
 pub const MAX_SYMBOLS: usize = 128;
 /// Source text longer than this is rejected before tokenising.
-const MAX_SOURCE_CHARS: usize = 4096;
+const MAX_SOURCE_CHARS: usize = 8192;
+/// Most symbols in a whole program. Each line is still held to `MAX_SYMBOLS`, which
+/// is what bounds the depth of an expression; blocks nest at most `MAX_BLOCK_DEPTH`
+/// deep, so the depth of a program is the two together.
+pub const MAX_PROGRAM_SYMBOLS: usize = 2048;
+const MAX_BLOCK_DEPTH: usize = 12;
 
 /// Parse one region's source text.
 pub fn parse(src: &str) -> Expr {
@@ -76,8 +82,8 @@ fn parse_inner(src: &str, lenient: bool) -> (Expr, Vec<spans::Entry>) {
         Ok(t) => t,
         Err((message, start, end)) => return failed(ParseError::new(message, start, end)),
     };
-    if toks.len() > MAX_SYMBOLS {
-        let start = spans[MAX_SYMBOLS].0;
+    if let Some(at) = over_the_limit(&toks) {
+        let start = spans[at].0;
         return failed(ParseError::new(too_long(), start, chars));
     }
     let mut parser = Parser {
@@ -86,11 +92,8 @@ fn parse_inner(src: &str, lenient: bool) -> (Expr, Vec<spans::Entry>) {
         pos: 0,
         log: Vec::new(),
         lenient,
-        text: if lenient {
-            src.chars().collect()
-        } else {
-            Vec::new()
-        },
+        text: src.chars().collect(),
+        blocks: 0,
         end: chars,
     };
     match parser.parse_all() {
@@ -102,6 +105,19 @@ fn parse_inner(src: &str, lenient: bool) -> (Expr, Vec<spans::Entry>) {
             failed(ParseError::new(message, start, end))
         }
     }
+}
+
+/// The first token past the limits: more than `MAX_SYMBOLS` on one line, or more
+/// than `MAX_PROGRAM_SYMBOLS` altogether.
+fn over_the_limit(toks: &[Tok]) -> Option<usize> {
+    let mut on_line = 0;
+    for (i, t) in toks.iter().enumerate() {
+        on_line = if *t == Tok::Line { 0 } else { on_line + 1 };
+        if on_line > MAX_SYMBOLS || i >= MAX_PROGRAM_SYMBOLS {
+            return Some(i);
+        }
+    }
+    None
 }
 
 fn too_long() -> String {
@@ -117,8 +133,10 @@ struct Parser {
     log: Vec<spans::Entry>,
     /// Display parse (`parse_lenient`): recover instead of failing.
     lenient: bool,
-    /// The source characters, kept only when lenient (for `Garbage` text).
+    /// The source characters (for `Garbage` text and the indentation of lines).
     text: Vec<char>,
+    /// How many blocks of a program the parser is inside.
+    blocks: usize,
     /// The length of the source in characters.
     end: usize,
 }
@@ -185,7 +203,11 @@ impl Parser {
                 // on the `:=`.
                 match forms::function_signature(&lhs) {
                     Err(message) => self.keep_or_fail(message, lhs)?,
-                    Ok((name, params)) => {
+                    Ok(forms::Signature {
+                        name,
+                        params,
+                        defaults,
+                    }) => {
                         self.pos += 1;
                         let body_mark = self.log.len();
                         let body = self.range_expr(true)?;
@@ -195,6 +217,7 @@ impl Parser {
                         Expr::FunctionDef {
                             name,
                             params,
+                            defaults: Box::new(defaults),
                             body: Box::new(body),
                         }
                     }
@@ -257,6 +280,11 @@ impl Parser {
             }
             _ => lhs,
         };
+        if forms::has_default_argument(&result) {
+            let message =
+                "a default (n := 2) belongs in a function definition, f(x, n := 2) := ...";
+            return self.keep_or_fail(message.to_owned(), result);
+        }
         match self.peek() {
             None => Ok(result),
             Some(_) if self.lenient => Ok(self.garbage_tail(result)),
@@ -297,6 +325,9 @@ impl Parser {
         let first = self.pos;
         match self.next() {
             Some(Tok::Num(v)) => self.after_number(v),
+            Some(Tok::Ident(name)) if name == "program" && self.peek() == Some(&Tok::Line) => {
+                self.program(first)
+            }
             Some(Tok::Ident(name)) => {
                 let e = if self.eat(&Tok::LParen) {
                     let args = self.args()?;
@@ -586,6 +617,94 @@ mod tests {
                 (message.to_owned(), text.to_owned()),
                 "{src}"
             );
+        }
+    }
+
+    #[test]
+    fn default_arguments() {
+        let f = "f(x, n := 2, m := n0 + 1) := x ^ n + m";
+        let lines = |call: &str| [f, "n0 := 10", call].map(str::to_owned);
+        let value = |call: &str| {
+            let l = lines(call);
+            run(&[&l[0], &l[1], &l[2]], 2)
+        };
+        assert_eq!(value("f(3)"), 3.0_f64.powi(2) + 11.0);
+        assert_eq!(value("f(3, 3)"), 27.0 + 11.0);
+        assert_eq!(value("f(3, 3, 0)"), 27.0);
+        assert_eq!(parse(f).to_string(), f);
+        let err = |call: &str| {
+            let out = evaluate(&[
+                (RegionId(0), parse(f)),
+                (RegionId(1), parse("n0 := 10")),
+                (RegionId(2), parse(call)),
+            ]);
+            out.values[&RegionId(2)].clone().unwrap_err().to_string()
+        };
+        assert_eq!(
+            err("f()"),
+            "cannot evaluate: function 'f' takes 1 to 3 arguments"
+        );
+        assert_eq!(
+            err("f(1, 2, 3, 4)"),
+            "cannot evaluate: function 'f' takes 1 to 3 arguments"
+        );
+    }
+
+    #[test]
+    fn default_arguments_are_checked_where_they_are_written() {
+        let bad = [
+            ("f(x, n := 2, m) := x", "'m' needs a default"),
+            ("f(x, n := x) := x", "cannot use the parameter 'x'"),
+            ("f(x := 1, n := x) := x", "cannot use the parameter 'x'"),
+            ("g(1, n := 2)", "belongs in a function definition"),
+            ("1 + g(n := 2)", "belongs in a function definition"),
+        ];
+        for (src, part) in bad {
+            let (message, _) = error_at(src);
+            assert!(message.contains(part), "{src}: {message}");
+        }
+        // A default is worked out in the worksheet, so a missing name is an error
+        // at the call, and a default that is itself a unit expression works.
+        let out = evaluate(&[
+            (RegionId(0), parse("f(x, n := nothing) := x + n")),
+            (RegionId(1), parse("f(1)")),
+            (RegionId(2), parse("h(x, d := 2 m) := x + d")),
+            (RegionId(3), parse("h(1 m)")),
+        ]);
+        assert!(out.values[&RegionId(1)].is_err());
+        assert_eq!(
+            out.values[&RegionId(3)]
+                .clone()
+                .unwrap()
+                .as_real()
+                .unwrap()
+                .si,
+            3.0
+        );
+    }
+
+    #[test]
+    fn binary_octal_and_hexadecimal_literals() {
+        assert_eq!(run(&["0xFF"], 0), 255.0);
+        assert_eq!(run(&["0Xff + 1"], 0), 256.0);
+        assert_eq!(run(&["0b1011"], 0), 11.0);
+        assert_eq!(run(&["0o17 * 2"], 0), 30.0);
+        assert_eq!(run(&["0x1F m"], 0), 31.0);
+        assert_eq!(run(&["0x20000000000000"], 0), 9007199254740992.0);
+        assert_eq!(run(&["2^0x3"], 0), 8.0);
+        // Too large to be exact, rather than quietly rounded.
+        assert_eq!(
+            error_at("0x20000000000001"),
+            (
+                "number too large to hold exactly (most 2^53)".to_owned(),
+                "0x20000000000001".to_owned()
+            )
+        );
+        // Not a literal: a digit outside the radix is a name run on to the zero,
+        // which is an ordinary (undefined) name; nothing is read as 0b1 times 2.
+        for src in ["0b12", "0o8", "0x", "0xG"] {
+            let out = evaluate(&[(RegionId(0), parse(src))]);
+            assert!(out.values[&RegionId(0)].is_err(), "{src}");
         }
     }
 

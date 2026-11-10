@@ -5,6 +5,7 @@
 //! topological order of the edges, so with edges drawn consumer -> producer the
 //! output order is already producers first, which is the evaluation order.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 
@@ -13,6 +14,7 @@ mod graph;
 mod meter;
 mod node;
 mod plot;
+mod program;
 mod undefined;
 
 pub use plot::{PlotData, PlotSeries};
@@ -89,6 +91,8 @@ type Env = HashMap<String, Result<Value, EvalError>>;
 /// A user-defined function: its parameter names and its body.
 struct UserFn<'a> {
     params: &'a [String],
+    /// Defaults of the last parameters, worked out at the call.
+    defaults: &'a [Expr],
     body: &'a Expr,
     /// The definition is part of a circular reference, so calling it is too.
     circular: bool,
@@ -96,11 +100,11 @@ struct UserFn<'a> {
 
 type Fns<'a> = HashMap<&'a str, UserFn<'a>>;
 
-/// Functions may call other functions this many levels deep. Recursion is not
-/// supported (a function that reaches itself is a circular reference), so this
-/// only bounds chains of different functions; it keeps the stack use of nested
-/// calls inside the worker thread's stack (see the test in `eval::tests`).
-const MAX_CALL_DEPTH: usize = 12;
+/// Functions may call each other, and themselves, this many levels deep. It keeps
+/// the stack use of nested calls inside the evaluation thread's stack
+/// (`worker::EVAL_STACK`; see the test in `eval::tests`, which uses the worst
+/// shape a function body may have at every level).
+const MAX_CALL_DEPTH: usize = 64;
 
 /// What an expression is evaluated against: the defined names, the user's
 /// functions, the units, and, inside a call, the function's parameters.
@@ -110,7 +114,8 @@ struct Cx<'a> {
     units: &'a UnitRegistry,
     /// Parameters of the function being evaluated, innermost scope only. They
     /// shadow everything else.
-    locals: Vec<(String, Value)>,
+    /// A `RefCell` because a program assigns to its variables as it runs.
+    locals: RefCell<Vec<(String, Value)>>,
     depth: usize,
     /// Counts repeated evaluations and watches for cancellation.
     meter: &'a Meter<'a>,
@@ -192,9 +197,7 @@ pub fn evaluate_cancellable(
                 target,
                 ..
             } => var_definers.entry(target.as_str()).or_default().push(*id),
-            Expr::FunctionDef { name, .. } => {
-                fn_definers.entry(name.as_str()).or_default().push(*id)
-            }
+            Expr::FunctionDef { name, .. } => fn_definers.entry(&**name).or_default().push(*id),
             _ => {}
         }
     }
@@ -243,7 +246,18 @@ pub fn evaluate_cancellable(
         .collect();
 
     let components = tarjan(&edges);
-    let circular = |i: usize, component: &[usize]| component.len() > 1 || edges[i].contains(&i);
+    // A cycle made only of function definitions is recursion, which is allowed: a
+    // definition's body runs when the function is called, not when it is defined,
+    // so nothing has to be evaluated before anything else. A cycle that includes a
+    // variable (`x := f(1)` with `f` reading `x`) is still circular.
+    let only_functions = |component: &[usize]| {
+        component
+            .iter()
+            .all(|&i| matches!(regions[i].1, Expr::FunctionDef { .. }))
+    };
+    let circular = |i: usize, component: &[usize]| {
+        (component.len() > 1 || edges[i].contains(&i)) && !only_functions(component)
+    };
     let in_cycle: Vec<bool> = {
         let mut flags = vec![false; regions.len()];
         for component in &components {
@@ -259,12 +273,18 @@ pub fn evaluate_cancellable(
         .iter()
         .enumerate()
         .filter_map(|(i, (id, e))| match e {
-            Expr::FunctionDef { name, params, body } if fn_winner.get(name) == Some(id) => {
+            Expr::FunctionDef {
+                name,
+                params,
+                defaults,
+                body,
+            } if fn_winner.get(&**name) == Some(id) => {
                 let circular = in_cycle[i];
                 Some((
-                    name.as_str(),
+                    &**name,
                     UserFn {
                         params,
+                        defaults,
                         body,
                         circular,
                     },
@@ -288,7 +308,7 @@ pub fn evaluate_cancellable(
                     env: &env,
                     fns: &fns,
                     units,
-                    locals: Vec::new(),
+                    locals: RefCell::default(),
                     depth: 0,
                     meter: &meter,
                 };
@@ -321,7 +341,7 @@ pub fn evaluate_cancellable(
             env: &env,
             fns: &fns,
             units,
-            locals: Vec::new(),
+            locals: RefCell::default(),
             depth: 0,
             meter: &meter,
         };
@@ -700,11 +720,11 @@ mod tests {
 
     #[test]
     fn nested_calls_at_the_depth_limit_fit_in_half_the_worker_stack() {
-        // The worker thread has 8 MB (see `worker::WORKER_STACK`); this must fit in
-        // half of it, in a debug build, which uses the most stack.
+        // The evaluation thread has `worker::EVAL_STACK`; this must fit in half
+        // of it, in a debug build, which uses the most stack.
         let regions = deep_chain(MAX_CALL_DEPTH);
         let last = id(regions.len() as u64);
-        let out = evaluate_on_stack(regions, 4 * 1024);
+        let out = evaluate_on_stack(regions, crate::worker::EVAL_STACK / 2 / 1024);
         // Even number of negations per level, so the value is unchanged.
         assert_eq!(si(&out, last.0), 1.0);
     }
@@ -713,7 +733,7 @@ mod tests {
     fn calls_nested_past_the_limit_are_an_error_not_a_crash() {
         let regions = deep_chain(MAX_CALL_DEPTH + 2);
         let last = id(regions.len() as u64);
-        let out = evaluate_on_stack(regions, 4 * 1024);
+        let out = evaluate_on_stack(regions, crate::worker::EVAL_STACK / 2 / 1024);
         assert!(matches!(
             &out.values[&last],
             Err(EvalError::InFunction { .. })

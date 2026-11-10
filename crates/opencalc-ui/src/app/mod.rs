@@ -168,6 +168,14 @@ impl App {
                 )
             })
             .unwrap_or_default();
+        let shown = self
+            .state
+            .active_sheet()
+            .map(|s| (s.key, s.doc.eval_revision()));
+        self.state.calc.shown_for = shown.map(|(key, _)| key);
+        if let (Some(i), Some((_, rev))) = (self.state.active, shown) {
+            self.state.sheets[i].calculated = Some(rev);
+        }
         self.state.calc.worker_ok =
             self.worker
                 .request_full(self.state.calc.revision, snapshot, plots, units);
@@ -190,7 +198,8 @@ impl App {
     fn run_effects(&mut self, ctx: &egui::Context, effects: Vec<Effect>) {
         for effect in effects {
             match effect {
-                Effect::Recalculate => self.recalculate(),
+                Effect::Recalculate if self.state.holds_back_recalc() => {}
+                Effect::Recalculate | Effect::CalculateNow => self.recalculate(),
                 Effect::ApplyTheme => theme::apply(ctx, &self.state.theme),
                 Effect::Quit => {
                     self.allow_close = true;

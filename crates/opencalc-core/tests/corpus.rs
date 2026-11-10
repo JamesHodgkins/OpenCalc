@@ -185,7 +185,7 @@ fn region_for(sources: &[String], regions: &[(RegionId, Expr)], t: &Target) -> O
                 ..
             } if target == name => Some(*id),
             // A function is named by its name alone: `!> area : ...`.
-            Expr::FunctionDef { name: f, .. } if f == name => Some(*id),
+            Expr::FunctionDef { name: f, .. } if **f == **name => Some(*id),
             _ => None,
         }),
     }

@@ -22,6 +22,8 @@ use std::path::PathBuf;
 pub enum Effect {
     /// Send the active sheet to the evaluation worker.
     Recalculate,
+    /// Calculate now, even in manual mode (the Calculate command).
+    CalculateNow,
     /// Re-apply the theme to egui.
     ApplyTheme,
     Quit,
@@ -139,7 +141,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         EditRedo => with_eval_check(state, &mut fx, |s| {
             s.redo();
         }),
-        CalcAll => fx.push(Effect::Recalculate),
+        CalcAll => fx.push(Effect::CalculateNow),
         ClipboardCopy => fx.push(Effect::Copy),
         ClipboardCut => fx.push(Effect::Cut),
         ClipboardPaste => fx.push(Effect::Paste),
@@ -168,7 +170,15 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         }
         ViewGrid => state.show_grid = !state.show_grid,
         ViewSnap => state.snap = !state.snap,
-        CalcAuto => state.live_recalc = !state.live_recalc,
+        CalcAuto => {
+            // Back to automatic: bring the numbers up to date at once. (Stale is
+            // only ever true in manual mode, so ask before switching.)
+            let catch_up = !state.live_recalc && state.results_stale();
+            state.live_recalc = !state.live_recalc;
+            if catch_up {
+                fx.push(Effect::CalculateNow);
+            }
+        }
         ViewFunctions => state.show_functions = !state.show_functions,
         ViewResetLayout => {
             state.show_functions = false;

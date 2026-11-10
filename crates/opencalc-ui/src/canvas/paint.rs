@@ -236,7 +236,11 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
             Beside::Value(v) => Some(plain(
                 f,
                 &format!("= {}", format_value_with(v, env.units, m.format())),
-                theme.text,
+                if env.stale {
+                    theme.text_weak
+                } else {
+                    theme.text
+                },
                 size,
             )),
             Beside::Failed(e) => Some(warn(e.to_string(), typed.w)),

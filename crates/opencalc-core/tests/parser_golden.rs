@@ -72,9 +72,49 @@ fn sexp(e: &Expr) -> String {
             let idx: Vec<String> = indices.iter().map(sexp).collect();
             format!("(index {} {})", sexp(base), idx.join(" "))
         }
-        Expr::FunctionDef { name, params, body } => {
-            format!("(defn {name} ({}) {})", params.join(" "), sexp(body))
+        Expr::FunctionDef {
+            name,
+            params,
+            defaults,
+            body,
+        } => {
+            let defaults: String = defaults
+                .iter()
+                .map(|d| format!(" default {}", sexp(d)))
+                .collect();
+            format!(
+                "(defn {name} ({}){defaults} {})",
+                params.join(" "),
+                sexp(body)
+            )
         }
+        Expr::Program(statements) => {
+            let all: Vec<String> = statements.iter().map(sexp).collect();
+            format!("(program {})", all.join(" "))
+        }
+        Expr::LocalAssign { target, value } => format!("(set {target} {})", sexp(value)),
+        Expr::IndexAssign {
+            target,
+            indices,
+            value,
+        } => {
+            let at: Vec<String> = indices.iter().map(sexp).collect();
+            format!("(setat {target} [{}] {})", at.join(" "), sexp(value))
+        }
+        Expr::IfBlock {
+            cond,
+            then,
+            otherwise,
+        } => match otherwise {
+            Some(o) => format!("(ifblock {} {} {})", sexp(cond), sexp(then), sexp(o)),
+            None => format!("(ifblock {} {})", sexp(cond), sexp(then)),
+        },
+        Expr::For { var, over, body } => format!("(for {var} {} {})", sexp(over), sexp(body)),
+        Expr::While { cond, body } => format!("(while {} {})", sexp(cond), sexp(body)),
+        Expr::Break => "(break)".to_owned(),
+        Expr::Continue => "(continue)".to_owned(),
+        Expr::Return(value) => format!("(return {})", sexp(value)),
+        Expr::Try { body, handler } => format!("(try {} {})", sexp(body), sexp(handler)),
         Expr::Range { start, step, end } => match step {
             Some(step) => format!("(range {} {} {})", sexp(start), sexp(step), sexp(end)),
             None => format!("(range {} {})", sexp(start), sexp(end)),
@@ -175,6 +215,8 @@ const INPUTS: &[&str] = &[
     "f(0, 2..10)",
     // Function definitions and calls.
     "f(x) := x ^ 2",
+    "f(x, n := 2) := x ^ n",
+    "f(x, n := 2, m := 1 + 1) := x ^ n + m",
     "area(w, h) := w * h",
     "g(a, b, c) := if(a > b, c, 0)",
     "h(x) := 0..x",

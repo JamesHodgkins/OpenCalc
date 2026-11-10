@@ -10,6 +10,7 @@ pub use forms::{
     is_binding_form, is_evaluator_form, is_origin_form, is_solver_form, solver_parts, SolverParts,
     BINDING_FORMS, SOLVER_FORMS,
 };
+pub use names::assigned_names;
 
 use serde::{Deserialize, Serialize};
 
@@ -112,8 +113,14 @@ pub enum Expr {
     /// `f(x, y) := body`. Only ever the top of a region. The body is not evaluated
     /// here; it runs, with the parameters bound, each time `f` is called.
     FunctionDef {
-        name: String,
-        params: Vec<String>,
+        name: Box<str>,
+        params: Box<[String]>,
+        /// Default values of the last `defaults.len()` parameters (`f(x, n := 2)`).
+        /// Not children: they run at the call, in the worksheet's scope. The
+        /// fields are boxed to keep `Expr` at 56 bytes (it is on the stack of every
+        /// recursion, and inside `Edit`, whose size clippy watches).
+        #[allow(clippy::box_collection)]
+        defaults: Box<Vec<Expr>>,
         body: Box<Expr>,
     },
     /// `start..end`, or `start, next..end`, where `next - start` is the step.
@@ -146,6 +153,48 @@ pub enum Expr {
     Garbage {
         head: Option<Box<Expr>>,
         text: String,
+    },
+    // Programs (docs/PROGRAMMING.md). A `Program` is a list of statements, and is
+    // both `program` itself and every indented block inside one. The rest are the
+    // statements. Names assigned in a program are local to it, all through it.
+    /// `program` and the indented lines under it, or one of those blocks.
+    Program(Vec<Expr>),
+    /// `name ← value`: a local variable of the program.
+    LocalAssign {
+        target: String,
+        value: Box<Expr>,
+    },
+    /// `name[i] ← value` or `name[i, j] ← value`: set one element of a local
+    /// vector or matrix, making it or growing it (with zeros) as needed.
+    IndexAssign {
+        target: String,
+        indices: Box<[Expr]>,
+        value: Box<Expr>,
+    },
+    /// `if cond` with an indented block, and optionally `else`. Both are `Program`s.
+    IfBlock {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        otherwise: Option<Box<Expr>>,
+    },
+    /// `for var in over`: once for each value of a range, vector or matrix.
+    For {
+        var: String,
+        over: Box<Expr>,
+        body: Box<Expr>,
+    },
+    While {
+        cond: Box<Expr>,
+        body: Box<Expr>,
+    },
+    Break,
+    Continue,
+    /// `return value`: the value of the whole program.
+    Return(Box<Expr>),
+    /// `try` with a block, and the `on error` block that runs if it fails.
+    Try {
+        body: Box<Expr>,
+        handler: Box<Expr>,
     },
 }
 
@@ -213,6 +262,24 @@ impl Expr {
             Expr::Assign { value, .. } => vec![value],
             Expr::FunctionDef { body, .. } => vec![body],
             Expr::Garbage { head, .. } => head.as_deref().into_iter().collect(),
+            Expr::Program(statements) => statements.iter().collect(),
+            Expr::LocalAssign { value, .. } => vec![value],
+            Expr::IndexAssign { indices, value, .. } => {
+                indices.iter().chain(std::iter::once(&**value)).collect()
+            }
+            Expr::IfBlock {
+                cond,
+                then,
+                otherwise,
+            } => [&**cond, &**then]
+                .into_iter()
+                .chain(otherwise.as_deref())
+                .collect(),
+            Expr::For { over, body, .. } => vec![over, body],
+            Expr::While { cond, body } => vec![cond, body],
+            Expr::Return(value) => vec![value],
+            Expr::Try { body, handler } => vec![body, handler],
+            Expr::Break | Expr::Continue => vec![],
             Expr::Number(_)
             | Expr::Name(_)
             | Expr::Quantity { .. }

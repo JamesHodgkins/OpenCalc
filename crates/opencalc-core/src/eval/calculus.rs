@@ -17,6 +17,7 @@ use crate::expr::Expr;
 use crate::numeric::{self, Complex64};
 use crate::units::{Dimension, UnitError};
 use crate::value::{Matrix, Scalar, Value};
+use std::cell::RefCell;
 
 mod ode;
 mod quadrature;
@@ -73,13 +74,13 @@ fn target<'a>(
 /// A context with the variable bound (initially to 0). Outer locals stay visible;
 /// the new one is last, and `name` looks from the last, so it shadows them.
 fn bound<'a>(cx: &Cx<'a>, var: &str) -> Cx<'a> {
-    let mut locals = cx.locals.clone();
+    let mut locals = cx.locals.borrow().clone();
     locals.push((var.to_owned(), Value::dimensionless(0.0)));
     Cx {
         env: cx.env,
         fns: cx.fns,
         units: cx.units,
-        locals,
+        locals: RefCell::new(locals),
         depth: cx.depth,
         meter: cx.meter,
     }
@@ -88,7 +89,7 @@ fn bound<'a>(cx: &Cx<'a>, var: &str) -> Cx<'a> {
 /// Evaluate the body with the variable set to `value`, charging one step.
 fn at(inner: &mut Cx, body: &Expr, value: Value) -> Evaluated {
     inner.meter.charge().map_err(Located::here)?;
-    if let Some(last) = inner.locals.last_mut() {
+    if let Some(last) = inner.locals.get_mut().last_mut() {
         last.1 = value;
     }
     eval(body, inner).map_err(|l| l.under(0))

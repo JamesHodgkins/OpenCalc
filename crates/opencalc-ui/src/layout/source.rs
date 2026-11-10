@@ -14,11 +14,11 @@
 
 use std::collections::HashMap;
 
-use eframe::egui::{epaint::text::Fonts, Color32, Pos2, Rect, Vec2};
+use eframe::egui::{epaint::text::Fonts, text::CCursor, Color32, FontId, Pos2, Rect, Vec2};
 use opencalc_core::expr::Expr;
 use opencalc_core::parser::{parse_lenient, Span, SpanNode};
 
-use super::{Layout, Typesetter};
+use super::{Layout, Op, Typesetter};
 
 /// What a recorded rectangle stands for.
 #[derive(Clone, Debug)]
@@ -110,6 +110,9 @@ impl SourceLayout {
         size: f32,
         select: impl for<'e> Fn(&'e Expr) -> &'e Expr,
     ) -> SourceLayout {
+        if src.contains('\n') {
+            return SourceLayout::program(fonts, colour, src, size);
+        }
         let (expr, spans) = parse_lenient(src);
         let shown = select(&expr);
         let shown_spans = if std::ptr::eq(shown, &expr) {
@@ -133,6 +136,42 @@ impl SourceLayout {
             layout,
             carets,
             spans,
+        }
+    }
+
+    /// A program being edited: its lines as typed, in a fixed-width face so the
+    /// indentation lines up. It is typeset (bars and all) once editing ends. Every
+    /// offset has a caret from the text itself, so none of the node bookkeeping the
+    /// formulas need is involved.
+    fn program(fonts: &Fonts, colour: Color32, src: &str, size: f32) -> SourceLayout {
+        let galley = fonts.layout_no_wrap(src.to_owned(), FontId::monospace(size), colour);
+        let chars = src.chars().count();
+        let carets = (0..=chars)
+            .map(|offset| {
+                let c = galley.pos_from_ccursor(CCursor::new(offset));
+                Stop {
+                    offset,
+                    x: c.min.x,
+                    top: c.min.y,
+                    bottom: c.max.y,
+                }
+            })
+            .collect();
+        let r = galley.rect;
+        let layout = Layout {
+            w: r.width(),
+            h: r.height(),
+            baseline: r.height() * 0.78,
+            ops: vec![Op::Text {
+                at: Vec2::ZERO,
+                galley,
+            }],
+            marks: Vec::new(),
+        };
+        SourceLayout {
+            layout,
+            carets,
+            spans: SpanNode::leaf(0, chars),
         }
     }
 

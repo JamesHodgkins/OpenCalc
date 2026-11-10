@@ -5,7 +5,17 @@ use super::{AssignKind, BinaryOp, Expr};
 /// Binding strength of an expression when printed, higher binds tighter.
 fn strength(e: &Expr) -> u8 {
     match e {
-        Expr::Assign { .. } | Expr::FunctionDef { .. } | Expr::Range { .. } => 0,
+        Expr::Assign { .. }
+        | Expr::FunctionDef { .. }
+        | Expr::Range { .. }
+        | Expr::Program(_)
+        | Expr::LocalAssign { .. }
+        | Expr::IndexAssign { .. }
+        | Expr::IfBlock { .. }
+        | Expr::For { .. }
+        | Expr::While { .. }
+        | Expr::Return(_)
+        | Expr::Try { .. } => 0,
         Expr::Binary {
             op:
                 BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Gt | BinaryOp::Le | BinaryOp::Ge,
@@ -142,9 +152,38 @@ impl std::fmt::Display for Expr {
                 };
                 write!(f, "{target} {op} {value}")
             }
-            Expr::FunctionDef { name, params, body } => {
-                write!(f, "{name}({}) := {body}", params.join(", "))
+            Expr::FunctionDef {
+                name,
+                params,
+                defaults,
+                body,
+            } => {
+                let plain = params.len() - defaults.len();
+                write!(f, "{name}(")?;
+                for (i, p) in params.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    match i.checked_sub(plain) {
+                        Some(k) => write!(f, "{p} := {}", defaults[k])?,
+                        None => f.write_str(p)?,
+                    }
+                }
+                write!(f, ") := {body}")
             }
+            Expr::Program(_) => {
+                f.write_str("program")?;
+                write_block(f, self, 4)
+            }
+            Expr::LocalAssign { .. }
+            | Expr::IndexAssign { .. }
+            | Expr::IfBlock { .. }
+            | Expr::For { .. }
+            | Expr::While { .. }
+            | Expr::Break
+            | Expr::Continue
+            | Expr::Return(_)
+            | Expr::Try { .. } => write_statement(f, self, 0),
             Expr::Error(e) => write!(f, "? {e}"),
             Expr::Hole => f.write_str("\u{25a1}"),
             Expr::Garbage { head, text } => match head {
@@ -152,5 +191,79 @@ impl std::fmt::Display for Expr {
                 None => f.write_str(text),
             },
         }
+    }
+}
+
+/// The statements of a block, one to a line, each indented by `indent` spaces.
+fn write_block(f: &mut std::fmt::Formatter<'_>, block: &Expr, indent: usize) -> std::fmt::Result {
+    let statements = match block {
+        Expr::Program(statements) => statements.as_slice(),
+        other => std::slice::from_ref(other),
+    };
+    for s in statements {
+        write!(f, "\n{:indent$}", "")?;
+        write_statement(f, s, indent)?;
+    }
+    Ok(())
+}
+
+/// A statement, whose own line is already indented by `indent` spaces. Its blocks
+/// go on the lines below, four further in.
+fn write_statement(f: &mut std::fmt::Formatter<'_>, e: &Expr, indent: usize) -> std::fmt::Result {
+    let inner = indent + 4;
+    match e {
+        Expr::LocalAssign { target, value } => write!(f, "{target} \u{2190} {value}"),
+        Expr::IndexAssign {
+            target,
+            indices,
+            value,
+        } => {
+            write!(f, "{target}[")?;
+            for (k, i) in indices.iter().enumerate() {
+                if k > 0 {
+                    f.write_str(", ")?;
+                }
+                write!(f, "{i}")?;
+            }
+            write!(f, "] \u{2190} {value}")
+        }
+        Expr::IfBlock {
+            cond,
+            then,
+            otherwise,
+        } => {
+            write!(f, "if {cond}")?;
+            write_block(f, then, inner)?;
+            match otherwise.as_deref() {
+                // An `else` holding one `if` is the `else if` it was read from.
+                Some(Expr::Program(only)) if matches!(only.as_slice(), [Expr::IfBlock { .. }]) => {
+                    write!(f, "\n{:indent$}else ", "")?;
+                    write_statement(f, &only[0], indent)
+                }
+                Some(o) => {
+                    write!(f, "\n{:indent$}else", "")?;
+                    write_block(f, o, inner)
+                }
+                None => Ok(()),
+            }
+        }
+        Expr::For { var, over, body } => {
+            write!(f, "for {var} in {over}")?;
+            write_block(f, body, inner)
+        }
+        Expr::While { cond, body } => {
+            write!(f, "while {cond}")?;
+            write_block(f, body, inner)
+        }
+        Expr::Break => f.write_str("break"),
+        Expr::Continue => f.write_str("continue"),
+        Expr::Return(value) => write!(f, "return {value}"),
+        Expr::Try { body, handler } => {
+            f.write_str("try")?;
+            write_block(f, body, inner)?;
+            write!(f, "\n{:indent$}on error", "")?;
+            write_block(f, handler, inner)
+        }
+        other => write!(f, "{other}"),
     }
 }

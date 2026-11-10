@@ -110,15 +110,17 @@ Design for the items still open: `DOCUMENT_FEATURES.md` (decisions A to E).
 
 ## Phase 6: Programming (L)
 
-Needs Phase 1 (booleans, text) and Phase 2 (cancellation).
+Needs Phase 1 (booleans, text) and Phase 2 (cancellation). Design and open decisions:
+`PROGRAMMING.md`.
 
-- [ ] Multi-line programs with local variables.
-- [ ] `for`, `while`, `break`, `continue`, `return`.
-- [ ] `try` / `on error`.
-- [ ] Recursion, behind a depth and time guard (reverses a TD-30 decision; record it).
-- [ ] Default arguments; functions that return several values.
-- [ ] Manual calculation mode (distinct from the current auto-calculate toggle).
-- [ ] Binary, octal and hexadecimal numbers.
+- [x] Multi-line programs with local variables (2026-11-10, `PROGRAMMING.md` section 7). `f(x) := program` and indented lines under it, or any definition's value; no file format change (the source text holds the line breaks). Locals are assigned with `←` (typed `<-`), belong to the program from its first line to its last, and never leak; a name read before it is given a value is an error, not the worksheet's. The program's value is `return`'s, else its last line. Typeset with a bar per block; edited as plain monospace text (Enter = new line with the indent carried, Enter on a blank last line = done, Tab / Shift+Tab indent, Escape or a click away also end it), typeset when editing ends. Element assignment `v[i] ← x` / `m[i, j] ← x` creates the vector or grows it with zeros of the new element's unit. Not done: the editor showing the typeset form while editing.
+- [x] `for`, `while`, `break`, `continue`, `return` (2026-11-10). `for x in range-or-vector-or-matrix` (a matrix goes through its elements row by row, each keeping its unit); every statement and every pass of a loop costs a step of the region's budget and checks for cancellation, so a runaway `while` ends with the budget error. `if cond` / `else if` / `else` blocks; `if(a, b, c)` on a line of its own is still the expression.
+- [x] `try` / `on error` (2026-11-10): the `on error` block runs if the `try` block fails. It never catches cancellation or the step budget. There is no text value yet, so the message cannot be bound to a name.
+- [x] Recursion (2026-11-10), reversing the TD-30 decision (recorded there): a function may call itself or others in a cycle. The graph treats a cycle of only function definitions as fine (a body runs at the call, not at the definition); a cycle that includes a variable stays circular. Guards: calls nest 64 deep (an error that says so), each call is a step of the region's budget (so `fib(32)` stops on the budget). The evaluation stack grew from 8 MB to 64 MB (virtual; committed as used) and the headless `check` now evaluates on such a thread too.
+- [x] Default arguments (2026-11-10): `f(x, n := 2) := x^n`. Defaults are the trailing parameters (one without a default cannot follow one with), are worked out at the call in the worksheet's scope and may not use the other parameters; a call may leave out trailing arguments (`f(3)`), else the arity error says "takes 1 to 2 arguments". `:=` rather than `=` because `=` already means evaluate. A default written outside a definition is a parse error. Not children of the definition in the tree (no error paths into them).
+- [x] Functions that return several values (2026-11-10): `return [a; b]` gives a vector; no tuple type (decided).
+- [x] Manual calculation mode (2026-11-10): the Automatic calculation toggle now means it. Off holds back every recalculation, not only typing (insert, delete, paste, undo too); Calculate (Ctrl+F9) runs it; results left on screen are dimmed and the status bar says "Manual: results out of date" until then; turning automatic back on catches up at once. Per session, never saved in the file. Switching worksheet always calculates the one you switch to (the results on screen belong to one sheet). Export in manual mode does not mark stale numbers.
+- [x] Binary, octal and hexadecimal numbers (2026-11-10): `0x1F`, `0b1011`, `0o17` (prefix form, since the suffix forms clash with units `h` and `b`); exact up to 2^53, larger is an error. Not done: showing a result in another base, bitwise functions.
 
 ## Phase 7: Controls and scripting (L, optional)
 
@@ -136,6 +138,10 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-10 | Phase 6: recursion; element assignment. Phase 6 is complete apart from the editor showing typeset programs while editing. |
+| 2026-11-10 | Phase 6: programs (parser, evaluator, typesetting, editor). |
+| 2026-11-10 | Phase 6: manual calculation mode; default arguments. |
+| 2026-11-10 | Phase 6 started: design note `PROGRAMMING.md`; binary, octal and hexadecimal literals. |
 | 2026-11-08 | Phase 5: rich text. |
 | 2026-11-08 | Phase 5: templates. |
 | 2026-11-08 | Phase 5: page backgrounds and tints; `≡` accepted as `:=`. |

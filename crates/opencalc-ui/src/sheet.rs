@@ -33,6 +33,9 @@ pub struct OpenSheet {
     pub adopted_recovery: Option<PathBuf>,
     /// The revision last written to a recovery file.
     pub autosaved: Option<u64>,
+    /// The `eval_revision` of the document when its results were last asked for.
+    /// With manual calculation, results are out of date when this differs.
+    pub calculated: Option<u64>,
 }
 
 static NEXT_KEY: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
@@ -60,6 +63,7 @@ impl OpenSheet {
             key: NEXT_KEY.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             adopted_recovery: None,
             autosaved: None,
+            calculated: None,
         }
     }
 

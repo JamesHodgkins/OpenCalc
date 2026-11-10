@@ -22,6 +22,8 @@ pub struct CalcStatus {
     pub applied: u64,
     /// False once the worker has stopped accepting requests.
     pub worker_ok: bool,
+    /// The worksheet (by `OpenSheet::key`) whose results are on screen.
+    pub shown_for: Option<u32>,
 }
 
 pub struct AppState {
@@ -38,6 +40,8 @@ pub struct AppState {
     /// The page in view (from 1) and the number of pages, from the last frame.
     pub page: (usize, usize),
     pub snap: bool,
+    /// Automatic calculation. Off is manual mode: nothing is calculated until the
+    /// Calculate command. A session setting, never saved in a file.
     pub live_recalc: bool,
     /// The optional Functions window.
     pub show_functions: bool,
@@ -96,6 +100,7 @@ impl AppState {
                 revision: 0,
                 applied: 0,
                 worker_ok: true,
+                shown_for: None,
             },
             show_grid: true,
             page: (1, 1),
@@ -201,6 +206,25 @@ impl AppState {
         })
     }
 
+    /// Manual mode, and the active worksheet has changed since its results were
+    /// asked for, so the numbers shown are out of date.
+    pub fn results_stale(&self) -> bool {
+        !self.live_recalc
+            && self
+                .active_sheet()
+                .is_some_and(|s| s.calculated != Some(s.doc.eval_revision()))
+    }
+
+    /// Whether an edit's request to recalculate is to be held back: manual mode,
+    /// out of date, and the results on screen are this worksheet's own. (When they
+    /// are another worksheet's, they are replaced; they are no use here.)
+    pub fn holds_back_recalc(&self) -> bool {
+        self.results_stale()
+            && self
+                .active_sheet()
+                .is_some_and(|s| self.calc.shown_for == Some(s.key))
+    }
+
     /// The calculation indicator on the status bar.
     pub fn calc_label(&self) -> &'static str {
         if !self.calc.worker_ok {
@@ -209,6 +233,8 @@ impl AppState {
             "Calculating\u{2026}"
         } else if self.live_recalc {
             "Calculated"
+        } else if self.results_stale() {
+            "Manual: results out of date (Ctrl+F9 to calculate)"
         } else {
             "Manual"
         }
@@ -239,7 +265,12 @@ mod tests {
         let mut s = AppState::new(PaletteKey::Neutral);
         assert_eq!(s.calc_label(), "Calculated");
         s.live_recalc = false;
+        let rev = s.sheets[0].doc.eval_revision();
+        s.sheets[0].calculated = Some(rev);
         assert_eq!(s.calc_label(), "Manual");
+        s.sheets[0].calculated = None;
+        assert!(s.calc_label().starts_with("Manual: results out of date"));
+        s.sheets[0].calculated = Some(rev);
         s.calc.revision = 3;
         assert!(s.calc_label().starts_with("Calculating"));
         s.calc.worker_ok = false;

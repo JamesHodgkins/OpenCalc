@@ -6,6 +6,7 @@ use crate::expr::{BinaryOp, Expr, UnaryOp, ORIGIN};
 use crate::functions;
 use crate::units::offset_unit;
 use crate::value::{Comparison, Matrix, Series, Value, ValueError};
+use std::cell::RefCell;
 
 /// An evaluation error and where in the expression it happened. The path is
 /// built from the inside out as the error propagates, so it is stored reversed.
@@ -41,13 +42,13 @@ pub(super) type Evaluated = Result<Value, Located>;
 pub(super) fn eval_region(expr: &Expr, cx: &Cx) -> Evaluated {
     match expr {
         Expr::FunctionDef { name, params, .. } => {
-            if name == "if" || functions::lookup(name).is_some() {
+            if &**name == "if" || functions::lookup(name).is_some() {
                 return Err(Located::here(EvalError::Invalid(format!(
                     "'{name}' is a built-in function and cannot be redefined"
                 ))));
             }
             Ok(Value::Function {
-                params: params.clone(),
+                params: params.to_vec(),
             })
         }
         Expr::Assign { value, .. } => eval(value, cx).map_err(|l| l.under(0)),
@@ -97,6 +98,16 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
             then,
             otherwise,
         } => conditional(cond, then, otherwise, cx),
+        Expr::Program(statements) => super::program::run(statements, cx),
+        Expr::LocalAssign { .. }
+        | Expr::IndexAssign { .. }
+        | Expr::IfBlock { .. }
+        | Expr::For { .. }
+        | Expr::While { .. }
+        | Expr::Break
+        | Expr::Continue
+        | Expr::Return(_)
+        | Expr::Try { .. } => outside_a_program(),
         Expr::Assign { value, .. } => child(value, 0, cx),
         Expr::FunctionDef { .. } => Err(Located::here(EvalError::Invalid(
             "a function can only be defined at the top of a region".into(),
@@ -110,6 +121,16 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
             "unexpected '{text}'"
         )))),
     }
+}
+
+/// Kept out of `eval_node` so that its frame, which every nesting level pays for,
+/// does not grow (the stack tests would fail).
+#[cold]
+#[inline(never)]
+fn outside_a_program() -> Evaluated {
+    Err(Located::here(EvalError::Invalid(
+        "this can only be used inside a program".into(),
+    )))
 }
 
 /// `[a, b; c, d]`: every cell must be a scalar, and all share one dimension.
@@ -137,11 +158,19 @@ fn call_user(name: &str, f: &UserFn, args: &[Expr], cx: &Cx) -> Evaluated {
     if f.circular {
         return Err(Located::here(EvalError::Cycle));
     }
-    if args.len() != f.params.len() {
-        return Err(Located::here(EvalError::Arity(
-            name.to_owned(),
-            f.params.len(),
-        )));
+    // Each call is a step of the region's budget, so a recursion that does not
+    // end (or only ends after too much work) stops on the budget.
+    cx.meter.charge().map_err(Located::here)?;
+    let fewest = f.params.len() - f.defaults.len();
+    if args.len() < fewest || args.len() > f.params.len() {
+        return Err(Located::here(if f.defaults.is_empty() {
+            EvalError::Arity(name.to_owned(), f.params.len())
+        } else {
+            EvalError::Invalid(format!(
+                "function '{name}' takes {fewest} to {} arguments",
+                f.params.len()
+            ))
+        }));
     }
     if cx.depth >= MAX_CALL_DEPTH {
         return Err(Located::here(EvalError::Invalid(
@@ -152,11 +181,14 @@ fn call_user(name: &str, f: &UserFn, args: &[Expr], cx: &Cx) -> Evaluated {
     for (i, (param, arg)) in f.params.iter().zip(args).enumerate() {
         locals.push((param.clone(), child(arg, i, cx)?));
     }
+    if args.len() < f.params.len() {
+        add_defaults(name, f, args.len(), &mut locals, cx)?;
+    }
     let inner = Cx {
         env: cx.env,
         fns: cx.fns,
         units: cx.units,
-        locals,
+        locals: RefCell::new(locals),
         depth: cx.depth + 1,
         meter: cx.meter,
     };
@@ -167,6 +199,42 @@ fn call_user(name: &str, f: &UserFn, args: &[Expr], cx: &Cx) -> Evaluated {
             error: Box::new(l.error),
         })
     })
+}
+
+/// Bind the parameters after the first `given` to their defaults. They are
+/// worked out in the worksheet (not where the function is called, and not with the
+/// other parameters). Kept out of `call_user` so its stack frame stays small: a
+/// test sizes `MAX_CALL_DEPTH` from it.
+#[inline(never)]
+fn add_defaults(
+    name: &str,
+    f: &UserFn,
+    given: usize,
+    locals: &mut Vec<(String, Value)>,
+    cx: &Cx,
+) -> Result<(), Located> {
+    let outer = Cx {
+        env: cx.env,
+        fns: cx.fns,
+        units: cx.units,
+        locals: RefCell::default(),
+        depth: cx.depth + 1,
+        meter: cx.meter,
+    };
+    let first = f.params.len() - f.defaults.len();
+    for (param, default) in f.params[given..].iter().zip(&f.defaults[given - first..]) {
+        let value = eval(default, &outer).map_err(|l| {
+            Located::here(EvalError::InFunction {
+                name: name.to_owned(),
+                error: Box::new(EvalError::Invalid(format!(
+                    "the default of '{param}': {}",
+                    l.error
+                ))),
+            })
+        })?;
+        locals.push((param.clone(), value));
+    }
+    Ok(())
 }
 
 /// `a..b` or `a, b..c`: a list of values.
@@ -201,7 +269,7 @@ pub(super) fn origin(cx: &Cx) -> Result<i64, Located> {
 }
 
 /// A dimensionless real whole number, if the value is one.
-fn whole_number(v: &Value) -> Option<i64> {
+pub(super) fn whole_number(v: &Value) -> Option<i64> {
     let q = v.as_real()?;
     let small = q.si.abs() <= 1e9;
     (q.dim.is_dimensionless() && q.si.fract() == 0.0 && small).then_some(q.si as i64)
@@ -251,8 +319,13 @@ fn conditional(cond: &Expr, then: &Expr, otherwise: &Expr, cx: &Cx) -> Evaluated
 fn name(n: &str, cx: &Cx) -> Evaluated {
     // The innermost binding wins: a bound variable of a sum or integral shadows
     // an outer one of the same name.
-    if let Some((_, value)) = cx.locals.iter().rev().find(|(p, _)| p == n) {
+    if let Some((_, value)) = cx.locals.borrow().iter().rev().find(|(p, _)| p == n) {
         return Ok(value.clone());
+    }
+    if super::program::unset(n, cx) {
+        return Err(Located::here(EvalError::Invalid(format!(
+            "'{n}' is used before it is given a value in this program"
+        ))));
     }
     match cx.env.get(n) {
         Some(r) => r.clone().map_err(Located::here),

@@ -123,6 +123,7 @@ pub fn render_pages(
         headers: doc.headers(),
         title: doc.title(),
         output: source.output,
+        stale: false,
         units: doc.unit_system(),
         show_grid: false,
         snap: false,

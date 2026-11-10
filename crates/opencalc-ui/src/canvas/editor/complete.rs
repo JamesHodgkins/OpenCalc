@@ -190,7 +190,7 @@ pub fn defined_names(regions: &[Region]) -> Vec<String> {
                     target,
                     ..
                 } => out.push(target.clone()),
-                Expr::FunctionDef { name, .. } => out.push(name.clone()),
+                Expr::FunctionDef { name, .. } => out.push(name.to_string()),
                 _ => {}
             }
         }

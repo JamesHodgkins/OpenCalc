@@ -6,6 +6,7 @@
 
 mod grid;
 mod names;
+mod program;
 mod source;
 
 use std::sync::Arc;
@@ -121,8 +122,13 @@ impl<'a> Typesetter<'a> {
             }
             Expr::Matrix { rows, cols, cells } => self.matrix(*rows, *cols, cells, size),
             Expr::Index { base, indices } => self.index(base, indices, size),
-            Expr::FunctionDef { name, params, body } => self.row(vec![
-                self.text(&format!("{name}({})", params.join(", ")), size),
+            Expr::FunctionDef {
+                name,
+                params,
+                defaults,
+                body,
+            } => self.row(vec![
+                self.text(&signature_text(name, params, defaults), size),
                 self.gap(size * 0.3),
                 self.text(":=", size),
                 self.gap(size * 0.3),
@@ -164,6 +170,16 @@ impl<'a> Typesetter<'a> {
                     self.layout(value, size),
                 ])
             }
+            Expr::Program(statements) => self.program(statements, size),
+            Expr::LocalAssign { .. }
+            | Expr::IndexAssign { .. }
+            | Expr::IfBlock { .. }
+            | Expr::For { .. }
+            | Expr::While { .. }
+            | Expr::Break
+            | Expr::Continue
+            | Expr::Return(_)
+            | Expr::Try { .. } => self.statement(e, size),
             Expr::Error(e) => self.text(&format!("? {e}"), size),
             // Display-tree nodes (`parse_lenient`): the editor draws them (E3/E4).
             Expr::Hole => self.text("\u{25a1}", size),
@@ -390,6 +406,20 @@ fn fmt_num(v: f64) -> String {
     }
 }
 
+/// `f(x, n := 2)`, as typed.
+fn signature_text(name: &str, params: &[String], defaults: &[Expr]) -> String {
+    let plain = params.len() - defaults.len();
+    let shown: Vec<String> = params
+        .iter()
+        .enumerate()
+        .map(|(i, p)| match i.checked_sub(plain) {
+            Some(k) => format!("{p} := {}", defaults[k]),
+            None => p.clone(),
+        })
+        .collect();
+    format!("{name}({})", shown.join(", "))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -493,6 +523,25 @@ mod tests {
             let whole = t.layout(&parsed("f(x) := x ^ 2"), 16.0);
             assert!(whole.w > body.w * 2.0);
             assert!(whole.h >= body.h);
+        });
+    }
+
+    #[test]
+    fn a_program_stacks_its_lines_beside_a_bar_and_nests_blocks_deeper() {
+        with_fonts(|t| {
+            let one = t.layout(&parsed("f(x) := program\n    x + 1"), 16.0);
+            let src = "f(x) := program\n    s \u{2190} 0\n    for i in 1..x\n        s \u{2190} s + i\n    return s";
+            let many = t.layout(&parsed(src), 16.0);
+            assert!(many.h > one.h * 3.0, "{} against {}", many.h, one.h);
+            // The program sits level with its `f(x) :=`, so it is no taller than
+            // the lines themselves.
+            assert!(many.baseline < one.baseline * 2.0);
+            let bars = many
+                .ops
+                .iter()
+                .filter(|op| matches!(op, Op::Line { a, b } if a.x == b.x && (b.y - a.y) > 5.0))
+                .count();
+            assert_eq!(bars, 2, "one bar for the program, one for the loop body");
         });
     }
 

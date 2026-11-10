@@ -35,7 +35,19 @@ pub struct Finding {
 pub fn check(ws: &Worksheet) -> Vec<Finding> {
     let units = ws.units().unwrap_or_else(|_| UnitRegistry::builtin());
     let regions = ws.math_regions();
-    let out = evaluate_all(&regions, &ws.plot_inputs(), &units);
+    // On a thread with the stack evaluation is sized for: the main thread's is far
+    // smaller (1 MB on Windows), and a deep recursion would overflow it.
+    let plots = ws.plot_inputs();
+    let out = std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .stack_size(crate::worker::EVAL_STACK)
+            .spawn_scoped(scope, || evaluate_all(&regions, &plots, &units))
+            .map(|handle| handle.join())
+    });
+    let out = match out {
+        Ok(Ok(out)) => out,
+        _ => evaluate_all(&regions, &plots, &units),
+    };
     let label = |id: RegionId| ws.region(id).map(|r| r.label.clone()).unwrap_or_default();
     let place = |id: RegionId| ws.region(id).map_or((0.0, 0.0), |r| (r.pos.x, r.pos.y));
     let mut findings = Vec::new();

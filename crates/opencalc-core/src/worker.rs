@@ -16,8 +16,11 @@ use crate::eval::{all_failed, evaluate_cancellable, Output, RegionId};
 use crate::expr::Expr;
 use crate::registry::UnitRegistry;
 
-/// Stack for the evaluation thread. Virtual memory only; pages are committed as used.
-const WORKER_STACK: usize = 8 * 1024 * 1024;
+/// Stack for any thread that evaluates a worksheet. Virtual memory only; pages are
+/// committed as used. Sized for `eval::MAX_CALL_DEPTH` levels of the deepest
+/// function body allowed, in a debug build (the test in `eval::tests` checks that
+/// it fits in half of this).
+pub const EVAL_STACK: usize = 64 * 1024 * 1024;
 
 enum Request {
     Recalculate {
@@ -58,7 +61,7 @@ impl Worker {
         // with the closure and `request` reports failure instead of panicking.
         let handle = std::thread::Builder::new()
             .name("opencalc-eval".to_owned())
-            .stack_size(WORKER_STACK)
+            .stack_size(EVAL_STACK)
             .spawn(move || {
                 while let Ok(first) = req_rx.recv() {
                     // Skip ahead to the newest queued request.

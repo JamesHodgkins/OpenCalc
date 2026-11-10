@@ -140,6 +140,10 @@ f(0, 2..10)
   (call f 0 (range 2 10))
 f(x) := x ^ 2
   (defn f (x) (^ x 2))
+f(x, n := 2) := x ^ n
+  (defn f (x n) default 2 (^ x n))
+f(x, n := 2, m := 1 + 1) := x ^ n + m
+  (defn f (x n m) default 2 default (+ 1 1) (+ (^ x n) m))
 area(w, h) := w * h
   (defn area (w h) (* w h))
 g(a, b, c) := if(a > b, c, 0)

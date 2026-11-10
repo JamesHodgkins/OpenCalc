@@ -111,21 +111,98 @@ impl Field {
         self.select(0, self.chars.len());
     }
 
+    /// Whether this is a program (docs/PROGRAMMING.md): it has line breaks, or it
+    /// ends with the word `program`, which the next Enter opens. Spaces and line
+    /// breaks are text here, where in a formula the display does the spacing.
+    pub fn in_program(&self) -> bool {
+        let text = self.text();
+        text.contains('\n') || ends_with_word(&text, "program")
+    }
+
+    /// The offset where the line holding `at` starts.
+    fn line_start(&self, at: usize) -> usize {
+        self.chars[..at.min(self.chars.len())]
+            .iter()
+            .rposition(|c| *c == '\n')
+            .map_or(0, |i| i + 1)
+    }
+
+    /// Whether only spaces lie between the start of the caret's line and the caret.
+    pub fn in_line_indent(&self) -> bool {
+        self.chars[self.line_start(self.caret)..self.caret]
+            .iter()
+            .all(|c| *c == ' ')
+    }
+
+    /// Enter in a program: a new line, indented as the line above, and four more
+    /// after a line that opens a block.
+    pub fn new_line(&mut self) {
+        let start = self.line_start(self.caret);
+        let line: String = self.chars[start..self.caret].iter().collect();
+        let indent = line.chars().take_while(|c| *c == ' ').count();
+        let body = line.trim_start();
+        let opens = ["if ", "for ", "while ", "else", "try", "on error"]
+            .iter()
+            .any(|w| body.starts_with(w))
+            || ends_with_word(body, "program");
+        let extra = if opens { 4 } else { 0 };
+        self.insert(&format!("\n{}", " ".repeat(indent + extra)));
+    }
+
+    /// Whether the caret's line holds nothing but spaces and the caret is at the
+    /// very end: a blank line after the last one, which in a program means "done".
+    pub fn at_blank_last_line(&self) -> bool {
+        self.caret == self.chars.len()
+            && self.chars[self.line_start(self.caret)..]
+                .iter()
+                .all(|c| *c == ' ')
+            && self.line_start(self.caret) > 0
+    }
+
+    /// Drop the blank last line (and any blank lines before it).
+    pub fn trim_end(&mut self) {
+        while self.chars.last().is_some_and(|c| *c == ' ' || *c == '\n') {
+            self.chars.pop();
+        }
+        self.caret = self.chars.len();
+        self.anchor = self.caret;
+    }
+
+    /// Tab in a program, at the start of a line: four spaces. Shift-Tab takes up to
+    /// four away from the start of the line.
+    pub fn indent(&mut self, back: bool) {
+        if !back {
+            self.insert("    ");
+            return;
+        }
+        let start = self.line_start(self.caret);
+        let spaces = self.chars[start..]
+            .iter()
+            .take(4)
+            .take_while(|c| **c == ' ')
+            .count();
+        self.chars.drain(start..start + spaces);
+        self.caret = self.caret.saturating_sub(spaces).max(start);
+        self.anchor = self.caret;
+    }
+
     /// Replace the selection (or insert at the caret) with `s`. Control characters
-    /// are dropped and line breaks become spaces; the length limit is respected.
+    /// are dropped and line breaks become spaces (but stay line breaks in a
+    /// program); the length limit is respected.
     pub fn insert(&mut self, s: &str) {
         let (a, b) = self.selection();
         let room = MAX_CHARS.saturating_sub(self.chars.len() - (b - a));
+        let lines = self.in_program() || s.contains("program\n") || s.contains("program\r\n");
         let new: Vec<char> = s
             .chars()
-            .map(|c| {
-                if c == '\n' || c == '\r' || c == '\t' {
-                    ' '
-                } else {
-                    c
-                }
+            .filter(|c| !(lines && *c == '\r'))
+            .flat_map(|c| match c {
+                '\n' if lines => vec!['\n'],
+                '\t' if lines => vec![' '; 4],
+                '\n' | '\r' | '\t' => vec![' '],
+                c => vec![c],
             })
-            .filter(|c| !c.is_control())
+            .filter(|c| *c == '\n' || !c.is_control())
             .collect();
         let wanted = new.len();
         let new: Vec<char> = new.into_iter().take(room).collect();
@@ -153,16 +230,23 @@ impl Field {
         let before = |n: usize| self.caret.checked_sub(n).map(|i| self.chars[i]);
         let after = self.chars.get(self.caret).copied();
         let hand_typed_define = before(1) == Some('=') && before(2) == Some(':');
+        let after_less = before(1) == Some('<');
         match s {
             // Spaces are not typed into math: the display does the spacing. A space
-            // after a backslash name is the Greek-letter terminator.
+            // after a backslash name is the Greek-letter terminator. (In a program
+            // they are text: `for i in 1..n` needs them.)
             " " => {
-                if !self.has_selection() {
-                    self.expand_greek(greek);
+                if !self.has_selection() && !self.expand_greek(greek) && self.in_program() {
+                    self.insert(" ");
                 }
+            }
+            // `<-` is the assignment arrow of a program.
+            "-" if after_less && self.in_program() && !self.has_selection() => {
+                self.replace(self.caret - 1, self.caret, "\u{2190}");
             }
             ":" if after != Some('=') => self.insert(":="),
             "=" if !self.has_selection() && hand_typed_define => {}
+            _ if self.in_program() => self.insert(s),
             _ => self.insert(&s.replace(' ', "")),
         }
     }
@@ -245,6 +329,13 @@ impl Field {
     }
 }
 
+/// Whether `text` ends with `word` as a whole word.
+fn ends_with_word(text: &str, word: &str) -> bool {
+    let text = text.trim_end();
+    text.strip_suffix(word)
+        .is_some_and(|rest| !rest.chars().next_back().is_some_and(is_word))
+}
+
 fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
@@ -266,6 +357,67 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn a_program_keeps_its_spaces_and_lines_and_a_formula_does_not() {
+        let mut formula = Field::new("");
+        formula.typed("a", |_| None);
+        formula.typed(" ", |_| None);
+        formula.typed("b", |_| None);
+        assert_eq!(formula.text(), "ab", "spaces are not typed into a formula");
+
+        let mut p = Field::new("f := program");
+        assert!(p.in_program(), "ending in `program` opens one");
+        assert!(!Field::new("myprogram").in_program());
+        p.new_line();
+        assert_eq!(p.text(), "f := program\n    ", "a block opener indents");
+        for c in "s <- 0".chars() {
+            p.typed(&c.to_string(), |_| None);
+        }
+        assert_eq!(p.text(), "f := program\n    s \u{2190} 0");
+        p.new_line();
+        assert_eq!(
+            p.text(),
+            "f := program\n    s \u{2190} 0\n    ",
+            "the indent carries on"
+        );
+        for c in "for i in 1..3".chars() {
+            p.typed(&c.to_string(), |_| None);
+        }
+        p.new_line();
+        assert!(
+            p.text().ends_with("1..3\n        "),
+            "a `for` indents the next line"
+        );
+    }
+
+    #[test]
+    fn a_blank_last_line_ends_a_program_and_tab_indents() {
+        let mut p = Field::new("f := program\n    1 + 2");
+        p.new_line();
+        assert!(p.at_blank_last_line());
+        p.trim_end();
+        assert_eq!(p.text(), "f := program\n    1 + 2");
+        assert!(!p.at_blank_last_line());
+
+        let mut q = Field::new("f := program\n");
+        assert!(q.in_line_indent());
+        q.indent(false);
+        assert_eq!(q.text(), "f := program\n    ");
+        q.indent(true);
+        assert_eq!(q.text(), "f := program\n");
+        assert_eq!(q.caret, q.len());
+    }
+
+    #[test]
+    fn pasting_lines_into_a_formula_joins_them_but_a_program_stays_lines() {
+        let mut f = Field::new("");
+        f.insert("a +\nb");
+        assert_eq!(f.text(), "a + b");
+        let mut p = Field::new("");
+        p.insert("f := program\n\tx ← 1\n    x");
+        assert_eq!(p.text(), "f := program\n    x ← 1\n    x");
+    }
 
     fn greek(name: &str) -> Option<char> {
         match name {

@@ -4,7 +4,7 @@
 
 use super::lexer::Tok;
 use super::Parser;
-use crate::expr::{BinaryOp, Expr};
+use crate::expr::{AssignKind, BinaryOp, Expr};
 use crate::units::{builtin_unit, offset_unit};
 
 /// `name(args)`: `if` with three arguments and `sqrt` with one become their own
@@ -32,24 +32,85 @@ pub(super) fn call(name: String, mut args: Vec<Expr>) -> Expr {
 }
 
 /// The name and parameters of `f(x, y)` on the left of `:=`.
-pub(super) fn function_signature(lhs: &Expr) -> Result<(String, Vec<String>), String> {
+pub(super) fn function_signature(lhs: &Expr) -> Result<Signature, String> {
     let Expr::Call { name, args } = lhs else {
         return Err("left of ':=' must be a name or a function like f(x)".into());
     };
     let mut params: Vec<String> = Vec::new();
+    let mut defaults: Vec<Expr> = Vec::new();
     for arg in args {
-        let Expr::Name(p) = arg else {
-            return Err(format!("the parameters of '{name}' must be plain names"));
+        let (p, default) = match arg {
+            Expr::Name(p) => (p, None),
+            Expr::Assign {
+                kind: AssignKind::Define,
+                target,
+                value,
+            } => (target, Some(&**value)),
+            _ => return Err(format!("the parameters of '{name}' must be plain names")),
         };
         if params.contains(p) {
             return Err(format!("'{name}' has the parameter '{p}' twice"));
+        }
+        match default {
+            Some(value) => {
+                // A default is worked out where the function is called, so it can
+                // see the worksheet but not the other parameters.
+                let used = value.free_names();
+                if let Some(other) = used.iter().find(|n| params.contains(n) || *n == p) {
+                    return Err(format!(
+                        "the default of '{p}' cannot use the parameter '{other}'"
+                    ));
+                }
+                defaults.push(value.clone());
+            }
+            None if !defaults.is_empty() => {
+                return Err(format!(
+                    "'{p}' needs a default: a parameter after one with a default must have one too"
+                ));
+            }
+            None => {}
         }
         params.push(p.clone());
     }
     if params.is_empty() {
         return Err(format!("'{name}' needs at least one parameter"));
     }
-    Ok((name.clone(), params))
+    Ok(Signature {
+        name: name.clone().into_boxed_str(),
+        params: params.into_boxed_slice(),
+        defaults,
+    })
+}
+
+/// `f(x, n := 2)` taken apart: see `Expr::FunctionDef`.
+pub(super) struct Signature {
+    pub name: Box<str>,
+    pub params: Box<[String]>,
+    pub defaults: Vec<Expr>,
+}
+
+/// Whether `expr` holds a default argument (`n := 2` written as an argument),
+/// which only a function definition's signature may.
+pub(super) fn has_default_argument(expr: &Expr) -> bool {
+    // Walks with its own stack: the tree can be as deep as the parser allows, and
+    // a recursion here would need more call stack than the parser itself does.
+    let default = |e: &Expr| {
+        matches!(
+            e,
+            Expr::Assign {
+                kind: AssignKind::Define,
+                ..
+            }
+        )
+    };
+    let mut todo = vec![expr];
+    while let Some(e) = todo.pop() {
+        if matches!(e, Expr::Call { args, .. } if args.iter().any(default)) {
+            return true;
+        }
+        todo.extend(e.children());
+    }
+    false
 }
 
 pub(super) fn target_name(lhs: &Expr) -> Result<String, String> {
@@ -146,6 +207,28 @@ impl Parser {
         }
     }
 
+    /// One argument: an expression, or `name := value`, which only the signature
+    /// of a function definition may use (`f(x, n := 2) := ...`).
+    fn argument(&mut self) -> Result<Expr, String> {
+        let (mark, from) = (self.log.len(), self.spans.get(self.pos).map(|s| s.start));
+        let first = self.range_expr(false)?;
+        let (Expr::Name(target), Some(Tok::Define), Some(from)) = (&first, self.peek(), from)
+        else {
+            return Ok(first);
+        };
+        let target = target.clone();
+        let name_end = self.log.len();
+        self.pos += 1;
+        let value = self.range_expr(false)?;
+        self.log.drain(mark..name_end);
+        self.done(from, self.last_node().end);
+        Ok(Expr::Assign {
+            kind: AssignKind::Define,
+            target,
+            value: Box::new(value),
+        })
+    }
+
     pub(super) fn args(&mut self) -> Result<Vec<Expr>, String> {
         let mut args = Vec::new();
         if self.eat(&Tok::RParen) {
@@ -154,7 +237,7 @@ impl Parser {
         loop {
             // A step needs a comma, which here separates arguments, so only the
             // plain `a..b` form is allowed inside a call.
-            args.push(self.range_expr(false)?);
+            args.push(self.argument()?);
             if self.eat(&Tok::Comma) {
                 continue;
             }

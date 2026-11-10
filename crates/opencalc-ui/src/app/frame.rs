@@ -153,6 +153,7 @@ impl App {
             headers: &headers,
             title: &title,
             output: &state.output,
+            stale: state.results_stale(),
             units: state.sheets[sheet].doc.unit_system(),
             show_grid: state.show_grid,
             snap: state.snap,

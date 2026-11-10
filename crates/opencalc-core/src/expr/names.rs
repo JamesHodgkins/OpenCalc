@@ -24,6 +24,12 @@ impl Expr {
         for c in self.children() {
             c.collect_called(out);
         }
+        // Defaults are not children, but they are worked out by calls too.
+        if let Expr::FunctionDef { defaults, .. } = self {
+            for d in defaults.iter() {
+                d.collect_called(out);
+            }
+        }
     }
 
     /// Names this expression reads (free variables), in first-seen order.
@@ -149,7 +155,12 @@ impl Expr {
             Expr::Assign { value, .. } => value.collect_names(out),
             // The parameters are the function's own; everything else it reads is
             // a dependency of the definition.
-            Expr::FunctionDef { params, body, .. } => {
+            Expr::FunctionDef {
+                params,
+                defaults,
+                body,
+                ..
+            } => {
                 let mut inner = Vec::new();
                 body.collect_names(&mut inner);
                 for n in inner {
@@ -157,7 +168,57 @@ impl Expr {
                         out.push(n);
                     }
                 }
+                // A default is worked out in the worksheet, so what it reads is a
+                // dependency too (and it may not name a parameter).
+                for default in defaults.iter() {
+                    default.collect_names(out);
+                }
             }
+            // What a program assigns (and the variable of each `for`) is its own,
+            // wherever in the program it is used; the rest is a dependency.
+            Expr::Program(statements) => {
+                let mut inner = Vec::new();
+                for s in statements {
+                    s.collect_names(&mut inner);
+                }
+                let local = assigned_names(statements);
+                for n in inner {
+                    if !local.contains(&n) && !out.contains(&n) {
+                        out.push(n);
+                    }
+                }
+            }
+            Expr::LocalAssign { value, .. } | Expr::Return(value) => value.collect_names(out),
+            Expr::IndexAssign { indices, value, .. } => {
+                for i in indices.iter() {
+                    i.collect_names(out);
+                }
+                value.collect_names(out);
+            }
+            Expr::IfBlock {
+                cond,
+                then,
+                otherwise,
+            } => {
+                cond.collect_names(out);
+                then.collect_names(out);
+                if let Some(o) = otherwise {
+                    o.collect_names(out);
+                }
+            }
+            Expr::For { over, body, .. } => {
+                over.collect_names(out);
+                body.collect_names(out);
+            }
+            Expr::While { cond, body } => {
+                cond.collect_names(out);
+                body.collect_names(out);
+            }
+            Expr::Try { body, handler } => {
+                body.collect_names(out);
+                handler.collect_names(out);
+            }
+            Expr::Break | Expr::Continue => {}
             Expr::Fraction { num, den } => {
                 num.collect_names(out);
                 den.collect_names(out);
@@ -171,4 +232,41 @@ impl Expr {
             Expr::Number(_) | Expr::Quantity { .. } | Expr::Error(_) | Expr::Hole => {}
         }
     }
+}
+
+/// The names a list of statements assigns to or loops over, anywhere inside it
+/// (nested blocks included): the program's local variables.
+pub fn assigned_names(statements: &[Expr]) -> Vec<String> {
+    fn add(out: &mut Vec<String>, name: &str) {
+        if !out.iter().any(|n| n == name) {
+            out.push(name.to_owned());
+        }
+    }
+    fn scan(e: &Expr, out: &mut Vec<String>) {
+        match e {
+            Expr::Program(statements) => statements.iter().for_each(|s| scan(s, out)),
+            Expr::LocalAssign { target, .. } | Expr::IndexAssign { target, .. } => add(out, target),
+            Expr::IfBlock {
+                then, otherwise, ..
+            } => {
+                scan(then, out);
+                if let Some(o) = otherwise {
+                    scan(o, out);
+                }
+            }
+            Expr::For { var, body, .. } => {
+                add(out, var);
+                scan(body, out);
+            }
+            Expr::While { body, .. } => scan(body, out),
+            Expr::Try { body, handler } => {
+                scan(body, out);
+                scan(handler, out);
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    statements.iter().for_each(|s| scan(s, &mut out));
+    out
 }

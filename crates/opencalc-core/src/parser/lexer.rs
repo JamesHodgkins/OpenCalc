@@ -24,6 +24,10 @@ pub(super) enum Tok {
     LessEq,
     GreaterEq,
     DotDot,
+    /// A line break (consecutive ones are one). Only programs use them.
+    Line,
+    /// `\u{2190}`: assignment to a local variable of a program.
+    Arrow,
     /// Text that is not a token (`parse_lenient` only): kept so the display can
     /// show it as typed.
     Bad(String),
@@ -43,6 +47,16 @@ pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usiz
         let (before, begin) = (toks.len(), i);
         let c = chars[i];
         match c {
+            '\n' => {
+                if toks.last().is_some_and(|t| *t != Tok::Line) {
+                    toks.push(Tok::Line);
+                }
+                i += 1;
+            }
+            '\u{2190}' => {
+                toks.push(Tok::Arrow);
+                i += 1;
+            }
             c if c.is_whitespace() => i += 1,
             '.' if chars.get(i + 1) == Some(&'.') => {
                 toks.push(Tok::DotDot);
@@ -50,6 +64,24 @@ pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usiz
             }
             '0'..='9' | '.' => {
                 let start = i;
+                if let Some((radix, end)) = radix_literal(&chars, i) {
+                    i = end;
+                    let digits: String = chars[start + 2..end].iter().collect();
+                    // Exact only up to 2^53, the integers an f64 holds without rounding.
+                    match u64::from_str_radix(&digits, radix) {
+                        Ok(v) if v <= (1u64 << 53) => toks.push(Tok::Num(v as f64)),
+                        _ if lenient => toks.push(Tok::Bad(chars[start..end].iter().collect())),
+                        _ => {
+                            return Err((
+                                "number too large to hold exactly (most 2^53)".to_string(),
+                                start,
+                                end,
+                            ))
+                        }
+                    }
+                    spans.push((begin, i));
+                    continue;
+                }
                 while i < chars.len()
                     && (chars[i].is_ascii_digit()
                         || (chars[i] == '.' && chars.get(i + 1) != Some(&'.')))
@@ -197,13 +229,44 @@ pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usiz
             spans.push((begin, i));
         }
     }
+    // A line break at the end ends nothing.
+    while toks.last() == Some(&Tok::Line) {
+        toks.pop();
+        spans.pop();
+    }
     Ok((toks, spans))
+}
+
+/// `0x1F`, `0b101`, `0o17`: the radix and the end of the literal, when the text at
+/// `i` is one. It needs at least one digit of the radix, and the digits must not
+/// run straight into a letter or digit that is not one (`0b12` is an error, not
+/// `0b1` times `2`), so those fall through to the decimal reader and fail there.
+fn radix_literal(chars: &[char], i: usize) -> Option<(u32, usize)> {
+    if chars[i] != '0' {
+        return None;
+    }
+    let radix = match chars.get(i + 1)? {
+        'x' | 'X' => 16,
+        'b' | 'B' => 2,
+        'o' | 'O' => 8,
+        _ => return None,
+    };
+    let mut end = i + 2;
+    while end < chars.len() && chars[end].is_digit(radix) {
+        end += 1;
+    }
+    if end == i + 2 || chars.get(end).is_some_and(|c| c.is_alphanumeric()) {
+        return None;
+    }
+    Some((radix, end))
 }
 
 pub(super) fn describe(t: &Tok) -> String {
     match t {
         Tok::Num(v) => format!("number {v}"),
         Tok::Ident(n) => format!("'{n}'"),
+        Tok::Line => "line break".into(),
+        Tok::Arrow => "'\u{2190}'".into(),
         Tok::Plus => "'+'".into(),
         Tok::Minus => "'-'".into(),
         Tok::Star => "'*'".into(),
