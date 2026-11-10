@@ -4,7 +4,7 @@
 //! never a value, so nothing is recalculated.
 
 use opencalc_core::document::{
-    DisplayUnit, FontStyle, Notation, RegionId, RegionKind, ResultFormat, Run, RunStyle,
+    FontStyle, Notation, RegionId, RegionKind, ResultFormat, Run, RunStyle,
 };
 use opencalc_core::edit::Edit;
 
@@ -189,30 +189,40 @@ pub fn all_in(state: &AppState, notation: Notation) -> bool {
     !formats.is_empty() && formats.iter().all(|(_, f)| f.notation() == notation)
 }
 
-fn unit_choice(unit: Option<DisplayUnit>) -> Box<dyn Fn(ResultFormat) -> ResultFormat> {
-    Box::new(move |f| f.with_unit(unit))
-}
-
-/// The display units that every selected math region has chosen.
-pub fn units_in_use(state: &AppState) -> Vec<CommandId> {
-    let formats = selected_formats(state);
-    let Some((_, first)) = formats.first() else {
-        return Vec::new();
+/// The Result unit menu for the selection: the units the selected results can be
+/// shown in (all of one kind, else none), and the unit the first one shows now.
+pub fn unit_menu(state: &AppState) -> (Vec<CommandId>, Option<String>) {
+    use opencalc_core::value::Value;
+    let Some(sheet) = state.active_sheet() else {
+        return (Vec::new(), None);
     };
-    let same = formats.iter().all(|(_, f)| f.unit() == first.unit());
-    let command = match first.unit() {
-        Some(DisplayUnit::Metre) => CommandId::UnitsDisplayM,
-        Some(DisplayUnit::Millimetre) => CommandId::UnitsDisplayMm,
-        Some(DisplayUnit::Inch) => CommandId::UnitsDisplayIn,
-        Some(DisplayUnit::Newton) => CommandId::UnitsDisplayN,
-        Some(DisplayUnit::Kilonewton) => CommandId::UnitsDisplayKn,
-        None => return Vec::new(),
-    };
-    if same {
-        vec![command]
-    } else {
-        Vec::new()
+    let system = sheet.doc.unit_system();
+    let mut dim = None;
+    let mut face = None;
+    for (id, format) in selected_formats(state) {
+        let Some(Ok(v @ Value::Scalar(s))) = state.output.values.get(&id) else {
+            continue;
+        };
+        if s.dim.is_dimensionless() {
+            continue;
+        }
+        if dim.is_some_and(|d| d != s.dim) {
+            // Results of different kinds: only Automatic applies to them all.
+            return (Vec::new(), Some("Mixed".to_owned()));
+        }
+        dim = Some(s.dim);
+        if face.is_none() {
+            face = crate::format::scalar_parts(v, system, &format)
+                .map(|(_, unit)| crate::format::pretty_unit(&unit));
+        }
     }
+    let choices = dim
+        .map(crate::format::unit_choices)
+        .unwrap_or_default()
+        .into_iter()
+        .map(CommandId::UnitsShowIn)
+        .collect();
+    (choices, face)
 }
 
 /// The selected regions that are not locked, with whether each has a border.
@@ -280,8 +290,8 @@ pub fn dispatch_format(state: &mut AppState, command: CommandId) -> Option<Vec<E
         return Some(Vec::new());
     }
     let choose: Box<dyn Fn(ResultFormat) -> ResultFormat> = match command {
-        FormatDecimalsMore => Box::new(ResultFormat::more_decimals),
-        FormatDecimalsLess => Box::new(ResultFormat::fewer_decimals),
+        FormatDecimalsMore => Box::new(|f| f.more_decimals()),
+        FormatDecimalsLess => Box::new(|f| f.fewer_decimals()),
         FormatScientific | FormatEngineering => {
             let notation = if command == FormatScientific {
                 Notation::Scientific
@@ -296,12 +306,8 @@ pub fn dispatch_format(state: &mut AppState, command: CommandId) -> Option<Vec<E
             };
             Box::new(move |f| f.with_notation(target))
         }
-        UnitsDisplayM => unit_choice(Some(DisplayUnit::Metre)),
-        UnitsDisplayMm => unit_choice(Some(DisplayUnit::Millimetre)),
-        UnitsDisplayIn => unit_choice(Some(DisplayUnit::Inch)),
-        UnitsDisplayN => unit_choice(Some(DisplayUnit::Newton)),
-        UnitsDisplayKn => unit_choice(Some(DisplayUnit::Kilonewton)),
-        UnitsDisplayReset => unit_choice(None),
+        UnitsDisplayReset => Box::new(|f| f.with_unit(None)),
+        UnitsShowIn(unit) => Box::new(move |f| f.with_custom_unit(Some(unit.to_owned()))),
         _ => return None,
     };
     let formats = selected_formats(state);

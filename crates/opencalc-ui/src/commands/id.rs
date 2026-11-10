@@ -34,6 +34,8 @@ macro_rules! commands {
             InsertMatrixSize(u8, u8),
             /// Go to the n-th labelled region of the Labels window.
             GoToLabel(u16),
+            /// Show the selected results in this unit (source text, such as `N/mm^2`).
+            UnitsShowIn(&'static str),
         }
 
         impl CommandId {
@@ -58,6 +60,7 @@ macro_rules! commands {
                     CommandId::GoToFinding(_) => "check.go_to",
                     CommandId::InsertMatrixSize(..) => "insert.matrix_size",
                     CommandId::GoToLabel(_) => "labels.go_to",
+                    CommandId::UnitsShowIn(_) => "units.show_in",
                 }
             }
 
@@ -77,6 +80,7 @@ macro_rules! commands {
                     CommandId::GoToFinding(_) => "Go to problem",
                     CommandId::InsertMatrixSize(..) => "Insert matrix",
                     CommandId::GoToLabel(_) => "Go to labelled region",
+                    CommandId::UnitsShowIn(u) => crate::format::unit_label(u),
                 }
             }
 
@@ -94,6 +98,7 @@ macro_rules! commands {
                     CommandId::GoToFinding(_) => icons::WARNING,
                     CommandId::InsertMatrixSize(..) => icons::TABLE,
                     CommandId::GoToLabel(_) => icons::TAG,
+                    CommandId::UnitsShowIn(_) => icons::RULER,
                 }
             }
         }
@@ -105,8 +110,8 @@ commands! {
     FileNew: "file.new", "New worksheet", icons::FILE_NEW;
     FileOpen: "file.open", "Open", icons::FOLDER_OPEN;
     FileSave: "file.save", "Save", icons::SAVE;
-    FileSaveAs: "file.save_as", "Save As", icons::SAVE;
-    FileExportPdf: "file.export_pdf", "Export as PDF", icons::SAVE;
+    FileSaveAs: "file.save_as", "Save As", icons::SAVE_AS;
+    FileExportPdf: "file.export_pdf", "Export as PDF", icons::FILE_OUTPUT;
     FileExportPng: "file.export_png", "Export as PNG", icons::PICTURE;
     // Answers to the dialogs that ask about unsaved changes or report a problem.
     DialogSave: "dialog.save", "Save", icons::SAVE;
@@ -115,12 +120,14 @@ commands! {
     DialogOk: "dialog.ok", "OK", icons::CLOSE;
     DialogRestore: "dialog.restore", "Restore", icons::REFRESH;
     DialogDropRecovery: "dialog.drop_recovery", "Discard", icons::DELETE;
-    FileClose: "file.close", "Close worksheet", icons::CLOSE;
-    FileNewFromTemplate: "file.new_from_template", "New from template...", icons::FILE_NEW;
-    FileSaveAsTemplate: "file.save_as_template", "Save as template...", icons::FILE_NEW;
+    FileClose: "file.close", "Close worksheet", icons::FILE_CLOSE;
+    FileNewFromTemplate: "file.new_from_template", "New from template...", icons::TEMPLATE;
+    FileSaveAsTemplate: "file.save_as_template", "Save as template...", icons::TEMPLATE;
     FileExample: "file.example", "Open example", icons::BOOK;
-    AppQuit: "app.quit", "Quit", icons::CLOSE;
-    AppOptions: "app.options", "Options", icons::PROPERTIES;
+    AppQuit: "app.quit", "Quit", icons::QUIT;
+    AppOptions: "app.options", "Options", icons::SETTINGS;
+    AppMenu: "app.menu", "File menu", icons::FILE_TEXT;
+    AppMenuClose: "app.menu_close", "Close File menu", icons::CLOSE;
     AppOptionsClose: "app.options_close", "Close Options", icons::CLOSE;
     FileTypeRegister: "app.file_type_register", "Open .ocx files with OpenCalc", icons::FILE_NEW;
     FileTypeRemove: "app.file_type_remove", "Stop opening .ocx files with OpenCalc", icons::CLOSE;
@@ -176,12 +183,8 @@ commands! {
     UnitsSi: "units.si", "SI", icons::RULER;
     UnitsUscs: "units.uscs", "USCS", icons::RULER;
     UnitsCgs: "units.cgs", "CGS", icons::RULER;
-    UnitsDisplayM: "units.display_m", "Metres", icons::RULER;
-    UnitsDisplayMm: "units.display_mm", "Millimetres", icons::RULER;
-    UnitsDisplayIn: "units.display_in", "Inches", icons::RULER;
-    UnitsDisplayN: "units.display_n", "Force in newtons", icons::CONVERT;
-    UnitsDisplayKn: "units.display_kn", "Force in kilonewtons", icons::CONVERT;
-    UnitsDisplayReset: "units.display_reset", "Reset display", icons::RESET;
+    UnitsShowInMenu: "units.show_in_menu", "Result unit", icons::CONVERT;
+    UnitsDisplayReset: "units.display_reset", "Automatic", icons::RESET;
     UnitsDefine: "units.define", "Define unit", icons::PLUS;
     UnitsManage: "units.manage", "Manage units", icons::LIST;
     UnitsClose: "units.close", "Close Units", icons::CLOSE;
@@ -262,21 +265,21 @@ impl CommandId {
             ViewLabels | LabelsClose | GoToLabel(_) | FileTypeRegister | FileTypeRemove
             | HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
             | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | FormatUnderline
-            | FormatBorder | UnitsDisplayM | UnitsDisplayMm | UnitsDisplayIn | UnitsDisplayN
-            | UnitsDisplayKn | UnitsDisplayReset | FormatDecimalsMore | FormatDecimalsLess
-            | FormatScientific | FormatEngineering | ClipboardPaste | ClipboardCut
-            | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng | EditFind
-            | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll | FindClose
-            | UnitsDefine | UnitsManage | UnitsClose | FileNew | FileNewFromTemplate
-            | FileSaveAsTemplate | FileOpen | FileSave | FileSaveAs | DialogSave
-            | DialogDiscard | DialogCancel | DialogOk | DialogRestore | DialogDropRecovery
-            | OpenRecent(_) | GoToFinding(_) | InsertMatrixSize(..) | MatrixClose
-            | InsertMatrix | InsertRange | InsertSolveBlock | InsertProgram | CheckClose
-            | CalcCheck | WarnNext | WarnPrev | FileClose | FileExample | AppQuit | TabHome
-            | EditUndo | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea
-            | InsertPlot | InsertTable | PictureChoose | TableImportCsv | TableExportCsv
-            | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100
-            | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | FormatBorder | UnitsShowInMenu | UnitsDisplayReset | FormatDecimalsMore
+            | FormatDecimalsLess | FormatScientific | FormatEngineering | ClipboardPaste
+            | ClipboardCut | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng
+            | EditFind | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll
+            | FindClose | UnitsDefine | UnitsManage | UnitsClose | FileNew
+            | FileNewFromTemplate | FileSaveAsTemplate | FileOpen | FileSave | FileSaveAs
+            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
+            | DialogDropRecovery | OpenRecent(_) | UnitsShowIn(_) | GoToFinding(_)
+            | InsertMatrixSize(..) | MatrixClose | InsertMatrix | InsertRange
+            | InsertSolveBlock | InsertProgram | CheckClose | CalcCheck | WarnNext | WarnPrev
+            | FileClose | FileExample | AppQuit | AppMenu | AppMenuClose | TabHome | EditUndo
+            | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot
+            | InsertTable | PictureChoose | TableImportCsv | TableExportCsv | InsertPicture
+            | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid
+            | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
             | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
             | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
             | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup

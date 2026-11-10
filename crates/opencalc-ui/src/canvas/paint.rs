@@ -182,7 +182,10 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
     let right = (env.page.size().0 - env.page.margin() - r.pos.x) * zoom;
     let room =
         |used: f32| (right - 2.0 * PAD * zoom - RESULT_GAP * zoom - used).max(MIN_MESSAGE * zoom);
-    let (lay, res, bands) = ui.ctx().fonts(|f| {
+    // A unit being typed into the result's slot (read outside `fonts`, which
+    // holds the context).
+    let typing = super::unit_slot::typing(ui.ctx(), r.id);
+    let (lay, res, bands, slot) = ui.ctx().fonts(|f| {
         let t = Typesetter::new(f, theme.text);
         let warn = |message: String, used: f32| {
             wrapped(
@@ -198,6 +201,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 plain(f, "math", theme.text_disabled, size),
                 None,
                 Vec::new(),
+                None,
             );
         }
         // An error is underlined in the typeset form; the message goes beside it.
@@ -215,10 +219,11 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 typed
             };
             let used = typed.w;
-            return (typed, Some(warn(e.to_string(), used)), bands);
+            return (typed, Some(warn(e.to_string(), used)), bands, None);
         }
         // A definition or bare expression shows only what was typed; an
         // evaluation region (`x =`) also shows its answer. Errors always show.
+        let mut slot = None;
         let after = match result::beside(expr, result) {
             Beside::Nothing => None,
             Beside::Pending => Some(plain(f, "= \u{2026}", theme.text_weak, size)),
@@ -234,16 +239,51 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 );
                 Some(plain(f, &text, theme.warning, size))
             }
-            Beside::Value(v) => Some(plain(
-                f,
-                &format!("= {}", format_value_with(v, env.units, m.format())),
-                if env.stale {
+            Beside::Value(v) => {
+                let colour = if env.stale {
                     theme.text_weak
                 } else {
                     theme.text
-                },
-                size,
-            )),
+                };
+                // While a unit is typed, the number already reads in it once it
+                // is a unit of the right kind (unit_in ignores anything else).
+                let format = match &typing {
+                    Some(t) => m.format().with_custom_unit(Some(t.clone())),
+                    None => m.format(),
+                };
+                match crate::format::scalar_parts(v, env.units, &format) {
+                    // A quantity: the number, then its unit typeset (a raised 2,
+                    // not a caret), which is also where the unit is changed by
+                    // clicking it.
+                    Some((number, unit)) if !unit.is_empty() => {
+                        let ts = Typesetter::new(f, colour);
+                        let head = plain(f, &format!("= {number}"), colour, size);
+                        let gap = ts.gap(size * 0.25);
+                        let tail = match &typing {
+                            // Blank room the size of the text, where the box types.
+                            Some(t) => {
+                                let mut room = ts.text(t, size);
+                                room.ops.clear();
+                                room.w = room.w.max(size) + size * 0.4;
+                                if t.is_empty() {
+                                    room.h = size;
+                                    room.baseline = size * 0.78;
+                                }
+                                room
+                            }
+                            None => ts.unit(&unit, size),
+                        };
+                        slot = Some((head.w + gap.w, tail.w, unit));
+                        Some(ts.row(vec![head, gap, tail]))
+                    }
+                    _ => Some(plain(
+                        f,
+                        &format!("= {}", format_value_with(v, env.units, &m.format())),
+                        colour,
+                        size,
+                    )),
+                }
+            }
             Beside::Failed(e) => Some(warn(e.to_string(), typed.w)),
         };
         // A name another region also defines: the last one wins, so say so here.
@@ -252,7 +292,7 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
             let text = format!("{} '{name}' is defined again", crate::icons::WARNING);
             Some(plain(f, &text, theme.warning, size))
         });
-        (typed, after, bands)
+        (typed, after, bands, slot)
     });
     let pad = PAD * zoom;
     let gap = if res.is_some() {
@@ -271,7 +311,18 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
         if let Some(res) = res {
             let at = origin + Vec2::new(lay.w + gap, lay.baseline - res.baseline);
             res.paint(painter, at, theme.text);
+            match slot {
+                Some((x, w, label)) => {
+                    let rect = Rect::from_min_size(at + Vec2::new(x, 0.0), Vec2::new(w, res.h));
+                    super::unit_slot::paint(ui, painter, env, r, rect, label, size);
+                }
+                None => super::unit_slot::forget(ui.ctx(), r.id),
+            }
+        } else {
+            super::unit_slot::forget(ui.ctx(), r.id);
         }
+    } else {
+        super::unit_slot::forget(ui.ctx(), r.id);
     }
     Vec2::new(content_w + 2.0 * pad, content_h + 2.0 * pad) / zoom
 }

@@ -248,11 +248,54 @@ impl Field {
             "-" if after_less && self.in_program() && !self.has_selection() => {
                 self.replace(self.caret - 1, self.caret, "\u{2190}");
             }
+            // `*` right after a denominator keeps the new factor in the denominator:
+            // `P*D/2` then `*` would otherwise read `(P*D/2)*`, which leaves the fraction.
+            "*" | "\u{b7}" | "\u{22c5}"
+                if !self.has_selection() && !self.in_program() && self.in_denominator() =>
+            {
+                let start = self.denominator_start().unwrap_or(self.caret);
+                let caret = self.caret;
+                self.chars.insert(caret, ')');
+                self.chars.insert(start, '(');
+                self.caret = caret + 1;
+                self.anchor = self.caret;
+                self.insert(s);
+            }
             ":" if after != Some('=') => self.insert(":="),
             "=" if !self.has_selection() && hand_typed_define => {}
             _ if self.in_program() => self.insert(s),
             _ => self.insert(&s.replace(' ', "")),
         }
+    }
+
+    /// Where the operand ending at the caret starts, when a `/` comes just before
+    /// it (so the operand is a denominator). Brackets are matched; names, numbers,
+    /// `^` and `!` belong to the operand.
+    fn denominator_start(&self) -> Option<usize> {
+        let mut i = self.caret;
+        let mut depth = 0usize;
+        while i > 0 {
+            let c = self.chars[i - 1];
+            match c {
+                ')' | ']' => depth += 1,
+                '(' | '[' => {
+                    if depth == 0 {
+                        return None;
+                    }
+                    depth -= 1;
+                }
+                _ if depth > 0 => {}
+                '/' => return (i < self.caret && self.chars.get(i - 2) != Some(&'/')).then_some(i),
+                c if is_word(c) || matches!(c, '.' | '^' | '!' | '\'') => {}
+                _ => return None,
+            }
+            i -= 1;
+        }
+        None
+    }
+
+    fn in_denominator(&self) -> bool {
+        self.denominator_start().is_some()
     }
 
     /// Replace a backslash and name just before the caret by its Greek letter, if
@@ -458,6 +501,21 @@ mod tests {
         let mut m = Field::new("");
         m.typed("a b  c", greek);
         assert_eq!(m.text(), "abc", "spaces inside typed text are dropped");
+    }
+
+    #[test]
+    fn a_product_typed_after_a_denominator_stays_in_the_denominator() {
+        let mut f = Field::new("s := P*D/2");
+        f.typed("*", greek);
+        f.typed("x", greek);
+        assert_eq!(f.text(), "s := P*D/(2*x)");
+        // Not after a numerator, and not when nothing follows a `/`.
+        let mut g = Field::new("a*b");
+        g.typed("*", greek);
+        assert_eq!(g.text(), "a*b*");
+        let mut h = Field::new("a/");
+        h.typed("*", greek);
+        assert_eq!(h.text(), "a/*");
     }
 
     #[test]

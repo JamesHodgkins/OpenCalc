@@ -20,6 +20,7 @@ use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
 use crate::theme::PaletteKey;
 
+mod app_menu;
 mod arrange;
 mod backgrounds;
 mod borders;

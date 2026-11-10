@@ -95,7 +95,7 @@ impl<'a> Typesetter<'a> {
             Expr::Quantity { value, unit } => self.row(vec![
                 self.text(&fmt_num(*value), size),
                 self.gap(size * 0.25),
-                self.text(unit, size),
+                self.unit(unit, size),
             ]),
             Expr::Unary {
                 op: UnaryOp::Neg,
@@ -239,7 +239,7 @@ impl<'a> Typesetter<'a> {
         }
     }
 
-    fn text(&self, s: &str, size: f32) -> Layout {
+    pub fn text(&self, s: &str, size: f32) -> Layout {
         let galley =
             self.fonts
                 .layout_no_wrap(s.to_owned(), FontId::proportional(size), self.colour);
@@ -257,7 +257,7 @@ impl<'a> Typesetter<'a> {
         }
     }
 
-    fn gap(&self, w: f32) -> Layout {
+    pub fn gap(&self, w: f32) -> Layout {
         Layout {
             w,
             h: 0.0,
@@ -269,7 +269,7 @@ impl<'a> Typesetter<'a> {
     }
 
     /// Left to right, aligned on baselines.
-    fn row(&self, parts: Vec<Layout>) -> Layout {
+    pub fn row(&self, parts: Vec<Layout>) -> Layout {
         let above = parts.iter().map(|p| p.baseline).fold(0.0, f32::max);
         let below = parts.iter().map(|p| p.h - p.baseline).fold(0.0, f32::max);
         let mut out = Layout {
@@ -320,6 +320,67 @@ impl<'a> Typesetter<'a> {
     fn power(&self, base: &Expr, exp: &Expr, size: f32) -> Layout {
         let b = self.operand(base, size, 6);
         let e = self.layout(exp, size * SCRIPT);
+        self.raise(b, e, size)
+    }
+
+    /// A unit as it is written in a sheet: `N/mm^2` as N/mm with a raised 2, `kg*m`
+    /// with a middle dot. Upright text, on one line (a unit is not a fraction).
+    pub fn unit(&self, text: &str, size: f32) -> Layout {
+        let chars: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
+        let mut parts: Vec<Layout> = Vec::new();
+        let mut word = String::new();
+        let flush = |word: &mut String, parts: &mut Vec<Layout>| {
+            if !word.is_empty() {
+                parts.push(self.text(word, size));
+                word.clear();
+            }
+        };
+        let mut i = 0;
+        while i < chars.len() {
+            match chars[i] {
+                '^' => {
+                    flush(&mut word, &mut parts);
+                    let mut exp = String::new();
+                    if chars.get(i + 1) == Some(&'(') {
+                        i += 2;
+                        while i < chars.len() && chars[i] != ')' {
+                            exp.push(chars[i]);
+                            i += 1;
+                        }
+                    } else {
+                        let mut j = i + 1;
+                        if matches!(chars.get(j), Some('-' | '+')) {
+                            exp.push(chars[j]);
+                            j += 1;
+                        }
+                        while j < chars.len() && (chars[j].is_ascii_digit() || chars[j] == '.') {
+                            exp.push(chars[j]);
+                            j += 1;
+                        }
+                        i = j - 1;
+                    }
+                    let exp = exp.replace('-', "\u{2212}");
+                    let base = parts.pop().unwrap_or_else(|| self.text("", size));
+                    parts.push(self.raise(base, self.text(&exp, size * SCRIPT), size));
+                }
+                '*' | '\u{b7}' | '\u{22c5}' => {
+                    flush(&mut word, &mut parts);
+                    parts.push(self.text("\u{b7}", size));
+                }
+                '/' => {
+                    flush(&mut word, &mut parts);
+                    parts.push(self.text("/", size));
+                }
+                c => word.push(c),
+            }
+            i += 1;
+        }
+        flush(&mut word, &mut parts);
+        self.row(parts)
+    }
+
+    /// `e` raised as a superscript on `b`.
+    fn raise(&self, b: Layout, e: Layout, size: f32) -> Layout {
         // Lift the exponent so its baseline sits about half a font size above the base's.
         let lift = size * 0.45;
         let top = (e.baseline - (b.baseline - lift)).max(0.0);

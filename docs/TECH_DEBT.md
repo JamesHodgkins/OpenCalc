@@ -28,7 +28,7 @@ context is in `ARCHITECTURE.md`.
 |---|---|---|---|---|
 | TD-12 | **Resolved.** `.ocx` file format with `FORMAT_VERSION`, migration chain, atomic writes and crash recovery (see `PERSISTENCE.md`). | | | |
 | TD-13 | **Resolved.** `opencalc check` loads, evaluates and reports worksheets (`crates/opencalc-cli`). | | | |
-| TD-11 | **Mostly done.** Result format (decimals, scientific, engineering) and display units exist (`document/result_format.rs`, Math Formatting tab). Still missing: a user-chosen display unit beyond the fixed set (m, mm, in, N, kN). | Minor. | When asked | S |
+| TD-11 | **Mostly done.** Result format (decimals, scientific, engineering) and display units exist (`document/result_format.rs`, Math Formatting tab). A result's unit is also a slot: click it and type any unit (`N/mm^2`). Still missing: custom (worksheet-defined) units in the slot, and a unit typed in the expression itself. | Minor. | When asked | S |
 | TD-21 | **Partly done.** CI builds and tests on Linux, and deb/AppImage packaging is configured. Not yet run by hand on a Linux desktop; macOS is not supported. | Possible Linux-only UI problems (fonts, file association, single-instance hand-off). | Before a Linux release | S |
 
 ### Hygiene

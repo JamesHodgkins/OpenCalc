@@ -150,7 +150,9 @@ impl App {
     }
 
     pub fn registry(&self) -> Registry {
+        let (choices, face) = formatting::unit_menu(&self.state);
         Registry::new(&self.state.command_context(), &self.state.active_toggles())
+            .with_unit_menu(choices, face)
     }
 
     /// Send the active sheet to the worker under a new revision.

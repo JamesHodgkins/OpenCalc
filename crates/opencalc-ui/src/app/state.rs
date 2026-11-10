@@ -52,6 +52,8 @@ pub struct AppState {
     pub dock_basis: f32,
     /// Screen rectangle of the canvas on the last frame.
     pub viewport: Rect,
+    /// The File menu behind the app button.
+    pub app_menu_open: bool,
     pub about_open: bool,
     /// The Page setup window.
     pub page_setup_open: bool,
@@ -110,6 +112,7 @@ impl AppState {
             layout_gen: 0,
             dock_basis: crate::INITIAL_WIDTH,
             viewport: Rect::from_min_size(Pos2::ZERO, eframe::egui::vec2(800.0, 600.0)),
+            app_menu_open: false,
             about_open: false,
             page_setup_open: false,
             text_box_focus: false,
@@ -191,7 +194,6 @@ impl AppState {
         .into_iter()
         .filter(|(n, _)| super::formatting::all_in(self, *n))
         .map(|(_, c)| c)
-        .chain(super::formatting::units_in_use(self))
         .chain(super::formatting::style_commands(self))
         .chain(super::arranging::all_locked(self).then_some(CommandId::RegionLock))
         .collect()

@@ -5,6 +5,7 @@ use crate::number_format::number_in;
 use opencalc_core::document::ResultFormat;
 use opencalc_core::numeric::Complex64;
 use opencalc_core::registry::UnitSystem;
+use opencalc_core::unit_define::define_unit;
 use opencalc_core::units::{builtin_unit, Dimension, Quantity};
 use opencalc_core::value::{Scalar, Value};
 
@@ -109,6 +110,87 @@ fn candidates(system: UnitSystem, dim: Dimension) -> Vec<(&'static str, f64)> {
     }
 }
 
+/// Compound units a result can be shown in, beside the built-in ones: the source
+/// text (what is stored and evaluated) and how a menu labels it.
+const COMPOUND: &[(&str, &str)] = &[
+    ("mm^2", "mm\u{b2}"),
+    ("cm^2", "cm\u{b2}"),
+    ("m^2", "m\u{b2}"),
+    ("in^2", "in\u{b2}"),
+    ("ft^2", "ft\u{b2}"),
+    ("mm^3", "mm\u{b3}"),
+    ("cm^3", "cm\u{b3}"),
+    ("m^3", "m\u{b3}"),
+    ("in^3", "in\u{b3}"),
+    ("ft^3", "ft\u{b3}"),
+    ("mm^4", "mm\u{2074}"),
+    ("cm^4", "cm\u{2074}"),
+    ("m^4", "m\u{2074}"),
+    ("in^4", "in\u{2074}"),
+    ("N/mm^2", "N/mm\u{b2}"),
+    ("N/m^2", "N/m\u{b2}"),
+    ("kN/m^2", "kN/m\u{b2}"),
+    ("m/s", "m/s"),
+    ("km/hr", "km/hr"),
+    ("ft/s", "ft/s"),
+    ("mi/hr", "mi/hr"),
+    ("m/s^2", "m/s\u{b2}"),
+    ("ft/s^2", "ft/s\u{b2}"),
+    ("kg/m^3", "kg/m\u{b3}"),
+    ("lb/ft^3", "lb/ft\u{b3}"),
+    ("kN/m^3", "kN/m\u{b3}"),
+    ("N/m", "N/m"),
+    ("N/mm", "N/mm"),
+    ("kN/m", "kN/m"),
+    ("lbf/in", "lbf/in"),
+    ("kip/ft", "kip/ft"),
+    ("N*mm", "N\u{b7}mm"),
+    ("N*m", "N\u{b7}m"),
+    ("kN*m", "kN\u{b7}m"),
+    ("lbf*ft", "lbf\u{b7}ft"),
+    ("kip*ft", "kip\u{b7}ft"),
+];
+
+/// The units a result of dimension `dim` can be shown in, smallest first: the
+/// built-in units of that kind and the common compound ones. None for a plain
+/// number.
+pub fn unit_choices(dim: Dimension) -> Vec<&'static str> {
+    if dim.is_dimensionless() {
+        return Vec::new();
+    }
+    let mut found: Vec<(&'static str, f64)> = opencalc_core::units::builtin_symbols()
+        .filter_map(|s| builtin_unit(s).map(|u| (s, u)))
+        .filter(|(_, u)| u.dimension == dim)
+        .map(|(s, u)| (s, u.to_si_scale))
+        .collect();
+    for (source, _) in COMPOUND {
+        if let Ok(u) = define_unit("shown", source, &[], None) {
+            if u.dimension == dim {
+                found.push((source, u.to_si_scale));
+            }
+        }
+    }
+    found.sort_by(|a, b| a.1.total_cmp(&b.1));
+    found.into_iter().map(|(s, _)| s).collect()
+}
+
+/// How a menu labels a unit from [`unit_choices`]: `N/mm\u{b2}` for `N/mm^2`.
+pub fn unit_label(source: &'static str) -> &'static str {
+    COMPOUND
+        .iter()
+        .find(|(s, _)| *s == source)
+        .map_or(source, |(_, label)| label)
+}
+
+/// A unit written for reading rather than typing: powers raised, products dotted.
+pub fn pretty_unit(text: &str) -> String {
+    text.replace("^-1", "\u{207b}\u{b9}")
+        .replace("^2", "\u{b2}")
+        .replace("^3", "\u{b3}")
+        .replace("^4", "\u{2074}")
+        .replace('*', "\u{b7}")
+}
+
 /// Relative slack when deciding whether a value reaches a unit. Arithmetic like
 /// 10 kN / (0.1 m)^2 gives 999999.9999999998 Pa, which is 1 MPa to anyone reading it.
 const ROUNDING: f64 = 1e-9;
@@ -137,8 +219,21 @@ fn unit_in(
     system: UnitSystem,
     dim: Dimension,
     magnitude: f64,
-    format: ResultFormat,
+    format: &ResultFormat,
 ) -> (String, f64) {
+    // A unit typed as an expression (`N/mm^2`) shows as typed; one that does not
+    // parse, or is of another kind than the result, is ignored.
+    let typed = format
+        .custom_unit()
+        .and_then(|text| {
+            define_unit("shown", text, &[], None)
+                .ok()
+                .map(|u| (text, u))
+        })
+        .filter(|(_, u)| u.dimension == dim && !dim.is_dimensionless());
+    if let Some((text, u)) = typed {
+        return (text.to_owned(), u.to_si_scale);
+    }
     let asked = format
         .unit()
         .and_then(|u| builtin_unit(u.symbol()))
@@ -160,7 +255,7 @@ pub fn axis_unit(system: UnitSystem, dim: Dimension, peak: f64) -> (String, f64)
 /// read plainly use scientific notation (`1.5e-7`, `2.5e12`).
 #[cfg(test)]
 pub fn number_text(x: f64) -> String {
-    number_in(x, ResultFormat::default())
+    number_in(x, &ResultFormat::default())
 }
 
 fn with_unit(text: String, label: &str) -> String {
@@ -172,10 +267,10 @@ fn with_unit(text: String, label: &str) -> String {
 }
 
 pub fn format_quantity(q: Quantity, system: UnitSystem) -> String {
-    format_quantity_with(q, system, ResultFormat::default())
+    format_quantity_with(q, system, &ResultFormat::default())
 }
 
-fn format_quantity_with(q: Quantity, system: UnitSystem, format: ResultFormat) -> String {
+fn format_quantity_with(q: Quantity, system: UnitSystem, format: &ResultFormat) -> String {
     let (label, scale) = unit_in(system, q.dim, q.si.abs(), format);
     with_unit(number_in(q.si / scale, format), &label)
 }
@@ -198,7 +293,7 @@ fn snapped(x: f64, peak: f64) -> f64 {
 
 /// A complex number as `a + bi`, with a sign that never doubles up. `peak` is the
 /// largest magnitude it is shown alongside (itself, or its matrix).
-fn complex_text(z: Complex64, scale: f64, peak: f64, format: ResultFormat) -> String {
+fn complex_text(z: Complex64, scale: f64, peak: f64, format: &ResultFormat) -> String {
     let (re, im) = (snapped(z.re, peak) / scale, snapped(z.im, peak) / scale);
     if im == 0.0 {
         return number_in(re, format);
@@ -215,11 +310,24 @@ fn complex_text(z: Complex64, scale: f64, peak: f64, format: ResultFormat) -> St
 /// separated by semicolons (`2x2 [1, 2; 3, 4]`) until matrices get typeset.
 #[cfg(test)]
 pub fn format_value(v: &Value, system: UnitSystem) -> String {
-    format_value_with(v, system, ResultFormat::default())
+    format_value_with(v, system, &ResultFormat::default())
+}
+
+/// A real scalar split into its number and the unit it is shown in (empty for a
+/// plain number), so the unit can be typeset rather than drawn as text.
+pub fn scalar_parts(
+    v: &Value,
+    system: UnitSystem,
+    format: &ResultFormat,
+) -> Option<(String, String)> {
+    let Value::Scalar(s) = v else { return None };
+    let q = s.as_real()?;
+    let (label, scale) = unit_in(system, q.dim, q.si.abs(), format);
+    Some((number_in(q.si / scale, format), label))
 }
 
 /// [`format_value`] with the number format a region asks for.
-pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) -> String {
+pub fn format_value_with(v: &Value, system: UnitSystem, format: &ResultFormat) -> String {
     // A list is shown on one line, so it gets fewer values than a matrix grid.
     const SHOWN_IN_LIST: usize = 8;
     const SHOWN: usize = 24;
@@ -396,6 +504,36 @@ mod tests {
 
     fn shown_in(system: UnitSystem, v: f64, unit: &str) -> String {
         format_quantity(Quantity::from_unit(v, unit).unwrap(), system)
+    }
+
+    #[test]
+    fn a_typed_unit_shows_a_result_in_it_when_the_kind_matches() {
+        let stress = Quantity::from_unit(12.6, "MPa").unwrap();
+        let in_nmm2 = ResultFormat::default().with_custom_unit(Some("N/mm^2".into()));
+        let shown = |q, f: &ResultFormat| format_value_with(&Value::Scalar(q), UnitSystem::Si, f);
+        assert_eq!(shown(stress.into(), &in_nmm2), "12.6 N/mm^2");
+        let kpa = ResultFormat::default().with_custom_unit(Some("kPa".into()));
+        assert_eq!(shown(stress.into(), &kpa), "12600 kPa");
+        // Another kind, or text that is not a unit, falls back to the automatic unit.
+        let length = Quantity::from_unit(5.0, "mm").unwrap();
+        assert_eq!(shown(length.into(), &in_nmm2), "5 mm");
+        let junk = ResultFormat::default().with_custom_unit(Some("wibble".into()));
+        assert_eq!(shown(stress.into(), &junk), "12.6 MPa");
+    }
+
+    #[test]
+    fn the_unit_choices_are_of_the_results_kind_smallest_first() {
+        let stress = Quantity::from_unit(1.0, "MPa").unwrap().dim;
+        let c = unit_choices(stress);
+        assert!(c.contains(&"MPa") && c.contains(&"N/mm^2") && c.contains(&"psi"));
+        assert!(!c.contains(&"mm"), "no lengths for a stress");
+        let length = Quantity::from_unit(1.0, "m").unwrap().dim;
+        let c = unit_choices(length);
+        let at = |s| c.iter().position(|x| *x == s).unwrap();
+        assert!(at("mm") < at("in") && at("in") < at("m") && at("m") < at("km"));
+        assert!(unit_choices(Dimension::NONE).is_empty());
+        assert_eq!(unit_label("N/mm^2"), "N/mm\u{b2}");
+        assert_eq!(pretty_unit("kN*m^2"), "kN\u{b7}m\u{b2}");
     }
 
     #[test]

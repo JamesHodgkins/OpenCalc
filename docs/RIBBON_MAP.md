@@ -19,7 +19,7 @@ reasonable grouping, not a copy. See `UI_ALIGNMENT.md` and `CLEAN_ROOM.md`.
 | | Edit | Find, Replace |
 | | Region | Delete, Lock, Tag |
 | | Symbols | Greek letters (flyout) |
-| | Units | Unit system (SI, USCS, CGS split), Display in (metres, millimetres, inches, newtons, kilonewtons, reset), Define unit, Manage units |
+| | Units | Unit system (SI, USCS, CGS split), Result unit (a drop-down of the units of the selected result's kind, Automatic first; the face reads the unit shown now), Define unit, Manage units |
 | **Functions** | Insert | Insert function (opens the Functions window) |
 | **Matrices/Tables** | Matrix | Matrix and vector, Range *(new, need the editor, dimmed until E4)* |
 | | Table | Table region *(dimmed, as today)* |

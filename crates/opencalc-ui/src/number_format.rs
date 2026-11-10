@@ -10,7 +10,7 @@ const DEFAULT_DECIMALS: usize = 3;
 /// `x` as text in the given format. With no decimals chosen, up to three are
 /// shown and trailing zeros dropped (`10`, `0.333`); with a chosen count that many
 /// are always shown (`10.00`).
-pub fn number_in(x: f64, format: ResultFormat) -> String {
+pub fn number_in(x: f64, format: &ResultFormat) -> String {
     if !x.is_finite() {
         return format!("{x}");
     }
@@ -110,30 +110,30 @@ mod tests {
             (2.5e12, "2.5e12"),
             (0.0009, "9e-4"),
         ] {
-            assert_eq!(number_in(x, d), want, "{x}");
+            assert_eq!(number_in(x, &d), want, "{x}");
         }
     }
 
     #[test]
     fn a_chosen_number_of_decimals_is_always_shown() {
         let f = fmt(Notation::General, Some(2));
-        assert_eq!(number_in(10.0, f), "10.00");
-        assert_eq!(number_in(1.0 / 3.0, f), "0.33");
-        assert_eq!(number_in(2.0 / 3.0, f), "0.67");
-        assert_eq!(number_in(0.0, f), "0.00");
-        assert_eq!(number_in(-1234.5678, f), "-1234.57");
-        assert_eq!(number_in(7.5, fmt(Notation::General, Some(0))), "8");
+        assert_eq!(number_in(10.0, &f), "10.00");
+        assert_eq!(number_in(1.0 / 3.0, &f), "0.33");
+        assert_eq!(number_in(2.0 / 3.0, &f), "0.67");
+        assert_eq!(number_in(0.0, &f), "0.00");
+        assert_eq!(number_in(-1234.5678, &f), "-1234.57");
+        assert_eq!(number_in(7.5, &fmt(Notation::General, Some(0))), "8");
         assert_eq!(
-            number_in(1.0 / 3.0, fmt(Notation::General, Some(6))),
+            number_in(1.0 / 3.0, &fmt(Notation::General, Some(6))),
             "0.333333"
         );
         // More decimals let a small number stay plain rather than turn scientific.
         assert_eq!(
-            number_in(0.0000125, fmt(Notation::General, Some(7))),
+            number_in(0.0000125, &fmt(Notation::General, Some(7))),
             "0.0000125"
         );
         assert_eq!(
-            number_in(0.0000125, fmt(Notation::General, Some(2))),
+            number_in(0.0000125, &fmt(Notation::General, Some(2))),
             "1.25e-5"
         );
     }
@@ -141,16 +141,16 @@ mod tests {
     #[test]
     fn scientific_has_one_digit_before_the_point() {
         let s = fmt(Notation::Scientific, None);
-        assert_eq!(number_in(15000.0, s), "1.5e4");
-        assert_eq!(number_in(0.00123, s), "1.23e-3");
-        assert_eq!(number_in(-2.0, s), "-2e0");
-        assert_eq!(number_in(0.0, s), "0e0");
+        assert_eq!(number_in(15000.0, &s), "1.5e4");
+        assert_eq!(number_in(0.00123, &s), "1.23e-3");
+        assert_eq!(number_in(-2.0, &s), "-2e0");
+        assert_eq!(number_in(0.0, &s), "0e0");
         assert_eq!(
-            number_in(15000.0, fmt(Notation::Scientific, Some(3))),
+            number_in(15000.0, &fmt(Notation::Scientific, Some(3))),
             "1.500e4"
         );
         assert_eq!(
-            number_in(9999.6, fmt(Notation::Scientific, Some(1))),
+            number_in(9999.6, &fmt(Notation::Scientific, Some(1))),
             "1.0e4"
         );
     }
@@ -168,15 +168,15 @@ mod tests {
             (-12_345_678.0, "-12.346e6"),
             (0.0, "0e0"),
         ] {
-            assert_eq!(number_in(x, e), want, "{x}");
+            assert_eq!(number_in(x, &e), want, "{x}");
         }
         // Rounding up to 1000 moves to the next step instead of showing 1000e3.
         assert_eq!(
-            number_in(999_999.0, fmt(Notation::Engineering, Some(1))),
+            number_in(999_999.0, &fmt(Notation::Engineering, Some(1))),
             "1.0e6"
         );
         assert_eq!(
-            number_in(15000.0, fmt(Notation::Engineering, Some(2))),
+            number_in(15000.0, &fmt(Notation::Engineering, Some(2))),
             "15.00e3"
         );
     }
@@ -199,12 +199,12 @@ mod tests {
                     f64::NEG_INFINITY,
                     1e308,
                 ] {
-                    let _ = number_in(x, fmt(notation, decimals));
+                    let _ = number_in(x, &fmt(notation, decimals));
                 }
             }
         }
         assert_eq!(
-            number_in(5e-324, fmt(Notation::Engineering, None)),
+            number_in(5e-324, &fmt(Notation::Engineering, None)),
             "5e-324"
         );
     }

@@ -47,6 +47,7 @@ pub const BINDINGS: &[Binding] = &[
     bind(CommandId::FileSaveAs, CTRL_SHIFT, Key::S),
     bind(CommandId::FileSave, CTRL, Key::S),
     bind(CommandId::FileClose, CTRL, Key::W),
+    bind(CommandId::AppMenu, Modifiers::ALT, Key::F),
     bind_free(CommandId::EditRedo, CTRL_SHIFT, Key::Z),
     bind_free(CommandId::EditRedo, CTRL, Key::Y),
     bind_free(CommandId::EditUndo, CTRL, Key::Z),

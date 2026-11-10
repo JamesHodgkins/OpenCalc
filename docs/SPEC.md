@@ -397,13 +397,15 @@ pub struct Evaluator {
 
 ### 4.1 Window structure (top to bottom)
 
-1. **Title row** (`base` tone): an app button at the far left (a square logo button that opens the application menu), then the Quick Access Toolbar (New, Open, Save, Save As, Undo, Redo, with dropdowns where relevant, and a customise chevron), then the worksheet title centred.
+1. **Title row** (`base` tone): an app button at the far left (the logo and "File", Alt+F) that opens the File menu, then the Quick Access Toolbar (New, Open, Save, Save As, Undo, Redo, with dropdowns where relevant, and a customise chevron), then the worksheet title centred.
 2. **Tab strip** (`base` tone): plain text tabs (Home, Insert, Format, Units, Calculate, View, Help). The active tab takes the ribbon body's tone and merges into it, with a 4 px top corner radius. Tab height 25 px.
 3. **Ribbon body** (`raised` tone, 6 × 4 px inner margin): panels laid out left to right, each separated by a 1 px `divider` line. Every panel is as tall as a large button (66 px, three small rows of 22 px), whatever it holds.
 4. **Document tab row** (`base` tone): a Home tab with a house icon (never closed), then one tab per open worksheet with a close button, then a `+` for a new worksheet. Tab height 26 px. The active tab takes the canvas tone.
 5. **Canvas**: the worksheet. A viewport overlay sits at its top-left (zoom percentage and view mode), drawn as clickable controls.
 6. **Dock panels** (`surface` tone): the Names and Units browser on the left, Region Properties on the right. Layout persists between sessions. Default split: left panel 13% of width; right column 30%. A "Reset layout" command restores it.
 7. **Status bar** (`base` tone, 1 px `divider` above): icon toggles in fixed order: grid display, grid snap, live recalculation, unit system, warnings count, zoom.
+
+**The File menu** (`panels/app_menu.rs`) drops from the app button. The left column lists New worksheet, Open, Save, Save As, Export and Close worksheet, each with its icon and shortcut, then Options, About and Quit at its foot under a divider. The right pane shows the recent worksheets (numbered 1 to 9 and 0, with the folder under the name, and "Open" on any already open), or, while New, Save As or Export is chosen, that command's choices, each with a line saying what it does. The left row whose pane shows takes the pane's `raised` tone and joins it, with a short accent bar. Resting the pointer on a row for 0.15 s opens its pane; a click on a row runs it (Export, which runs nothing itself, opens its pane). Keys: Up and Down move, Right enters the pane, Left leaves it, Enter or Space runs, a digit opens that recent worksheet, Escape closes. Running any command closes the menu.
 
 ### 4.1a Floating and overlay rules
 - Popups and menus use the `panel_raised` tone, a 2 px margin and 22 px rows. Lists over 12 rows scroll.

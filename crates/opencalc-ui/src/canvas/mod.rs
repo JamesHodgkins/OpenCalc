@@ -21,6 +21,7 @@ mod result;
 pub(crate) mod separate;
 mod table;
 pub mod text_style;
+pub(crate) mod unit_slot;
 pub mod view;
 
 use eframe::egui::{self, FontId, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
@@ -103,6 +104,8 @@ pub struct CanvasUi {
     pub enter_at_start: bool,
     /// The math editor's text, caret and selection while a math region is edited.
     pub field: Option<editor::Field>,
+    /// The unit being typed into the slot after a result.
+    pub unit_edit: Option<unit_slot::UnitEdit>,
     /// Where the next inserted region goes (document space).
     pub insert_at: Pos2,
     /// The last click was on blank page, so typing starts a math region there.
@@ -126,6 +129,7 @@ impl Default for CanvasUi {
             focus_edit: false,
             enter_at_start: false,
             field: None,
+            unit_edit: None,
             insert_at: Pos2::new(40.0, 40.0),
             // The initial insertion point is ready for type-to-create, just like
             // the point after moving the crosshair or clicking the blank page.
@@ -206,7 +210,11 @@ pub fn show(
         }
         let editing_here = st.editing == Some(r.id);
         let size = paint::region(ui, &painter, env, r, screen.min, view.zoom, editing_here);
-        if r.kind.is_auto_sized() {
+        // While a region is edited, the editor sizes it from the form it is
+        // typesetting (holes and all), which the strict parse measured here can
+        // differ from; two writers made the frame lag behind the content.
+        let editor_sizes_it = editing_here && st.field.is_some();
+        if r.kind.is_auto_sized() && !editor_sizes_it {
             st.sizes.insert(r.id, size);
         }
     }
@@ -239,6 +247,10 @@ pub fn show(
 
     let was_editing = st.editing.is_some();
     overlay::edit_overlay(ui, env, regions, view, origin, st, &mut cmds);
+    if st.editing.is_some() {
+        st.unit_edit = None;
+    }
+    unit_slot::edit(ui, env, regions, st, &mut cmds);
     if st.editing.is_none() {
         // (A key that just ended editing has already placed the crosshair.)
         if !was_editing {
@@ -386,6 +398,17 @@ fn pointer(
     let Some(pos) = resp.interact_pointer_pos() else {
         return;
     };
+    // A click on the unit after a result opens it for typing.
+    if resp.clicked() || resp.double_clicked() {
+        if let Some(id) = unit_slot::hit(ui.ctx(), regions, pos) {
+            cmds.push(CanvasCmd::Seal);
+            st.selection = vec![id];
+            st.editing = None;
+            st.armed = false;
+            st.unit_edit = unit_slot::begin(ui.ctx(), regions, id);
+            return;
+        }
+    }
     if resp.double_clicked() {
         cmds.push(CanvasCmd::Seal);
         if let Some(id) = hit_test(regions, &st.sizes, to_doc(pos)) {

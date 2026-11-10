@@ -67,6 +67,18 @@ pub enum Effect {
 /// reflects by keeping it disabled.
 pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>> {
     use CommandId::*;
+    // Running anything closes the File menu, as picking from it would; the menu
+    // button toggles it.
+    match command {
+        AppMenu => {
+            state.app_menu_open = !state.app_menu_open;
+            return Some(Vec::new());
+        }
+        _ => state.app_menu_open = false,
+    }
+    if command == AppMenuClose {
+        return Some(Vec::new());
+    }
     if let Some(fx) = dispatch_file(state, command) {
         return Some(fx);
     }
@@ -187,6 +199,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         }
         ThemeNeutral => set_palette(state, &mut fx, PaletteKey::Neutral),
         ThemeSlate => set_palette(state, &mut fx, PaletteKey::Slate),
+        // The ribbon opens the Result unit list itself; its face runs nothing.
+        UnitsShowInMenu => {}
         UnitsDefine | UnitsManage => state.units_open = true,
         UnitsClose => state.units_open = false,
         AppOptions => {

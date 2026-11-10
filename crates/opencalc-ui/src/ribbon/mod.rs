@@ -40,14 +40,11 @@ pub struct Split {
 }
 
 pub enum Cell {
-    /// Small icon and label.
-    Button(Item),
     /// Small icon only; the label is the tooltip.
     Icon(Item),
-    /// Small icon, label and arrow.
-    Split(Split),
-    /// Small icon and arrow.
-    IconSplit(Split),
+    /// A drop-down whose items come from the command source when it opens; the
+    /// face reads what is chosen now. `first` is always listed first.
+    Menu { menu: Item, first: Item },
 }
 
 pub enum Column {
@@ -94,6 +91,11 @@ pub trait CommandSource {
     fn shortcut_text(&self, command: CommandId) -> Option<String>;
     fn is_active(&self, _command: CommandId) -> bool {
         false
+    }
+    /// A menu filled at run time: its items, and the text on its face (else its
+    /// own label).
+    fn menu(&self, _menu: CommandId) -> (Vec<CommandId>, Option<String>) {
+        (Vec::new(), None)
     }
 }
 

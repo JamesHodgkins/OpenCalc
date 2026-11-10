@@ -29,6 +29,9 @@ pub struct Registry {
     active: HashSet<CommandId>,
     /// Whether a symbol can be inserted: a math region is being edited.
     symbols: bool,
+    /// The units the selected results can be shown in, and the unit they show.
+    unit_choices: Vec<CommandId>,
+    unit_face: Option<String>,
 }
 
 impl Registry {
@@ -42,7 +45,16 @@ impl Registry {
                 .collect(),
             active: active.iter().copied().collect(),
             symbols: ctx.editing_math,
+            unit_choices: Vec::new(),
+            unit_face: None,
         }
+    }
+
+    /// The Result unit menu: the units on offer and the one the selection shows.
+    pub fn with_unit_menu(mut self, choices: Vec<CommandId>, face: Option<String>) -> Registry {
+        self.unit_choices = choices;
+        self.unit_face = face;
+        self
     }
 
     /// Whether a command can run. Parameterised commands (tab select and close)
@@ -60,6 +72,7 @@ impl Registry {
             | CommandId::InsertMatrixSize(..)
             | CommandId::GoToLabel(_) => true,
             CommandId::InsertSymbol(_) => self.symbols,
+            CommandId::UnitsShowIn(_) => self.unit_choices.contains(&command),
             other => self.enabled.contains(&other),
         }
     }
@@ -131,12 +144,8 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
                     | FormatDecimalsLess
                     | FormatScientific
                     | FormatEngineering
-                    | UnitsDisplayM
-                    | UnitsDisplayMm
-                    | UnitsDisplayIn
-                    | UnitsDisplayN
-                    | UnitsDisplayKn
                     | UnitsDisplayReset
+                    | UnitsShowInMenu
             ))
         && (ctx.selects_several || !matches!(command, ArrangeAlignH | ArrangeAlignV))
         && (ctx.selects_text || !matches!(command, FormatBold | FormatItalic | FormatUnderline))
@@ -156,6 +165,13 @@ impl CommandSource for Registry {
 
     fn is_active(&self, command: CommandId) -> bool {
         self.active.contains(&command)
+    }
+
+    fn menu(&self, menu: CommandId) -> (Vec<CommandId>, Option<String>) {
+        match menu {
+            CommandId::UnitsShowInMenu => (self.unit_choices.clone(), self.unit_face.clone()),
+            _ => (Vec::new(), None),
+        }
     }
 }
 

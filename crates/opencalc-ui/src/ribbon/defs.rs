@@ -100,22 +100,11 @@ fn math() -> Tab {
                 })],
             ),
             panel(
-                "Display In",
-                vec![Column::Rows(vec![
-                    vec![Cell::Split(Split {
-                        label: Some("Length"),
-                        items: vec![
-                            it(CommandId::UnitsDisplayM),
-                            it(CommandId::UnitsDisplayMm),
-                            it(CommandId::UnitsDisplayIn),
-                        ],
-                    })],
-                    vec![Cell::IconSplit(Split {
-                        label: None,
-                        items: vec![it(CommandId::UnitsDisplayN), it(CommandId::UnitsDisplayKn)],
-                    })],
-                    vec![Cell::Button(it(CommandId::UnitsDisplayReset))],
-                ])],
+                "Result Unit",
+                vec![Column::Rows(vec![vec![Cell::Menu {
+                    menu: it(CommandId::UnitsShowInMenu),
+                    first: it(CommandId::UnitsDisplayReset),
+                }]])],
             ),
             panel(
                 "Custom Units",
@@ -283,8 +272,11 @@ mod tests {
                     Column::Rows(rows) => {
                         for cell in rows.iter().flatten() {
                             match cell {
-                                Cell::Button(i) | Cell::Icon(i) => v.push(i),
-                                Cell::Split(s) | Cell::IconSplit(s) => v.extend(s.items.iter()),
+                                Cell::Icon(i) => v.push(i),
+                                Cell::Menu { menu, first } => {
+                                    v.push(menu);
+                                    v.push(first);
+                                }
                             }
                         }
                     }
@@ -330,7 +322,7 @@ mod tests {
                 "Region",
                 "Symbols",
                 "Unit System",
-                "Display In",
+                "Result Unit",
                 "Custom Units"
             ]
         );
@@ -369,15 +361,17 @@ mod tests {
     /// window, a tab, the Home page or a key (listed here).
     #[test]
     fn every_command_can_be_reached_from_somewhere() {
-        use crate::panels::title::{MENU, QUICK_ACCESS};
+        use crate::panels::title::QUICK_ACCESS;
         let ribbon = opencalc_ribbon();
         let mut reachable: HashSet<CommandId> =
             all_items(&ribbon).iter().map(|i| i.command).collect();
-        reachable.extend(MENU);
+        reachable.extend(crate::panels::app_menu::commands());
         reachable.extend(QUICK_ACCESS);
         reachable.extend([
             CommandId::FileClose,          // the worksheet tab's close button, Ctrl+W
-            CommandId::FileExample,        // the Home page
+            CommandId::FileExample,        // the Home page, the File menu
+            CommandId::AppMenu,            // the app button, Alt+F
+            CommandId::AppMenuClose,       // the File menu: Escape, a click outside
             CommandId::TabHome,            // the Home tab
             CommandId::HelpAboutClose,     // the About window
             CommandId::AppOptionsClose,    // the Options window

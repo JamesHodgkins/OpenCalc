@@ -50,13 +50,18 @@ impl DisplayUnit {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "Saved", into = "Saved")]
 pub struct ResultFormat {
     notation: Notation,
     decimals: Option<u8>,
     unit: Option<DisplayUnit>,
+    /// A unit typed as an expression (`N/mm^2`); it wins over `unit`.
+    custom: Option<String>,
 }
+
+/// Longest unit expression kept.
+const MAX_CUSTOM_LEN: usize = 64;
 
 /// The saved form; `from` brings an out-of-range count back into range.
 #[derive(Serialize, Deserialize)]
@@ -67,11 +72,17 @@ struct Saved {
     decimals: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     unit: Option<DisplayUnit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    custom: Option<String>,
 }
 
 impl From<Saved> for ResultFormat {
     fn from(s: Saved) -> ResultFormat {
-        ResultFormat::new(s.notation, s.decimals).with_unit(s.unit)
+        let f = ResultFormat::new(s.notation, s.decimals).with_unit(s.unit);
+        match s.custom {
+            Some(c) => f.with_custom_unit(Some(c)),
+            None => f,
+        }
     }
 }
 
@@ -81,6 +92,7 @@ impl From<ResultFormat> for Saved {
             notation: f.notation,
             decimals: f.decimals,
             unit: f.unit,
+            custom: f.custom,
         }
     }
 }
@@ -92,14 +104,15 @@ impl ResultFormat {
             notation,
             decimals: decimals.map(|d| d.min(MAX_DECIMALS)),
             unit: None,
+            custom: None,
         }
     }
 
-    pub fn notation(self) -> Notation {
+    pub fn notation(&self) -> Notation {
         self.notation
     }
 
-    pub fn decimals(self) -> Option<u8> {
+    pub fn decimals(&self) -> Option<u8> {
         self.decimals
     }
 
@@ -110,30 +123,52 @@ impl ResultFormat {
 
     /// One more decimal. From the default it starts at 4 (one more than the three
     /// the default shows) and stops at the most that means anything.
-    pub fn more_decimals(self) -> ResultFormat {
+    pub fn more_decimals(&self) -> ResultFormat {
         let next = self.decimals.map_or(4, |d| d.saturating_add(1));
         ResultFormat {
             decimals: Some(next.min(MAX_DECIMALS)),
-            ..self
+            ..self.clone()
         }
     }
 
     /// One fewer decimal, down to none.
-    pub fn fewer_decimals(self) -> ResultFormat {
+    pub fn fewer_decimals(&self) -> ResultFormat {
         let next = self.decimals.map_or(2, |d| d.saturating_sub(1));
         ResultFormat {
             decimals: Some(next),
+            ..self.clone()
+        }
+    }
+
+    pub fn unit(&self) -> Option<DisplayUnit> {
+        self.unit
+    }
+
+    /// The unit expression typed for this region, such as `N/mm^2`.
+    pub fn custom_unit(&self) -> Option<&str> {
+        self.custom.as_deref()
+    }
+
+    /// Show results in `unit` (`None`: chosen automatically). Clears any typed unit.
+    pub fn with_unit(self, unit: Option<DisplayUnit>) -> ResultFormat {
+        ResultFormat {
+            unit,
+            custom: None,
             ..self
         }
     }
 
-    pub fn unit(self) -> Option<DisplayUnit> {
-        self.unit
-    }
-
-    /// Show results in `unit` (`None`: chosen automatically).
-    pub fn with_unit(self, unit: Option<DisplayUnit>) -> ResultFormat {
-        ResultFormat { unit, ..self }
+    /// Show results in a unit typed as an expression. Blank means none. It is
+    /// applied to results of the same kind only, like [`DisplayUnit`].
+    pub fn with_custom_unit(self, text: Option<String>) -> ResultFormat {
+        let custom = text
+            .map(|t| t.trim().chars().take(MAX_CUSTOM_LEN).collect::<String>())
+            .filter(|t| !t.is_empty());
+        ResultFormat {
+            unit: None,
+            custom,
+            ..self
+        }
     }
 
     pub fn with_notation(self, notation: Notation) -> ResultFormat {
@@ -150,7 +185,7 @@ mod tests {
         let f = ResultFormat::default();
         assert_eq!(f.more_decimals().decimals(), Some(4));
         assert_eq!(f.fewer_decimals().decimals(), Some(2));
-        let mut g = f;
+        let mut g = f.clone();
         for _ in 0..40 {
             g = g.more_decimals();
         }
@@ -159,6 +194,19 @@ mod tests {
             g = g.fewer_decimals();
         }
         assert_eq!(g.decimals(), Some(0));
+    }
+
+    #[test]
+    fn a_typed_unit_replaces_a_preset_and_survives_saving() {
+        let f = ResultFormat::default()
+            .with_unit(Some(DisplayUnit::Metre))
+            .with_custom_unit(Some("  N/mm^2 ".into()));
+        assert_eq!(f.unit(), None);
+        assert_eq!(f.custom_unit(), Some("N/mm^2"));
+        let json = serde_json::to_string(&f).unwrap();
+        assert_eq!(serde_json::from_str::<ResultFormat>(&json).unwrap(), f);
+        assert!(f.clone().with_custom_unit(Some("  ".into())).is_default());
+        assert_eq!(f.with_unit(None).custom_unit(), None);
     }
 
     #[test]

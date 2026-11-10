@@ -8,6 +8,7 @@ use opencalc_core::persist::{load_bytes, save_bytes};
 use super::Harness;
 use crate::commands::CommandId;
 use crate::format::format_value_with;
+use crate::ribbon::CommandSource;
 
 /// A worksheet with `x := 1234.5678` and the evaluation `x =`.
 fn setup() -> (Harness, RegionId, RegionId) {
@@ -34,7 +35,7 @@ fn result(h: &Harness, id: RegionId) -> String {
         panic!("not math")
     };
     match h.app.state.output.values.get(&id) {
-        Some(Ok(v)) => format_value_with(v, sheet.doc.unit_system(), m.format()),
+        Some(Ok(v)) => format_value_with(v, sheet.doc.unit_system(), &m.format()),
         other => panic!("no value: {other:?}"),
     }
 }
@@ -105,7 +106,7 @@ fn engineering_notation_uses_exponents_in_threes() {
     assert_eq!(m.format().notation(), Notation::Engineering);
     assert_eq!(m.format().decimals(), Some(4));
     assert_eq!(
-        crate::number_format::number_in(15_000.0, m.format()),
+        crate::number_format::number_in(15_000.0, &m.format()),
         "15.0000e3"
     );
 }
@@ -199,26 +200,55 @@ fn setup_units() -> (Harness, RegionId, RegionId) {
 }
 
 #[test]
-fn display_in_shows_a_result_in_the_chosen_unit_and_reset_puts_it_back() {
+fn the_result_unit_menu_offers_units_of_the_selected_results_kind() {
     let (mut h, length, force) = setup_units();
-    assert_eq!(result(&h, length), "2 m");
-    select(&mut h, &[length]);
-    h.command(CommandId::UnitsDisplayMm);
-    assert_eq!(result(&h, length), "2000 mm");
-    h.command(CommandId::UnitsDisplayIn);
-    assert_eq!(result(&h, length), "78.74 in");
+    select(&mut h, &[]);
     assert!(h
         .app
-        .state
-        .active_toggles()
-        .contains(&CommandId::UnitsDisplayIn));
+        .registry()
+        .menu(CommandId::UnitsShowInMenu)
+        .0
+        .is_empty());
+    select(&mut h, &[length]);
+    let (choices, face) = h.app.registry().menu(CommandId::UnitsShowInMenu);
+    assert_eq!(face.as_deref(), Some("m"));
+    assert!(choices.contains(&CommandId::UnitsShowIn("mm")));
+    assert!(!choices.contains(&CommandId::UnitsShowIn("kN")));
+    // A length and a force together have no unit in common.
+    select(&mut h, &[length, force]);
+    assert!(h
+        .app
+        .registry()
+        .menu(CommandId::UnitsShowInMenu)
+        .0
+        .is_empty());
+}
+
+#[test]
+fn choosing_a_unit_shows_the_result_in_it_and_automatic_puts_it_back() {
+    let (mut h, length, force) = setup_units();
+    select(&mut h, &[length]);
+    h.command(CommandId::UnitsShowIn("mm"));
+    assert_eq!(result(&h, length), "2000 mm");
+    let (_, face) = h.app.registry().menu(CommandId::UnitsShowInMenu);
+    assert_eq!(
+        face.as_deref(),
+        Some("mm"),
+        "the menu reads the unit chosen"
+    );
+    h.command(CommandId::UnitsShowIn("in"));
+    assert_eq!(result(&h, length), "78.74 in");
     h.command(CommandId::UnitsDisplayReset);
     assert_eq!(result(&h, length), "2 m");
 
     select(&mut h, &[force]);
-    h.command(CommandId::UnitsDisplayN);
+    h.command(CommandId::UnitsShowIn("N"));
     assert_eq!(result(&h, force), "5000 N");
-    h.command(CommandId::UnitsDisplayKn);
+    assert!(
+        !h.app.registry().allows(CommandId::UnitsShowIn("kN*m")),
+        "a unit of another kind is not offered"
+    );
+    h.command(CommandId::UnitsShowIn("kN"));
     assert_eq!(result(&h, force), "5 kN");
     // Undo goes back one choice at a time.
     h.command(CommandId::EditUndo);
@@ -226,47 +256,22 @@ fn display_in_shows_a_result_in_the_chosen_unit_and_reset_puts_it_back() {
 }
 
 #[test]
-fn a_unit_of_another_kind_is_ignored_and_the_choice_combines_with_the_number_format() {
-    let (mut h, length, force) = setup_units();
-    select(&mut h, &[force]);
-    h.command(CommandId::UnitsDisplayMm);
-    assert_eq!(result(&h, force), "5 kN", "metres do not apply to a force");
-    // Length in millimetres to two decimals, in scientific notation.
+fn a_chosen_unit_combines_with_the_number_format_and_is_saved() {
+    let (mut h, length, _) = setup_units();
     select(&mut h, &[length]);
-    h.command(CommandId::UnitsDisplayMm);
+    h.command(CommandId::UnitsShowIn("mm"));
     h.command(CommandId::FormatDecimalsLess);
     h.command(CommandId::FormatScientific);
     assert_eq!(result(&h, length), "2.00e3 mm");
     // A format change keeps the unit, and the other way round.
     h.command(CommandId::FormatScientific);
     assert_eq!(result(&h, length), "2000.00 mm");
-}
-
-#[test]
-fn display_in_is_saved_and_the_buttons_need_a_math_region() {
-    let (mut h, length, _) = setup_units();
-    let formats = [
-        CommandId::UnitsDisplayM,
-        CommandId::UnitsDisplayMm,
-        CommandId::UnitsDisplayIn,
-        CommandId::UnitsDisplayN,
-        CommandId::UnitsDisplayKn,
-        CommandId::UnitsDisplayReset,
-    ];
-    select(&mut h, &[]);
-    assert!(formats.iter().all(|c| !h.app.registry().allows(*c)));
-    select(&mut h, &[length]);
-    assert!(formats.iter().all(|c| h.app.registry().allows(*c)));
-    h.command(CommandId::UnitsDisplayMm);
     let bytes = save_bytes(&h.sheet().doc).unwrap();
     let loaded = load_bytes(&bytes).unwrap();
     let RegionKind::Math(m) = &loaded.worksheet.region(length).unwrap().kind else {
         panic!()
     };
-    assert_eq!(
-        m.format().unit(),
-        Some(opencalc_core::document::DisplayUnit::Millimetre)
-    );
+    assert_eq!(m.format().custom_unit(), Some("mm"));
 }
 
 fn text_region(h: &mut Harness, text: &str, y: f32) -> RegionId {
@@ -369,4 +374,30 @@ fn the_style_is_saved_copied_and_drawn() {
         })
     };
     assert!(width(true) > width(false) + 1.0);
+}
+
+#[test]
+fn clicking_the_unit_of_a_result_and_typing_changes_it_and_undo_puts_it_back() {
+    use eframe::egui::{Event, Key, Modifiers};
+    let mut h = Harness::new();
+    h.settle();
+    let sheet = &mut h.app.state.sheets[0];
+    sheet.add(RegionKind::math("s := 12.6 MPa"), Point::new(400.0, 60.0));
+    let shown = sheet.add(RegionKind::math("s ="), Point::new(400.0, 120.0));
+    h.app.recalculate();
+    h.settle();
+    assert_eq!(result(&h, shown), "12.6 MPa");
+    let at = crate::canvas::unit_slot::centre_of(&h.ctx, shown).expect("the unit is a slot");
+    h.frame_with(vec![Event::PointerMoved(at)]);
+    h.frame_with(vec![super::press(at)]);
+    h.frame_with(vec![super::release(at)]);
+    h.frame();
+    h.frame_with(vec![Event::Text("N/mm^2".into())]);
+    h.frame();
+    h.key(Key::Enter, Modifiers::NONE);
+    h.frame();
+    assert_eq!(result(&h, shown), "12.6 N/mm^2");
+    // Undo puts the automatic unit back.
+    h.command(CommandId::EditUndo);
+    assert_eq!(result(&h, shown), "12.6 MPa");
 }

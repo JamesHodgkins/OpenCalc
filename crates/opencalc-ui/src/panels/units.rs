@@ -124,40 +124,46 @@ fn list(ui: &mut Ui, units: &[UnitDef], form: &mut Form, edits: &mut Vec<CanvasC
         ui.label("None yet. Define one below, then use it in a worksheet like any unit.");
         return;
     }
-    egui::Grid::new("units-list")
-        .num_columns(4)
-        .spacing([12.0, 4.0])
+    egui::ScrollArea::vertical()
+        .id_salt("units-list-scroll")
+        .max_height(160.0)
+        .auto_shrink([false, true])
         .show(ui, |ui| {
-            for (i, def) in units.iter().enumerate() {
-                ui.label(RichText::new(&def.symbol).strong());
-                let shown = if def.definition.is_empty() {
-                    meaning(def)
-                } else {
-                    format!("{}  ({})", def.definition, meaning(def))
-                };
-                ui.label(format!("= {shown}"));
-                if ui.small_button("Edit").clicked() {
-                    *form = Form {
-                        symbol: def.symbol.clone(),
-                        definition: if def.definition.is_empty() {
+            egui::Grid::new("units-list")
+                .num_columns(4)
+                .spacing([12.0, 4.0])
+                .show(ui, |ui| {
+                    for (i, def) in units.iter().enumerate() {
+                        ui.label(RichText::new(&def.symbol).strong());
+                        let shown = if def.definition.is_empty() {
                             meaning(def)
                         } else {
-                            def.definition.clone()
-                        },
-                        editing: Some(i),
-                        started: true,
-                    };
-                }
-                if ui
-                    .small_button("Delete")
-                    .on_hover_text("Undo restores it")
-                    .clicked()
-                {
-                    replace(edits, without_unit(units, i));
-                    *form = Form::default();
-                }
-                ui.end_row();
-            }
+                            format!("{}  ({})", def.definition, meaning(def))
+                        };
+                        ui.label(format!("= {shown}"));
+                        if ui.small_button("Edit").clicked() {
+                            *form = Form {
+                                symbol: def.symbol.clone(),
+                                definition: if def.definition.is_empty() {
+                                    meaning(def)
+                                } else {
+                                    def.definition.clone()
+                                },
+                                editing: Some(i),
+                                started: true,
+                            };
+                        }
+                        if ui
+                            .small_button("Delete")
+                            .on_hover_text("Undo restores it")
+                            .clicked()
+                        {
+                            replace(edits, without_unit(units, i));
+                            *form = Form::default();
+                        }
+                        ui.end_row();
+                    }
+                });
         });
 }
 
@@ -233,17 +239,24 @@ fn editor(
 }
 
 fn builtin_list(ui: &mut Ui, weak: egui::Color32) {
-    egui::Grid::new("units-builtin")
-        .num_columns(2)
-        .spacing([16.0, 2.0])
+    // Scrolls within a fixed height so the window never outgrows the screen.
+    egui::ScrollArea::vertical()
+        .id_salt("units-builtin-scroll")
+        .max_height(240.0)
+        .auto_shrink([false, true])
         .show(ui, |ui| {
-            for symbol in builtin_symbols() {
-                if let Some(def) = builtin_unit(symbol) {
-                    ui.label(symbol);
-                    ui.label(RichText::new(format!("= {}", meaning(&def))).color(weak));
-                    ui.end_row();
-                }
-            }
+            egui::Grid::new("units-builtin")
+                .num_columns(2)
+                .spacing([16.0, 2.0])
+                .show(ui, |ui| {
+                    for symbol in builtin_symbols() {
+                        if let Some(def) = builtin_unit(symbol) {
+                            ui.label(symbol);
+                            ui.label(RichText::new(format!("= {}", meaning(&def))).color(weak));
+                            ui.end_row();
+                        }
+                    }
+                });
         });
 }
 

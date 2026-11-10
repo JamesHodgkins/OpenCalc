@@ -245,7 +245,7 @@ impl Worksheet {
                     return Err(EditError::WrongKind(*id));
                 };
                 let old = m.format();
-                m.set_format(*format);
+                m.set_format(format.clone());
                 Ok(Edit::SetResultFormat {
                     id: *id,
                     format: old,

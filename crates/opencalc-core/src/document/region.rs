@@ -73,7 +73,7 @@ impl MathRegion {
 
     /// How the result is shown.
     pub fn format(&self) -> ResultFormat {
-        self.format
+        self.format.clone()
     }
 
     pub(crate) fn set_format(&mut self, format: ResultFormat) {
