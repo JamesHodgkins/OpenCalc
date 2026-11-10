@@ -9,6 +9,7 @@ fn strength(e: &Expr) -> u8 {
         | Expr::FunctionDef { .. }
         | Expr::Range { .. }
         | Expr::Program(_)
+        | Expr::MultiDefine { .. }
         | Expr::LocalAssign { .. }
         | Expr::IndexAssign { .. }
         | Expr::IfBlock { .. }
@@ -170,6 +171,9 @@ impl std::fmt::Display for Expr {
                     }
                 }
                 write!(f, ") := {body}")
+            }
+            Expr::MultiDefine { targets, value } => {
+                write!(f, "[{}] := {value}", targets.join("; "))
             }
             Expr::Given(g) => {
                 f.write_str("given")?;

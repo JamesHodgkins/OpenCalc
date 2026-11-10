@@ -176,7 +176,8 @@ impl Expr {
             }
             // What a program assigns (and the variable of each `for`) is its own,
             // wherever in the program it is used; the rest is a dependency.
-            Expr::Given(g) => g.lowered().collect_names(out),
+            Expr::Given(g) => given_names(g, out),
+            Expr::MultiDefine { value, .. } => value.collect_names(out),
             Expr::Program(statements) => {
                 let mut inner = Vec::new();
                 for s in statements {
@@ -281,4 +282,22 @@ pub fn assigned_names(statements: &[Expr]) -> Vec<String> {
     let mut out = Vec::new();
     statements.iter().for_each(|s| scan(s, &mut out));
     out
+}
+
+/// The names a `given` block reads. The unknowns a guess is written for are the
+/// block's own. (Out of line: `collect_names` recurses over the whole tree, and its
+/// stack frame is what the small-stack tests measure.)
+#[inline(never)]
+fn given_names(g: &super::GivenBlock, out: &mut Vec<String>) {
+    let mut inner = Vec::new();
+    g.lowered().collect_names(&mut inner);
+    let guessed: Vec<&str> = g.guesses().map(|(_, n, _)| n).collect();
+    for n in inner {
+        if !guessed.contains(&n.as_str()) && !out.contains(&n) {
+            out.push(n);
+        }
+    }
+    for (_, _, value) in g.guesses() {
+        value.collect_names(out);
+    }
 }

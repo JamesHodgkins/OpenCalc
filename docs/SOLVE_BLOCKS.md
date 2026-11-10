@@ -239,12 +239,29 @@ find(x, y)
   blocks: a missing closing line is a box, a line that does not parse is kept as typed.
 - **Typesetting.** `Given`, the constraints beside a bar, then `Find(x, y)`.
 
-**Not done: naming the result.** The roadmap item was "named-variable assignment of a
-result (each variable keeps its own unit)", i.e. something like `[x; y] := given ...`. It
-cannot work as it reads: the unknowns' guesses are worksheet variables of the same names,
-so a region that defines `x` and reads `x` as its guess is a circular reference. Two ways
-out, to decide: guesses written inside the block (`x := 1` as a line, local to it), so the
-region reads nothing it defines; or leave it as it is and index the result (`r[0]`,
-`r[1]`), or copy it out in a program (`x ← r[0]`). The first needs a multi-name
-definition (a region defining several names, with one unit each), which touches the
-evaluator's definition handling.
+**Naming the results (built, option 1 of the question below).** The roadmap item was
+"named-variable assignment of a result (each variable keeps its own unit)". Defining `x`
+from a block whose guess is the worksheet's own `x` is a circular reference, so:
+
+```
+[force; moment] := given
+    force := 1 N
+    moment := 1 N*m
+    force == 5 N
+    moment == 2 * force * 1 m
+find(force, moment)
+```
+
+- A line `name := value` in the block is a guess for `name`, local to the block (bound
+  for the call). Such a name is not a dependency of the region; the value's own names
+  are. A guess is a line like any other in the tree (an assignment node whose one
+  child is the value), so errors in it are located.
+- `[a; b] := value` (or `[a, b] := value`) defines each name from its element of the
+  vector `value`, keeping that element's unit (`Expr::MultiDefine`). The count must
+  match, and a name that cannot be defined is an error, not a missing name. It is a
+  general feature, not tied to blocks. Each name takes part in redefinition warnings and
+  dependency edges like any other definition. The region's own value is the whole
+  vector.
+- Still circular, correctly: `[x; y] := find(x, y, ...)` with the guesses taken from the
+  worksheet, since the region would read what it defines.
+- Not done: an Insert command for the block (type `given`).

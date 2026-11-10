@@ -21,7 +21,7 @@ pub use plot::{PlotData, PlotSeries};
 
 use graph::tarjan;
 use meter::Meter;
-use node::{eval_region, Located};
+use node::{eval_region, multi_part, Located};
 
 use crate::document::PlotInput;
 use crate::expr::{AssignKind, Expr};
@@ -197,6 +197,11 @@ pub fn evaluate_cancellable(
                 target,
                 ..
             } => var_definers.entry(target.as_str()).or_default().push(*id),
+            Expr::MultiDefine { targets, .. } => {
+                for t in targets.iter() {
+                    var_definers.entry(t.as_str()).or_default().push(*id);
+                }
+            }
             Expr::FunctionDef { name, .. } => fn_definers.entry(&**name).or_default().push(*id),
             _ => {}
         }
@@ -331,6 +336,9 @@ pub fn evaluate_cancellable(
                     env.insert(target.clone(), result.clone());
                 }
             }
+            if let Expr::MultiDefine { targets, .. } = expr {
+                define_each(targets, &result, &var_winner, *id, &mut env);
+            }
             out.values.insert(*id, result);
         }
     }
@@ -348,6 +356,27 @@ pub fn evaluate_cancellable(
         out.plots.insert(*id, plot::evaluate_plot(input, &cx));
     }
     out
+}
+
+/// `[a; b] := value`: each name this region wins gets its element of the result.
+/// (A function of its own: `evaluate` has a very large stack frame already.)
+#[inline(never)]
+fn define_each(
+    targets: &[String],
+    result: &Result<Value, EvalError>,
+    winners: &HashMap<String, RegionId>,
+    id: RegionId,
+    env: &mut Env,
+) {
+    for (i, t) in targets.iter().enumerate() {
+        if winners.get(t.as_str()) == Some(&id) {
+            let part = match result {
+                Ok(v) => multi_part(v, i, targets.len()),
+                Err(e) => Err(e.clone()),
+            };
+            env.insert(t.clone(), part);
+        }
+    }
 }
 
 #[cfg(test)]

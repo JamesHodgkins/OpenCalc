@@ -52,6 +52,7 @@ pub(super) fn eval_region(expr: &Expr, cx: &Cx) -> Evaluated {
             })
         }
         Expr::Assign { value, .. } => eval(value, cx).map_err(|l| l.under(0)),
+        Expr::MultiDefine { targets, value } => multi_define(targets, value, cx),
         other => eval(other, cx),
     }
 }
@@ -100,6 +101,7 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
             otherwise,
         } => conditional(cond, then, otherwise, cx),
         Expr::Given(g) => given(g, cx),
+        Expr::MultiDefine { .. } => misplaced_definition(),
         Expr::Program(statements) => super::program::run(statements, cx),
         Expr::LocalAssign { .. }
         | Expr::IndexAssign { .. }
@@ -130,11 +132,28 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
 /// round (the order of the text), so the step into the call is renumbered.
 #[inline(never)]
 fn given(block: &crate::expr::GivenBlock, cx: &Cx) -> Evaluated {
+    // The guesses written in the block are local to it: they are bound for the
+    // call, which reads the unknowns' starting values by name.
+    let base = cx.locals.borrow().len();
+    let result = given_call(block, cx);
+    cx.locals.borrow_mut().truncate(base);
+    result
+}
+
+fn given_call(block: &crate::expr::GivenBlock, cx: &Cx) -> Evaluated {
+    for (line, name, value) in block.guesses() {
+        // (The guess line is an assignment, whose one child is the value.)
+        let guess = eval(value, cx).map_err(|l| l.under(0).under(line))?;
+        cx.locals.borrow_mut().push((name.to_owned(), guess));
+    }
+    let lines = block.constraint_lines();
     eval(&block.lowered(), cx).map_err(|mut l| {
-        let (args, constraints) = (block.args.len(), block.constraints.len());
         if let Some(step) = l.rev_path.last_mut() {
             let k = usize::from(*step);
-            let child = if k < args { constraints + k } else { k - args };
+            let child = match k.checked_sub(block.args.len()) {
+                None => block.constraints.len() + k,
+                Some(c) => lines.get(c).copied().unwrap_or(c),
+            };
             *step = u16::try_from(child).unwrap_or(u16::MAX);
         }
         l
@@ -143,6 +162,14 @@ fn given(block: &crate::expr::GivenBlock, cx: &Cx) -> Evaluated {
 
 /// Kept out of `eval_node` so that its frame, which every nesting level pays for,
 /// does not grow (the stack tests would fail).
+#[cold]
+#[inline(never)]
+fn misplaced_definition() -> Evaluated {
+    Err(Located::here(EvalError::Invalid(
+        "several names can only be defined at the top of a region".into(),
+    )))
+}
+
 #[cold]
 #[inline(never)]
 fn outside_a_program() -> Evaluated {
@@ -435,4 +462,39 @@ fn binary(op: BinaryOp, a: &Value, b: &Value) -> Result<Value, ValueError> {
         BinaryOp::Le => a.compare(b, Comparison::Le)?,
         BinaryOp::Ge => a.compare(b, Comparison::Ge)?,
     })
+}
+
+/// `[a; b] := value`: the value, once it is known to have a value for every name.
+#[inline(never)]
+fn multi_define(targets: &[String], value: &Expr, cx: &Cx) -> Evaluated {
+    let v = eval(value, cx).map_err(|l| l.under(0))?;
+    match multi_part(&v, 0, targets.len()) {
+        Ok(_) => Ok(v),
+        Err(e) => Err(Located::here(e).under(0)),
+    }
+}
+
+/// Element `i` of the `n` values a `[a; b; ...] := value` definition spreads over its
+/// names, with the unit that element has.
+pub(super) fn multi_part(v: &Value, i: usize, n: usize) -> Result<Value, EvalError> {
+    let count = match v {
+        Value::Matrix(m) if m.is_vector() => m.elements().len(),
+        Value::Series(r) => r.len(),
+        Value::Scalar(_) => 1,
+        _ => 0,
+    };
+    if count != n {
+        return Err(EvalError::Invalid(format!(
+            "{n} name(s) need a vector of {n} value(s), but this gives {}",
+            if count == 0 {
+                "no vector".to_owned()
+            } else {
+                format!("{count}")
+            }
+        )));
+    }
+    match v {
+        Value::Scalar(_) => Ok(v.clone()),
+        other => Ok(other.element(&[i])?),
+    }
 }

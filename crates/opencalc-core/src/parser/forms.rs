@@ -113,6 +113,20 @@ pub(super) fn has_default_argument(expr: &Expr) -> bool {
     false
 }
 
+/// `[x; y]` or `[x, y]` on the left of `:=`: the names, when it is only names.
+pub(super) fn multi_targets(lhs: &Expr) -> Option<Vec<String>> {
+    let Expr::Matrix { cells, .. } = lhs else {
+        return None;
+    };
+    cells
+        .iter()
+        .map(|c| match c {
+            Expr::Name(n) => Some(n.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 pub(super) fn target_name(lhs: &Expr) -> Result<String, String> {
     match lhs {
         Expr::Name(n) => Ok(n.clone()),

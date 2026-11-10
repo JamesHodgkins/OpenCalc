@@ -187,6 +187,16 @@ impl<'a> Typesetter<'a> {
                 ])
             }
             Expr::Given(g) => self.given(g, size),
+            Expr::MultiDefine { targets, value } => {
+                let names: Vec<Expr> = targets.iter().map(|t| Expr::Name(t.clone())).collect();
+                self.row(vec![
+                    self.matrix(names.len(), 1, &names, size),
+                    self.gap(size * 0.3),
+                    self.text(":=", size),
+                    self.gap(size * 0.3),
+                    self.layout(value, size),
+                ])
+            }
             Expr::Program(statements) => self.program(statements, size),
             Expr::LocalAssign { .. }
             | Expr::IndexAssign { .. }

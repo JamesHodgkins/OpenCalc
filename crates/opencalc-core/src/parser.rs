@@ -223,6 +223,9 @@ impl Parser {
                     }
                 }
             }
+            Some(Tok::Define) if forms::multi_targets(&lhs).is_some() => {
+                self.multi_define(&lhs, mark, from)?
+            }
             Some(Tok::Define) => {
                 // Checked first, while the position is still on the `:=`.
                 match forms::target_name(&lhs) {
@@ -290,6 +293,30 @@ impl Parser {
             Some(_) if self.lenient => Ok(self.garbage_tail(result)),
             Some(t) => Err(format!("unexpected {}", describe(t))),
         }
+    }
+
+    /// `[x; y] := value`, with the position on the `:=` (kept out of `parse_all`, whose
+    /// stack frame sits under every deep parse).
+    #[inline(never)]
+    fn multi_define(&mut self, lhs: &Expr, mark: usize, from: usize) -> Result<Expr, String> {
+        let targets = forms::multi_targets(lhs).unwrap_or_default();
+        if let Some(twice) = targets
+            .iter()
+            .enumerate()
+            .find(|(i, t)| targets[..*i].contains(t))
+            .map(|(_, t)| t.clone())
+        {
+            return Err(format!("'{twice}' is named twice"));
+        }
+        self.pos += 1;
+        let body_mark = self.log.len();
+        let value = self.range_expr(true)?;
+        self.log.drain(mark..body_mark);
+        self.done(from, self.last_node().end);
+        Ok(Expr::MultiDefine {
+            targets: targets.into_boxed_slice(),
+            value: Box::new(value),
+        })
     }
 
     fn expr(&mut self, min_bp: u8) -> Result<Expr, String> {

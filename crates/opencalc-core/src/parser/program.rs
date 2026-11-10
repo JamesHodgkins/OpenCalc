@@ -63,7 +63,11 @@ impl Parser {
                 break;
             }
             let (line, mark) = (self.pos, self.log.len());
-            match self.expr(0) {
+            let line_start = self.start_of(line);
+            match self
+                .expr(0)
+                .and_then(|e| self.guess_or(e, mark, line_start))
+            {
                 Ok(e) if self.lenient && !self.at_statement_end() => {
                     let kept = self.garbage_to_line_end(e);
                     constraints.push(kept);
@@ -116,6 +120,28 @@ impl Parser {
             args,
             constraints,
         })))
+    }
+
+    /// A line of a `given` block that is `x := value` is a guess for `x`; anything
+    /// else is `e`, a constraint. `mark` is where the line's log entries start.
+    fn guess_or(&mut self, e: Expr, mark: usize, from: usize) -> Result<Expr, String> {
+        if self.peek() != Some(&Tok::Define) {
+            return Ok(e);
+        }
+        let Expr::Name(target) = e else {
+            return Err("left of ':=' must be a name".into());
+        };
+        let name_end = self.log.len();
+        self.pos += 1;
+        let value = self.expr(0)?;
+        // The name is not a child: only the value is.
+        self.log.drain(mark..name_end);
+        self.done(from, self.last_node().end);
+        Ok(Expr::Assign {
+            kind: crate::expr::AssignKind::Define,
+            target,
+            value: Box::new(value),
+        })
     }
 
     /// The indented block that follows, whose lines are indented further than

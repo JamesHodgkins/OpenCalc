@@ -488,6 +488,8 @@ mod tests {
 
     /// Programs, as they are typed (several lines).
     const PROGRAMS: &[&str] = &[
+        "[x; y] := given\n    x := 1\n    y := 1 m\n    x + y == 10\n    x - y == 2\nfind(x, y)",
+        "[a, b] := [1 m, 2 s]",
         "r := given\n    x + y == 10\n    x - y == 2\nfind(x, y)",
         "given\n    a ^ 2 == 9\n    a > 0\nfind(a)",
         "m := given\nminimize((a - 3)^2, a)",

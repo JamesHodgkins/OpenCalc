@@ -50,7 +50,9 @@ pub fn define_unit(
     let expr = parse(definition);
     match &expr {
         Expr::Error(e) => return Err(DefineError::Parse(e.message.clone())),
-        Expr::Assign { .. } | Expr::FunctionDef { .. } => return Err(DefineError::NotAQuantity),
+        Expr::Assign { .. } | Expr::MultiDefine { .. } | Expr::FunctionDef { .. } => {
+            return Err(DefineError::NotAQuantity)
+        }
         _ => {}
     }
     // The unit being defined is not available to its own definition.

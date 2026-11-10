@@ -89,6 +89,9 @@ fn sexp(e: &Expr) -> String {
                 sexp(body)
             )
         }
+        Expr::MultiDefine { targets, value } => {
+            format!("(define-each ({}) {})", targets.join(" "), sexp(value))
+        }
         Expr::Given(g) => {
             let args: Vec<String> = g.args.iter().map(sexp).collect();
             let constraints: Vec<String> = g.constraints.iter().map(sexp).collect();

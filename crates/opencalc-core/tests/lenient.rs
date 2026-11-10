@@ -295,3 +295,18 @@ fn the_closing_line_of_a_given_block_being_typed_is_a_box() {
     let e = checked("r := given\n    a == 1\n");
     assert_eq!(holes(&e), 1, "{e:?}");
 }
+
+#[test]
+fn every_prefix_of_a_block_with_guesses_and_names_has_consistent_spans() {
+    for src in [
+        "[x; y] := given\n    x := 1\n    y := 2\n    x + y == 10\n    x - y == 2\nfind(x, y)",
+        "[a, b] := [1, 2]",
+    ] {
+        let chars: Vec<char> = src.chars().collect();
+        for n in 0..=chars.len() {
+            let prefix: String = chars[..n].iter().collect();
+            checked(&prefix);
+        }
+        assert_eq!(parse(src), checked(src), "{src:?}");
+    }
+}

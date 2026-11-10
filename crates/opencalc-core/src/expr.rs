@@ -84,11 +84,43 @@ pub struct GivenBlock {
 }
 
 impl GivenBlock {
-    /// The call this block means.
+    /// A line of the form `x := 1` is a guess for the unknown `x`, local to the
+    /// block; every other line is a constraint.
+    fn guess(line: &Expr) -> Option<(&str, &Expr)> {
+        match line {
+            Expr::Assign {
+                kind: AssignKind::Define,
+                target,
+                value,
+            } => Some((target, value)),
+            _ => None,
+        }
+    }
+
+    /// The guesses written in the block: the line each is on, the unknown, its value.
+    pub fn guesses(&self) -> impl Iterator<Item = (usize, &str, &Expr)> {
+        self.constraints
+            .iter()
+            .enumerate()
+            .filter_map(|(i, line)| GivenBlock::guess(line).map(|(n, v)| (i, n, v)))
+    }
+
+    /// The lines that are constraints, by position among the lines.
+    pub fn constraint_lines(&self) -> Vec<usize> {
+        (0..self.constraints.len())
+            .filter(|i| GivenBlock::guess(&self.constraints[*i]).is_none())
+            .collect()
+    }
+
+    /// The call this block means, without its guesses.
     pub fn lowered(&self) -> Expr {
+        let lines = self
+            .constraints
+            .iter()
+            .filter(|line| GivenBlock::guess(line).is_none());
         Expr::Call {
             name: self.solver.clone(),
-            args: self.args.iter().chain(&self.constraints).cloned().collect(),
+            args: self.args.iter().chain(lines).cloned().collect(),
         }
     }
 }
@@ -182,6 +214,12 @@ pub enum Expr {
     /// call `solver(args..., constraints...)`. Its children are in the order of the
     /// text: the constraints, then the closing line's arguments.
     Given(Box<GivenBlock>),
+    /// `[x; y] := value`: define several names at once from the elements of a vector,
+    /// each element keeping its own unit.
+    MultiDefine {
+        targets: Box<[String]>,
+        value: Box<Expr>,
+    },
     // Programs (docs/PROGRAMMING.md). A `Program` is a list of statements, and is
     // both `program` itself and every indented block inside one. The rest are the
     // statements. Names assigned in a program are local to it, all through it.
@@ -293,6 +331,7 @@ impl Expr {
             Expr::FunctionDef { body, .. } => vec![body],
             Expr::Garbage { head, .. } => head.as_deref().into_iter().collect(),
             Expr::Given(g) => g.constraints.iter().chain(&g.args).collect(),
+            Expr::MultiDefine { value, .. } => vec![value],
             Expr::Program(statements) => statements.iter().collect(),
             Expr::LocalAssign { value, .. } => vec![value],
             Expr::IndexAssign { indices, value, .. } => {

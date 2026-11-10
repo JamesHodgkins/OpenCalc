@@ -243,3 +243,128 @@ fn an_error_in_a_constraint_is_located_in_that_line() {
     let path = &out.error_paths[&RegionId(2)];
     assert_eq!(path[..3], [0, 0, 1], "{path:?}");
 }
+
+// ---- guesses inside the block, and naming the results ----
+
+#[test]
+fn a_guess_written_in_the_block_is_local_to_it() {
+    // No worksheet `x` or `y` at all: the block carries its own starting values.
+    let out = run(
+        &[
+            "r := given\n    x := 1\n    y := 1\n    x + y == 10\n    x - y == 2\nfind(x, y)",
+            "r[0]",
+            "r[1]",
+        ],
+        None,
+    );
+    assert!((number(&out, 2) - 6.0).abs() < 1e-7);
+    assert!((number(&out, 3) - 4.0).abs() < 1e-7);
+}
+
+#[test]
+fn naming_the_results_defines_each_name_with_its_own_unit() {
+    let out = run(
+        &[
+            "[force; moment] := given\n    force := 1 N\n    moment := 1 N*m\n    force == 5 N\n    moment == 2 * force * 1 m\nfind(force, moment)",
+            "force =",
+            "moment =",
+            "twice := 2 * force",
+        ],
+        None,
+    );
+    assert!((number(&out, 2) - 5.0).abs() < 1e-7);
+    assert!((number(&out, 3) - 10.0).abs() < 1e-6);
+    assert!(
+        (number(&out, 4) - 10.0).abs() < 1e-7,
+        "usable by other regions"
+    );
+    // Each keeps its own dimension: a force and a moment.
+    let force = out.values[&RegionId(2)]
+        .as_ref()
+        .unwrap()
+        .as_real()
+        .unwrap()
+        .dim;
+    let moment = out.values[&RegionId(3)]
+        .as_ref()
+        .unwrap()
+        .as_real()
+        .unwrap()
+        .dim;
+    assert_ne!(force, moment);
+}
+
+#[test]
+fn naming_works_for_any_vector_and_checks_the_count() {
+    let out = run(
+        &[
+            "[a; b] := [1 m; 2 s]",
+            "a =",
+            "b =",
+            "[c; d; e] := [1; 2]",
+            "c =",
+        ],
+        None,
+    );
+    assert_eq!(number(&out, 2), 1.0);
+    assert_eq!(number(&out, 3), 2.0);
+    let message = out.values[&RegionId(4)].as_ref().unwrap_err().to_string();
+    assert!(
+        message.contains("3 name(s) need a vector of 3"),
+        "{message}"
+    );
+    assert!(
+        out.values[&RegionId(5)].is_err(),
+        "a name that failed to define is an error"
+    );
+}
+
+#[test]
+fn naming_a_result_after_a_guess_in_the_worksheet_is_still_circular() {
+    // The guess is the worksheet's own `x`, which this region also defines.
+    let out = run(&["[x; y] := find(x, y, x + y == 3, x - y == 1)"], None);
+    assert!(matches!(
+        out.values[&RegionId(1)].as_ref().unwrap_err(),
+        opencalc_core::eval::EvalError::Cycle
+    ));
+}
+
+#[test]
+fn guess_lines_and_names_round_trip_and_have_spans() {
+    let src = "[x; y] := given\n    x := 1\n    y := 2\n    x + y == 10\nfind(x, y)";
+    let e = opencalc_core::parser::parse(src);
+    assert!(!matches!(e, opencalc_core::expr::Expr::Error(_)), "{e:?}");
+    assert_eq!(e.to_string(), src);
+    let (_, spans) = opencalc_core::parser::parse_with_spans(src);
+    let chars: Vec<char> = src.chars().collect();
+    let text = |s: &opencalc_core::parser::SpanNode| -> String {
+        chars[s.inner.start..s.inner.end].iter().collect()
+    };
+    let block = spans.at_path(&[0]).expect("the block");
+    assert_eq!(text(&block.kids[0]), "x := 1");
+    assert_eq!(text(&block.kids[2]), "x + y == 10");
+    // The same name twice is an error.
+    assert!(matches!(
+        opencalc_core::parser::parse("[x; x] := [1; 2]"),
+        opencalc_core::expr::Expr::Error(_)
+    ));
+}
+
+#[test]
+fn an_error_in_a_guess_or_a_constraint_after_it_is_located() {
+    let out = run(
+        &["r := given\n    a := nothing\n    a == 1\nfind(a)", "r :="],
+        None,
+    );
+    assert_eq!(
+        out.error_paths[&RegionId(1)][..3],
+        [0, 0, 0],
+        "the guess's value"
+    );
+    let out = run(&["r := given\n    a := 1\n    a == nothing\nfind(a)"], None);
+    assert_eq!(
+        out.error_paths[&RegionId(1)][..2],
+        [0, 1],
+        "the constraint after the guess"
+    );
+}
