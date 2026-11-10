@@ -151,11 +151,21 @@ impl Parser {
                     return Err("'try' needs an 'on error' block after it".into());
                 }
                 self.pos += 3;
+                // `on error e` names the message.
+                let message = match self.peek() {
+                    Some(Tok::Ident(name)) => {
+                        let name = name.clone();
+                        self.pos += 1;
+                        Some(name)
+                    }
+                    _ => None,
+                };
                 let handler = self.block(indent, None)?;
                 self.done(from, self.last_node().end);
                 Ok(Expr::Try {
                     body: Box::new(body),
                     handler: Box::new(handler),
+                    message,
                 })
             }
             "else" => Err("'else' has no 'if' above it".into()),

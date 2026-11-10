@@ -233,6 +233,7 @@ fn differs(got: &Value, want: &Value, tol: f64) -> Option<String> {
                 out
             }
             Value::Function { params } => vec![-2.0, params.len() as f64],
+            Value::Text(s) => vec![-3.0, s.chars().count() as f64],
         }
     };
     let (g, w) = (parts(got), parts(want));

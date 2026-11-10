@@ -82,6 +82,7 @@ fn eval_node(expr: &Expr, cx: &Cx) -> Evaluated {
         Expr::Number(v) => Ok(Value::dimensionless(*v)),
         Expr::Quantity { value, unit } => Ok(cx.units.quantity(*value, unit)?.into()),
         Expr::Name(n) => name(n, cx),
+        Expr::Text(s) => Ok(Value::Text(s.clone())),
         Expr::Unary {
             op: UnaryOp::Neg,
             arg,
@@ -140,7 +141,7 @@ fn literal(rows: usize, cols: usize, cells: &[Expr], cx: &Cx) -> Evaluated {
     for (i, cell) in cells.iter().enumerate() {
         match child(cell, i, cx)? {
             Value::Scalar(s) => items.push(s),
-            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } => {
+            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } | Value::Text(_) => {
                 return Err(Located::here(ValueError::Shape(
                     "a matrix cell must be a single number".into(),
                 ))

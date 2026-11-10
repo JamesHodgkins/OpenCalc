@@ -283,6 +283,7 @@ pub fn format_value_with(v: &Value, system: UnitSystem, format: ResultFormat) ->
             with_unit(format!("{size} [{}]", rows.join("; ")), &label)
         }
         Value::Function { params } => format!("function of {}", params.join(", ")),
+        Value::Text(s) => format!("\"{s}\""),
         Value::Series(r) => {
             let peak = r
                 .elements()

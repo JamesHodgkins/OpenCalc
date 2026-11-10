@@ -424,3 +424,71 @@ fn the_deepest_recursion_of_the_deepest_functions_fits_in_the_evaluation_stack()
     assert_eq!(number(&out, 2), 0.0);
     assert!(failure(&out, 3).contains("too deeply"));
 }
+
+fn text(out: &Output, n: u64) -> String {
+    match out.values[&RegionId(n)].as_ref().unwrap() {
+        opencalc_core::value::Value::Text(s) => s.clone(),
+        other => panic!("region {n} is {other:?}, not text"),
+    }
+}
+
+#[test]
+fn text_is_joined_with_plus_and_compared_with_equals() {
+    let out = run(&[
+        "greeting := \"Hello, \" + \"world\"",
+        "greeting =",
+        "same := greeting == \"Hello, world\"",
+        "different := greeting != \"Hello, world\"",
+        "same =",
+        "different =",
+    ]);
+    assert_eq!(text(&out, 2), "Hello, world");
+    assert_eq!((number(&out, 5), number(&out, 6)), (1.0, 0.0));
+}
+
+#[test]
+fn text_does_not_do_arithmetic_or_ordering() {
+    for src in [
+        "\"a\" - \"b\"",
+        "\"a\" * 2",
+        "\"a\" + 1",
+        "\"a\" < \"b\"",
+        "\"a\" == 1",
+        "sqrt(\"a\")",
+        "[\"a\"]",
+    ] {
+        let out = run(&[src]);
+        assert!(out.values[&RegionId(1)].is_err(), "{src}");
+    }
+}
+
+#[test]
+fn text_must_be_closed_and_not_too_long() {
+    for src in ["\"open", &format!("\"{}\"", "x".repeat(300))] {
+        assert!(matches!(parse(src), Expr::Error(_)), "{src}");
+    }
+    assert_eq!(parse("\"a b\"").to_string(), "\"a b\"");
+}
+
+#[test]
+fn on_error_can_name_the_message() {
+    let src = "f(x) := program\n    try\n        r ← 1 / (x - x)\n    on error e\n        return \"failed: \" + e\n    return \"fine\"";
+    let out = run(&[src, "f(2)"]);
+    let message = text(&out, 2);
+    assert!(message.starts_with("failed: "), "{message}");
+    assert!(message.len() > "failed: ".len());
+    // The name is a local of the program, only given a value if there was an error.
+    let ok = "g := program\n    try\n        r ← 1\n    on error e\n        r ← 2\n    e";
+    assert!(failure(&run(&[ok, "g ="]), 2).contains("before it is given a value"));
+    // The message can be compared.
+    let cmp = "h := program\n    try\n        r ← missing_name\n    on error e\n        return e == \"x\"\n    return 2";
+    assert_eq!(number(&run(&[cmp, "h ="]), 2), 0.0);
+}
+
+#[test]
+fn on_error_with_a_name_round_trips() {
+    let src = "f := program\n    try\n        x ← 1\n    on error msg\n        x ← 2\n    x";
+    let e = parse(src);
+    assert!(!matches!(e, Expr::Error(_)), "{e:?}");
+    assert_eq!(e.to_string(), src);
+}

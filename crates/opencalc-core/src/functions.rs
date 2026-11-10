@@ -327,7 +327,7 @@ fn scalars(args: &[Value]) -> Result<Vec<Scalar>> {
     args.iter()
         .map(|a| match a {
             Value::Scalar(s) => Ok(*s),
-            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } => {
+            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } | Value::Text(_) => {
                 Err(ValueError::Shape("matrix elements must be scalars".into()).into())
             }
         })

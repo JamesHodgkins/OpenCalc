@@ -169,9 +169,18 @@ fn exec(s: &Expr, cx: &Cx) -> Done {
         Expr::Break => Ok(Flow::Break),
         Expr::Continue => Ok(Flow::Continue),
         Expr::Return(value) => Ok(Flow::Return(eval(value, cx).map_err(|l| l.under(0))?)),
-        Expr::Try { body, handler } => match block(body, cx) {
+        Expr::Try {
+            body,
+            handler,
+            message,
+        } => match block(body, cx) {
             // Stopping the calculation is not a failure to be recovered from.
-            Err(l) if !l.error.is_stop() => block(handler, cx).map_err(|l| l.under(1)),
+            Err(l) if !l.error.is_stop() => {
+                if let Some(name) = message {
+                    set(cx, name, Value::Text(l.error.to_string()));
+                }
+                block(handler, cx).map_err(|l| l.under(1))
+            }
             other => other.map_err(|l| l.under(0)),
         },
         other => eval(other, cx).map(|_| Flow::Next),
@@ -184,7 +193,7 @@ fn repeat_for(var: &str, over: &Expr, body: &Expr, cx: &Cx) -> Done {
         Value::Scalar(s) => vec![s],
         Value::Series(s) => s.scalars().collect(),
         Value::Matrix(m) => m.scalars().collect(),
-        Value::Function { .. } => {
+        Value::Function { .. } | Value::Text(_) => {
             return Err(Located::here(EvalError::Invalid(
                 "'for' goes through a range, a vector or a matrix".into(),
             ))
@@ -241,9 +250,9 @@ fn assign_element(target: &str, indices: &[Expr], value: &Expr, cx: &Cx) -> Resu
         Some(Value::Scalar(s)) => (1, 1, vec![s]),
         Some(Value::Series(s)) => (s.len(), 1, s.scalars().collect()),
         Some(Value::Matrix(m)) => (m.rows(), m.cols(), m.scalars().collect()),
-        Some(Value::Function { .. }) => {
+        Some(Value::Function { .. } | Value::Text(_)) => {
             return Err(Located::here(EvalError::Invalid(format!(
-                "'{target}' is a function, not a vector"
+                "'{target}' is not a vector"
             ))))
         }
     };

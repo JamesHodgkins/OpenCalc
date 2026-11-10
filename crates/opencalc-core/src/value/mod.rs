@@ -46,6 +46,9 @@ pub enum Value {
     Function {
         params: Vec<String>,
     },
+    /// Text: `"like this"`, or the message of an error caught by `on error`. It can
+    /// be joined with `+` and compared with `==` and `!=`, and nothing else yet.
+    Text(String),
 }
 
 impl From<Quantity> for Value {
@@ -78,7 +81,7 @@ impl Value {
             Value::Scalar(s) => s.is_finite(),
             Value::Matrix(m) => m.is_finite(),
             Value::Series(r) => r.is_finite(),
-            Value::Function { .. } => true,
+            Value::Function { .. } | Value::Text(_) => true,
         }
     }
 
@@ -89,7 +92,7 @@ impl Value {
             Value::Scalar(s) => Some(s.dim),
             Value::Matrix(m) => m.uniform_dim(),
             Value::Series(r) => Some(r.dim),
-            Value::Function { .. } => Some(Dimension::NONE),
+            Value::Function { .. } | Value::Text(_) => Some(Dimension::NONE),
         }
     }
 
@@ -99,7 +102,7 @@ impl Value {
             Value::Scalar(s) => vec![s.dim],
             Value::Matrix(m) => (0..m.elements().len()).map(|i| m.dim_of(i)).collect(),
             Value::Series(r) => vec![r.dim; r.len()],
-            Value::Function { .. } => Vec::new(),
+            Value::Function { .. } | Value::Text(_) => Vec::new(),
         }
     }
 
@@ -107,7 +110,7 @@ impl Value {
     pub fn as_real(&self) -> Option<Quantity> {
         match self {
             Value::Scalar(s) => s.as_real(),
-            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } => None,
+            Value::Matrix(_) | Value::Series(_) | Value::Function { .. } | Value::Text(_) => None,
         }
     }
 
@@ -119,7 +122,7 @@ impl Value {
                 Series::new(r.elements().iter().map(|z| -*z).collect(), r.dim)
                     .expect("negation keeps the length"),
             ),
-            Value::Function { .. } => self.clone(),
+            Value::Function { .. } | Value::Text(_) => self.clone(),
         }
     }
 
@@ -153,6 +156,11 @@ impl Value {
             return r;
         }
         match (self, o) {
+            // `+` joins text; there is nothing to take away from it.
+            (Value::Text(a), Value::Text(b)) if !subtract => Ok(Value::Text(format!("{a}{b}"))),
+            (Value::Text(_), _) | (_, Value::Text(_)) => Err(ValueError::Unsupported(
+                "arithmetic on text (only text + text joins it)".into(),
+            )),
             (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(a.sum(*b, subtract)?)),
             (Value::Matrix(a), Value::Matrix(b)) => Ok(Value::Matrix(a.sum(b, subtract)?)),
             _ => Err(ValueError::Shape(
@@ -198,8 +206,14 @@ impl Value {
         if let Some(r) = self.pairwise(o, &flag) {
             return r;
         }
+        let yes = |same: bool| Value::dimensionless(f64::from(u8::from(same)));
         match (self, o) {
             (Value::Scalar(a), Value::Scalar(b)) => Ok(Value::Scalar(flag(*a, *b)?)),
+            (Value::Text(a), Value::Text(b)) if how == Comparison::Eq => Ok(yes(a == b)),
+            (Value::Text(a), Value::Text(b)) if how == Comparison::Ne => Ok(yes(a != b)),
+            (Value::Text(_), _) | (_, Value::Text(_)) => Err(ValueError::Unsupported(
+                "comparing text (only == and != work, and only between two texts)".into(),
+            )),
             _ => Err(ValueError::Unsupported("comparing matrices".into())),
         }
     }
@@ -215,9 +229,9 @@ impl Value {
             (Value::Series(_), _) => {
                 Err(ValueError::Shape("a list of values takes one index".into()))
             }
-            (Value::Scalar(_) | Value::Function { .. }, _) => Err(ValueError::Shape(
-                "only a matrix or list can be indexed".into(),
-            )),
+            (Value::Scalar(_) | Value::Function { .. } | Value::Text(_), _) => Err(
+                ValueError::Shape("only a matrix or list can be indexed".into()),
+            ),
         }
     }
 

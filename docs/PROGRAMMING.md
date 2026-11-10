@@ -146,8 +146,7 @@ Syntax and evaluator are as section 3 proposed, with these particulars.
   `the_deepest_recursion_of_the_deepest_functions_fits_in_the_evaluation_stack` runs it
   64 levels deep in half of `EVAL_STACK` (64 MB). Anything that evaluates a worksheet
   must do it on a thread with that stack (`worker` does; `check` now does).
-- **Still to do.** The typeset form while editing, and an error message for `on error`
-  (needs a text value). The `Given`/`Find` solve block is a separate roadmap item.
+- **Still to do.** The typeset form while editing. The `Given`/`Find` solve block is a separate roadmap item.
 
 ## 4. Order of work
 

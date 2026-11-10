@@ -4,6 +4,8 @@
 pub(super) enum Tok {
     Num(f64),
     Ident(String),
+    /// Text in quotes, without the quotes.
+    Str(String),
     Plus,
     Minus,
     Star,
@@ -33,6 +35,9 @@ pub(super) enum Tok {
     Bad(String),
 }
 
+/// The longest text in quotes.
+const MAX_TEXT_CHARS: usize = 256;
+
 /// Tokens with the character range each came from.
 pub(super) type Tokens = (Vec<Tok>, Vec<(usize, usize)>);
 
@@ -47,6 +52,32 @@ pub(super) fn tokenize(src: &str, lenient: bool) -> Result<Tokens, (String, usiz
         let (before, begin) = (toks.len(), i);
         let c = chars[i];
         match c {
+            '"' => {
+                let start = i;
+                i += 1;
+                let mut text = String::new();
+                while i < chars.len() && chars[i] != '"' && chars[i] != '\n' {
+                    text.push(chars[i]);
+                    i += 1;
+                }
+                let closed = chars.get(i) == Some(&'"');
+                if closed {
+                    i += 1;
+                }
+                if closed && text.chars().count() <= MAX_TEXT_CHARS {
+                    toks.push(Tok::Str(text));
+                } else if lenient {
+                    toks.push(Tok::Bad(chars[start..i].iter().collect()));
+                } else if closed {
+                    return Err((
+                        format!("text is longer than {MAX_TEXT_CHARS} characters"),
+                        start,
+                        i,
+                    ));
+                } else {
+                    return Err(("text is missing its closing quote".into(), start, i));
+                }
+            }
             '\n' => {
                 if toks.last().is_some_and(|t| *t != Tok::Line) {
                     toks.push(Tok::Line);
@@ -265,6 +296,7 @@ pub(super) fn describe(t: &Tok) -> String {
     match t {
         Tok::Num(v) => format!("number {v}"),
         Tok::Ident(n) => format!("'{n}'"),
+        Tok::Str(s) => format!("text \"{s}\""),
         Tok::Line => "line break".into(),
         Tok::Arrow => "'\u{2190}'".into(),
         Tok::Plus => "'+'".into(),

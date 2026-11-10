@@ -184,6 +184,7 @@ impl std::fmt::Display for Expr {
             | Expr::Continue
             | Expr::Return(_)
             | Expr::Try { .. } => write_statement(f, self, 0),
+            Expr::Text(s) => write!(f, "\"{s}\""),
             Expr::Error(e) => write!(f, "? {e}"),
             Expr::Hole => f.write_str("\u{25a1}"),
             Expr::Garbage { head, text } => match head {
@@ -258,10 +259,17 @@ fn write_statement(f: &mut std::fmt::Formatter<'_>, e: &Expr, indent: usize) -> 
         Expr::Break => f.write_str("break"),
         Expr::Continue => f.write_str("continue"),
         Expr::Return(value) => write!(f, "return {value}"),
-        Expr::Try { body, handler } => {
+        Expr::Try {
+            body,
+            handler,
+            message,
+        } => {
             f.write_str("try")?;
             write_block(f, body, inner)?;
             write!(f, "\n{:indent$}on error", "")?;
+            if let Some(name) = message {
+                write!(f, " {name}")?;
+            }
             write_block(f, handler, inner)
         }
         other => write!(f, "{other}"),

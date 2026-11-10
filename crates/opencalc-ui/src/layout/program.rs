@@ -123,15 +123,25 @@ impl Typesetter<'_> {
                     size * LINE_GAP,
                 )
             }
-            Expr::Try { body, handler } => self.stack(
-                vec![
-                    (0.0, word("try")),
-                    (indent, self.layout(body, size)),
-                    (0.0, word("on error")),
-                    (indent, self.layout(handler, size)),
-                ],
-                size * LINE_GAP,
-            ),
+            Expr::Try {
+                body,
+                handler,
+                message,
+            } => {
+                let on_error = match message {
+                    Some(name) => self.row(vec![word("on error"), space(), self.name(name, size)]),
+                    None => word("on error"),
+                };
+                self.stack(
+                    vec![
+                        (0.0, word("try")),
+                        (indent, self.layout(body, size)),
+                        (0.0, on_error),
+                        (indent, self.layout(handler, size)),
+                    ],
+                    size * LINE_GAP,
+                )
+            }
             Expr::Return(value) => {
                 self.row(vec![word("return"), space(), self.layout(value, size)])
             }

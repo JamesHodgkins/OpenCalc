@@ -27,6 +27,7 @@ fn golden_path() -> PathBuf {
 fn sexp(e: &Expr) -> String {
     match e {
         Expr::Number(v) => format!("{v}"),
+        Expr::Text(s) => format!("{s:?}"),
         Expr::Name(n) => n.clone(),
         Expr::Quantity { value, unit } => format!("(qty {value} {unit})"),
         Expr::Unary {
@@ -114,7 +115,7 @@ fn sexp(e: &Expr) -> String {
         Expr::Break => "(break)".to_owned(),
         Expr::Continue => "(continue)".to_owned(),
         Expr::Return(value) => format!("(return {})", sexp(value)),
-        Expr::Try { body, handler } => format!("(try {} {})", sexp(body), sexp(handler)),
+        Expr::Try { body, handler, .. } => format!("(try {} {})", sexp(body), sexp(handler)),
         Expr::Range { start, step, end } => match step {
             Some(step) => format!("(range {} {} {})", sexp(start), sexp(step), sexp(end)),
             None => format!("(range {} {})", sexp(start), sexp(end)),

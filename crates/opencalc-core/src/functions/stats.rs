@@ -20,6 +20,7 @@ pub(super) fn gather(args: &[Value]) -> Result<(Vec<Complex64>, Dimension)> {
             Value::Function { .. } => {
                 return Err(ValueError::Unsupported("a function as a value".into()).into())
             }
+            Value::Text(_) => return Err(ValueError::Unsupported("text as a number".into()).into()),
         };
         match dim {
             None => dim = Some(d),

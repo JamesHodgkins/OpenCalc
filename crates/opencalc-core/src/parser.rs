@@ -325,6 +325,10 @@ impl Parser {
         let first = self.pos;
         match self.next() {
             Some(Tok::Num(v)) => self.after_number(v),
+            Some(Tok::Str(text)) => {
+                self.done_token();
+                Ok(Expr::Text(text))
+            }
             Some(Tok::Ident(name)) if name == "program" && self.peek() == Some(&Tok::Line) => {
                 self.program(first)
             }

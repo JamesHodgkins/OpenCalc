@@ -76,6 +76,7 @@ impl<'a> Typesetter<'a> {
         match e {
             Expr::Number(v) => self.text(&fmt_num(*v), size),
             Expr::Name(n) => self.name(n, size),
+            Expr::Text(s) => self.text(&format!("\u{201c}{s}\u{201d}"), size),
             Expr::Quantity { value, unit } => self.row(vec![
                 self.text(&fmt_num(*value), size),
                 self.gap(size * 0.25),

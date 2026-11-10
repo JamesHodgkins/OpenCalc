@@ -76,6 +76,8 @@ impl std::fmt::Display for ParseError {
 pub enum Expr {
     Number(f64),
     Name(String),
+    /// Text in quotes: `"like this"`. No escapes; at most 256 characters.
+    Text(String),
     /// A number with a unit symbol, such as `5 kN`.
     Quantity {
         value: f64,
@@ -191,10 +193,12 @@ pub enum Expr {
     Continue,
     /// `return value`: the value of the whole program.
     Return(Box<Expr>),
-    /// `try` with a block, and the `on error` block that runs if it fails.
+    /// `try` with a block, and the `on error` block that runs if it fails. With
+    /// `on error e`, the message of the error is the text `e` in that block.
     Try {
         body: Box<Expr>,
         handler: Box<Expr>,
+        message: Option<String>,
     },
 }
 
@@ -278,10 +282,11 @@ impl Expr {
             Expr::For { over, body, .. } => vec![over, body],
             Expr::While { cond, body } => vec![cond, body],
             Expr::Return(value) => vec![value],
-            Expr::Try { body, handler } => vec![body, handler],
+            Expr::Try { body, handler, .. } => vec![body, handler],
             Expr::Break | Expr::Continue => vec![],
             Expr::Number(_)
             | Expr::Name(_)
+            | Expr::Text(_)
             | Expr::Quantity { .. }
             | Expr::Error(_)
             | Expr::Hole => vec![],

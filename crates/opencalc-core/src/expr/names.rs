@@ -214,7 +214,7 @@ impl Expr {
                 cond.collect_names(out);
                 body.collect_names(out);
             }
-            Expr::Try { body, handler } => {
+            Expr::Try { body, handler, .. } => {
                 body.collect_names(out);
                 handler.collect_names(out);
             }
@@ -229,7 +229,11 @@ impl Expr {
                     head.collect_names(out);
                 }
             }
-            Expr::Number(_) | Expr::Quantity { .. } | Expr::Error(_) | Expr::Hole => {}
+            Expr::Number(_)
+            | Expr::Text(_)
+            | Expr::Quantity { .. }
+            | Expr::Error(_)
+            | Expr::Hole => {}
         }
     }
 }
@@ -259,8 +263,15 @@ pub fn assigned_names(statements: &[Expr]) -> Vec<String> {
                 scan(body, out);
             }
             Expr::While { body, .. } => scan(body, out),
-            Expr::Try { body, handler } => {
+            Expr::Try {
+                body,
+                handler,
+                message,
+            } => {
                 scan(body, out);
+                if let Some(name) = message {
+                    add(out, name);
+                }
                 scan(handler, out);
             }
             _ => {}
