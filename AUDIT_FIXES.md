@@ -19,16 +19,16 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 ### 1b. File-size gate fails (found while running item 1)
 `scripts/line_limit_exceptions.txt` is empty, but 12 files exceed 400 production lines. Split each below the limit, or list it in the exceptions file as a ratchet.
 
-- [ ] `opencalc-core/src/csv.rs` (410)
+- [x] `opencalc-core/src/csv.rs` (410)
 - [ ] `opencalc-core/src/parser.rs` (424)
 - [ ] `opencalc-core/src/edit/mod.rs` (507)
 - [ ] `opencalc-core/src/eval/node.rs` (500)
 - [ ] `opencalc-core/src/parser/program.rs` (470)
 - [ ] `opencalc-ui/src/layout.rs` (521)
-- [ ] `opencalc-ui/src/app/dispatch.rs` (404)
+- [x] `opencalc-ui/src/app/dispatch.rs` (404)
 - [ ] `opencalc-ui/src/canvas/mod.rs` (608)
-- [ ] `opencalc-ui/src/commands/id.rs` (405)
-- [ ] `opencalc-ui/src/layout/source.rs` (410)
+- [x] `opencalc-ui/src/commands/id.rs` (405)
+- [x] `opencalc-ui/src/layout/source.rs` (410)
 - [ ] `opencalc-ui/src/panels/colour_picker.rs` (469)
 - [ ] `opencalc-ui/src/ribbon/show.rs` (518)
 
