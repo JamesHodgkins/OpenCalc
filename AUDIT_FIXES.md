@@ -38,7 +38,7 @@ No function-length limit exists. Split the first four; the last four are large m
 - [x] `opencalc-core/src/parser/lexer.rs` `tokenize` (now a loop over `symbol`, `text`, `number`, `unknown`)
 - [x] `opencalc-ui/src/canvas/plot.rs` `chart` (now `plot/cartesian.rs`: plotting_area, ticks, series, captions)
 - [x] `opencalc-ui/src/canvas/plot/polar.rs` `draw` (now `Disc` with rings_and_spokes, series; stand_in_scales)
-- [ ] `opencalc-ui/src/canvas/editor.rs:39` `math` (~234 lines)
+- [x] `opencalc-ui/src/canvas/editor.rs` `math` (now refuse_long, prepare_field, pointer_input, key_events, paint, autocomplete)
 - [x] `opencalc-core/src/edit/mod.rs` `apply_inner` now one-line arms calling `edit/content.rs`
 - [ ] Review only: `opencalc-core/src/expr/names.rs:42` `collect_names` (~203 lines)
 - [ ] Review only: `opencalc-core/src/eval.rs:181` `evaluate_cancellable` (~183 lines)

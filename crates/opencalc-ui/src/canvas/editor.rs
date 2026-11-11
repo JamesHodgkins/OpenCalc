@@ -60,39 +60,13 @@ pub(super) fn math(
     let source = m.source();
     let source_len = source.chars().count();
     if source_len > text::MAX_CHARS {
-        // Keep the complete source in the worksheet. This editor currently has
-        // no windowed-buffer model, so don't activate a truncated Field.
-        st.field = None;
-        st.focus_edit = false;
-        ui.painter().text(
-            text_origin,
-            Align2::LEFT_TOP,
-            format!(
-                "Cannot edit: expression has {source_len} characters (limit {}).",
-                text::MAX_CHARS
-            ),
-            FontId::proportional(12.0 * zoom),
-            env.theme.error,
-        );
-        if ui.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Enter)) {
-            st.editing = None;
-            cmds.push(CanvasCmd::Seal);
-        }
+        refuse_long(ui, st, cmds, env, text_origin, zoom, source_len);
         return;
     }
-    let fresh = st.focus_edit || st.field.is_none();
-    let field = st.field.get_or_insert_with(|| Field::new(source));
-    if fresh {
-        *field = Field::new(source);
-        if let Some((a, b)) = st.preselect.take() {
-            field.select(a, b);
-        }
-        if std::mem::take(&mut st.enter_at_start) {
-            field.set_caret(0, false);
-        }
-    } else if field.text() != source {
-        field.sync(source);
-    }
+    prepare_field(st, source);
+    let Some(field) = st.field.as_mut() else {
+        return;
+    };
     let defined = complete::defined_names(cx.regions);
     let layout_of = |ui: &Ui, text: &str| {
         ui.ctx()
@@ -126,58 +100,10 @@ pub(super) fn math(
     });
     ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
 
-    let mods = ui.input(|i| i.modifiers);
+    pointer_input(ui, &resp, field, &lay, text_origin);
     let mut finished = false;
-    // Pointer: press places the caret, dragging extends, double click picks a node.
-    if let Some(pos) = resp.interact_pointer_pos() {
-        let offset = lay.offset_at((pos - text_origin).to_pos2());
-        if resp.double_clicked() {
-            let (a, b) = lay.enclosing(offset);
-            field.select(a, b);
-        } else if ui.input(|i| i.pointer.primary_pressed()) {
-            field.set_caret(offset, mods.shift);
-            resp.request_focus();
-        } else if resp.dragged() {
-            field.set_caret(offset, true);
-        }
-    }
-
     if resp.has_focus() {
-        let events = ui.input(|i| i.events.clone());
-        for event in events {
-            let (start, list) = complete::for_field(field, &defined);
-            match event {
-                // In a program a space is text; see `Field::typed`.
-                Event::Text(s) if s == " " && field.in_program() && !field.has_selection() => {
-                    field.typed(&s, greek_by_name);
-                }
-                Event::Text(s) if s == " " => {
-                    // Space finishes a Greek name, else grows the selection.
-                    if field.has_selection() || !field.expand_greek(greek_by_name) {
-                        grow(field, &lay);
-                    }
-                }
-                Event::Text(s) if s == "=" && complete::defines_by_equals(field, &defined) => {
-                    field.insert(":=");
-                }
-                Event::Text(s) => field.typed(&s, greek_by_name),
-                Event::Paste(s) => field.insert(&s),
-                Event::Copy => copy(ui, field),
-                Event::Cut => {
-                    copy(ui, field);
-                    field.insert("");
-                }
-                Event::Key {
-                    key,
-                    pressed: true,
-                    modifiers,
-                    ..
-                } => finished |= key_down(field, &lay, key, modifiers, start, &list),
-                _ => {}
-            }
-            // Later events in this frame (fast typing) see the text so far.
-            lay = layout_of(ui, &field.text());
-        }
+        finished |= key_events(ui, field, &mut lay, &defined, &layout_of);
     }
     // A press on the autocomplete list takes focus for a moment; that is not the
     // end of editing.
@@ -231,14 +157,151 @@ pub(super) fn math(
         return;
     }
 
-    // Draw: selection, the typeset text, then the caret.
+    let caret = paint(ui, env, field, &lay, text_origin, id, zoom);
+    st.sizes.insert(
+        r.id,
+        Vec2::new(lay.layout.w + 2.0 * pad, lay.layout.h + 2.0 * pad) / zoom,
+    );
+    let below = text_origin + Vec2::new(caret.min.x, caret.max.y + 4.0);
+    autocomplete(ui, env, field, &defined, popup_id, below, &resp);
+}
+
+/// A source too long to edit: keep it whole in the worksheet and say so. This editor
+/// has no windowed-buffer model, so a truncated `Field` is never made active.
+fn refuse_long(
+    ui: &Ui,
+    st: &mut CanvasUi,
+    cmds: &mut Vec<CanvasCmd>,
+    env: &Env,
+    at: Pos2,
+    zoom: f32,
+    len: usize,
+) {
+    st.field = None;
+    st.focus_edit = false;
+    ui.painter().text(
+        at,
+        Align2::LEFT_TOP,
+        format!(
+            "Cannot edit: expression has {len} characters (limit {}).",
+            text::MAX_CHARS
+        ),
+        FontId::proportional(12.0 * zoom),
+        env.theme.error,
+    );
+    if ui.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Enter)) {
+        st.editing = None;
+        cmds.push(CanvasCmd::Seal);
+    }
+}
+
+/// Make `st.field` the editing state for `source`: a new one when editing has just
+/// started (with any selection or caret position asked for), else brought in step
+/// with the source.
+fn prepare_field(st: &mut CanvasUi, source: &str) {
+    let fresh = st.focus_edit || st.field.is_none();
+    let field = st.field.get_or_insert_with(|| Field::new(source));
+    if fresh {
+        *field = Field::new(source);
+        if let Some((a, b)) = st.preselect.take() {
+            field.select(a, b);
+        }
+        if std::mem::take(&mut st.enter_at_start) {
+            field.set_caret(0, false);
+        }
+    } else if field.text() != source {
+        field.sync(source);
+    }
+}
+
+/// Pointer: press places the caret, dragging extends, double click picks a node.
+fn pointer_input(
+    ui: &Ui,
+    resp: &egui::Response,
+    field: &mut Field,
+    lay: &SourceLayout,
+    text_origin: Pos2,
+) {
+    let mods = ui.input(|i| i.modifiers);
+    if let Some(pos) = resp.interact_pointer_pos() {
+        let offset = lay.offset_at((pos - text_origin).to_pos2());
+        if resp.double_clicked() {
+            let (a, b) = lay.enclosing(offset);
+            field.select(a, b);
+        } else if ui.input(|i| i.pointer.primary_pressed()) {
+            field.set_caret(offset, mods.shift);
+            resp.request_focus();
+        } else if resp.dragged() {
+            field.set_caret(offset, true);
+        }
+    }
+}
+
+/// Keyboard, text, paste, copy and cut for this frame. Gives back whether one of
+/// them ended editing. The layout is redone after each event, so later events in
+/// the frame (fast typing) see the text so far.
+fn key_events(
+    ui: &Ui,
+    field: &mut Field,
+    lay: &mut SourceLayout,
+    defined: &[String],
+    layout_of: &impl Fn(&Ui, &str) -> SourceLayout,
+) -> bool {
+    let mut finished = false;
+    let events = ui.input(|i| i.events.clone());
+    for event in events {
+        let (start, list) = complete::for_field(field, defined);
+        match event {
+            // In a program a space is text; see `Field::typed`.
+            Event::Text(s) if s == " " && field.in_program() && !field.has_selection() => {
+                field.typed(&s, greek_by_name);
+            }
+            Event::Text(s) if s == " " => {
+                // Space finishes a Greek name, else grows the selection.
+                if field.has_selection() || !field.expand_greek(greek_by_name) {
+                    grow(field, lay);
+                }
+            }
+            Event::Text(s) if s == "=" && complete::defines_by_equals(field, defined) => {
+                field.insert(":=");
+            }
+            Event::Text(s) => field.typed(&s, greek_by_name),
+            Event::Paste(s) => field.insert(&s),
+            Event::Copy => copy(ui, field),
+            Event::Cut => {
+                copy(ui, field);
+                field.insert("");
+            }
+            Event::Key {
+                key,
+                pressed: true,
+                modifiers,
+                ..
+            } => finished |= key_down(field, lay, key, modifiers, start, &list),
+            _ => {}
+        }
+        *lay = layout_of(ui, &field.text());
+    }
+    finished
+}
+
+/// Draw the selection, the typeset text and the caret. Gives back the caret's box.
+fn paint(
+    ui: &Ui,
+    env: &Env,
+    field: &Field,
+    lay: &SourceLayout,
+    text_origin: Pos2,
+    id: Id,
+    zoom: f32,
+) -> Rect {
     let painter = ui.painter();
     let (a, b) = field.selection();
     for band in lay.bands(a, b) {
         let band = band.translate(text_origin.to_vec2());
         painter.rect_filled(band, 0.0, env.theme.accent.gamma_multiply(0.3));
     }
-    lay.layout.paint(painter, text_origin, paper.text);
+    lay.layout.paint(painter, text_origin, env.paper.text);
     let caret = lay.caret_rect(field.caret);
     if blink::caret_shown(ui, id) {
         let line = [
@@ -250,18 +313,24 @@ pub(super) fn math(
     if field.clipped {
         super::overlay::clip_notice(painter, text_origin, lay.layout.h, zoom, env);
     }
-    st.sizes.insert(
-        r.id,
-        Vec2::new(lay.layout.w + 2.0 * pad, lay.layout.h + 2.0 * pad) / zoom,
-    );
+    caret
+}
 
-    // The autocomplete list, under the caret.
-    let (start, list) = complete::for_field(field, &defined);
+/// The autocomplete list, under the caret.
+fn autocomplete(
+    ui: &Ui,
+    env: &Env,
+    field: &mut Field,
+    defined: &[String],
+    popup_id: Id,
+    at: Pos2,
+    resp: &egui::Response,
+) {
+    let (start, list) = complete::for_field(field, defined);
     if list.is_empty() {
         ui.data_mut(|d| d.remove::<Rect>(popup_id));
         return;
     }
-    let at = text_origin + Vec2::new(caret.min.x, caret.max.y + 4.0);
     let (rect, clicked) = popup::show(ui, popup_id, at, &list, field.pick, env);
     ui.data_mut(|d| d.insert_temp(popup_id, rect));
     if let Some(i) = clicked {
