@@ -40,7 +40,7 @@ No function-length limit exists. Split the first four; the last four are large m
 - [x] `opencalc-ui/src/canvas/plot/polar.rs` `draw` (now `Disc` with rings_and_spokes, series; stand_in_scales)
 - [x] `opencalc-ui/src/canvas/editor.rs` `math` (now refuse_long, prepare_field, pointer_input, key_events, paint, autocomplete)
 - [x] `opencalc-core/src/edit/mod.rs` `apply_inner` now one-line arms calling `edit/content.rs`
-- [ ] Review only: `opencalc-core/src/expr/names.rs:42` `collect_names` (~203 lines)
+- [x] `opencalc-core/src/expr/names.rs` `collect_names` (call forms moved to `call_names`)
 - [ ] Review only: `opencalc-core/src/eval.rs:181` `evaluate_cancellable` (~183 lines)
 - [ ] Review only: `opencalc-ui/src/app/dispatch.rs:70` `dispatch` (~176 lines)
 - [ ] Decide whether to add a function-length check to `scripts/check.ps1`
