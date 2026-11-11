@@ -8,12 +8,12 @@
 //! than deltas. That makes them idempotent to apply, and lets two consecutive
 //! edits of the same thing merge by keeping the last one.
 
+mod content;
 mod history;
 
 use crate::document::{
-    adjust_runs, clean_label, normalise_runs, FontStyle, HeaderFooter, PageSetup, PictureSpec,
-    PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Run, ShapeSpec, Size, TableSpec,
-    Worksheet,
+    FontStyle, HeaderFooter, PageSetup, PictureSpec, PlotSpec, Point, Region, RegionId, RegionKind,
+    ResultFormat, Run, ShapeSpec, Size, TableSpec, Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -200,172 +200,21 @@ impl Worksheet {
             Edit::InsertRegions { regions } => self.insert(regions),
             Edit::DeleteRegions { ids } => self.delete(ids),
             Edit::MoveRegions { moves } => self.move_regions(moves),
-            Edit::SetMathSource { id, source } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Math(m) = &mut region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let old = m.source().to_owned();
-                m.set_source(source.clone());
-                Ok(Edit::SetMathSource {
-                    id: *id,
-                    source: old,
-                })
-            }
-            Edit::SetLabel { id, label } => {
-                let region = self.region_mut(*id)?;
-                let old = std::mem::replace(&mut region.label, clean_label(label));
-                Ok(Edit::SetLabel {
-                    id: *id,
-                    label: old,
-                })
-            }
-            Edit::SetLocked { id, locked } => {
-                let region = self.region_mut(*id)?;
-                let old = std::mem::replace(&mut region.locked, *locked);
-                Ok(Edit::SetLocked {
-                    id: *id,
-                    locked: old,
-                })
-            }
-            Edit::SetFontStyle { id, style } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let old = std::mem::replace(&mut region.style, *style);
-                Ok(Edit::SetFontStyle {
-                    id: *id,
-                    style: old,
-                })
-            }
-            Edit::SetRuns { id, runs } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Text { text } = &region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let fitted = normalise_runs(runs, text.chars().count());
-                let old = std::mem::replace(&mut region.runs, fitted);
-                Ok(Edit::SetRuns { id: *id, runs: old })
-            }
-            Edit::SetBorder { id, border } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let old = std::mem::replace(&mut region.border, *border);
-                Ok(Edit::SetBorder {
-                    id: *id,
-                    border: old,
-                })
-            }
-            Edit::SetResultFormat { id, format } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Math(m) = &mut region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let old = m.format();
-                m.set_format(format.clone());
-                Ok(Edit::SetResultFormat {
-                    id: *id,
-                    format: old,
-                })
-            }
-            Edit::SetText { id, text } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Text { text: current } = &mut region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let old = std::mem::replace(current, text.clone());
-                // Styled stretches follow the text they were made on.
-                let old_runs = region.runs.clone();
-                region.runs = adjust_runs(&old_runs, &old, text);
-                if region.runs == old_runs {
-                    Ok(Edit::SetText { id: *id, text: old })
-                } else {
-                    // Undo must bring the exact old styling back, not a guess.
-                    Ok(Edit::Batch(vec![
-                        Edit::SetText { id: *id, text: old },
-                        Edit::SetRuns {
-                            id: *id,
-                            runs: old_runs,
-                        },
-                    ]))
-                }
-            }
-            Edit::SetPlot { id, spec } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Plot(current) = &mut region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let old = std::mem::replace(current, PlotSpec::clone(spec));
-                Ok(Edit::SetPlot {
-                    id: *id,
-                    spec: Box::new(old),
-                })
-            }
-            Edit::SetTable { id, spec } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Table(current) = &mut region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let old = std::mem::replace(current, Box::new((**spec).clone().repaired()));
-                Ok(Edit::SetTable { id: *id, spec: old })
-            }
-            Edit::SetPicture { id, spec } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Picture(current) = &mut region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let old = std::mem::replace(current, spec.clone());
-                Ok(Edit::SetPicture { id: *id, spec: old })
-            }
-            Edit::SetShape { id, spec } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let RegionKind::Shape(current) = &mut region.kind else {
-                    return Err(EditError::WrongKind(*id));
-                };
-                let old = std::mem::replace(current, Box::new((**spec).clone().repaired()));
-                Ok(Edit::SetShape { id: *id, spec: old })
-            }
             Edit::SetZ { moves } => self.set_z(moves),
-            Edit::SetRegionSize { id, size } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let old = std::mem::replace(&mut region.size, *size);
-                Ok(Edit::SetRegionSize { id: *id, size: old })
-            }
-            Edit::SetRegionBox { id, pos, size } => {
-                self.unlocked(*id)?;
-                let region = self.region_mut(*id)?;
-                let usable = |v: f32| {
-                    if v.is_finite() {
-                        v.clamp(1.0, crate::persist::MAX_EXTENT)
-                    } else {
-                        1.0
-                    }
-                };
-                let coord = |v: f32| {
-                    if v.is_finite() {
-                        v.clamp(-crate::persist::MAX_COORD, crate::persist::MAX_COORD)
-                    } else {
-                        0.0
-                    }
-                };
-                let old_pos =
-                    std::mem::replace(&mut region.pos, Point::new(coord(pos.x), coord(pos.y)));
-                let old_size =
-                    std::mem::replace(&mut region.size, Size::new(usable(size.w), usable(size.h)));
-                Ok(Edit::SetRegionBox {
-                    id: *id,
-                    pos: old_pos,
-                    size: old_size,
-                })
-            }
+            Edit::SetMathSource { id, source } => self.set_math_source(*id, source),
+            Edit::SetLabel { id, label } => self.set_label(*id, label),
+            Edit::SetLocked { id, locked } => self.set_locked(*id, *locked),
+            Edit::SetFontStyle { id, style } => self.set_font_style(*id, *style),
+            Edit::SetRuns { id, runs } => self.set_runs(*id, runs),
+            Edit::SetBorder { id, border } => self.set_border(*id, *border),
+            Edit::SetResultFormat { id, format } => self.set_result_format(*id, format),
+            Edit::SetText { id, text } => self.set_text(*id, text),
+            Edit::SetPlot { id, spec } => self.set_plot(*id, spec),
+            Edit::SetTable { id, spec } => self.set_table(*id, spec),
+            Edit::SetPicture { id, spec } => self.set_picture(*id, spec),
+            Edit::SetShape { id, spec } => self.set_shape(*id, spec),
+            Edit::SetRegionSize { id, size } => self.set_region_size(*id, *size),
+            Edit::SetRegionBox { id, pos, size } => self.set_region_box(*id, *pos, *size),
             Edit::SetHeaders(h) => Ok(Edit::SetHeaders(Box::new(std::mem::replace(
                 &mut self.headers,
                 h.sanitised(),
@@ -374,23 +223,7 @@ impl Worksheet {
                 &mut self.page,
                 page.sanitised(),
             ))),
-            Edit::Batch(edits) => {
-                let mut inverses = Vec::with_capacity(edits.len());
-                for edit in edits {
-                    match self.apply_inner(edit) {
-                        Ok(inverse) => inverses.push(inverse),
-                        Err(error) => {
-                            // Put back what was done, so a failure changes nothing.
-                            for inverse in inverses.iter().rev() {
-                                let _ = self.apply_inner(inverse);
-                            }
-                            return Err(error);
-                        }
-                    }
-                }
-                inverses.reverse();
-                Ok(Edit::Batch(inverses))
-            }
+            Edit::Batch(edits) => self.apply_batch(edits),
             Edit::SetTitle(title) => Ok(Edit::SetTitle(std::mem::replace(
                 &mut self.title,
                 title.clone(),
@@ -409,15 +242,34 @@ impl Worksheet {
         }
     }
 
+    /// Apply the edits in order. If one fails, the ones already done are undone, so
+    /// a failure changes nothing.
+    fn apply_batch(&mut self, edits: &[Edit]) -> Result<Edit, EditError> {
+        let mut inverses = Vec::with_capacity(edits.len());
+        for edit in edits {
+            match self.apply_inner(edit) {
+                Ok(inverse) => inverses.push(inverse),
+                Err(error) => {
+                    for inverse in inverses.iter().rev() {
+                        let _ = self.apply_inner(inverse);
+                    }
+                    return Err(error);
+                }
+            }
+        }
+        inverses.reverse();
+        Ok(Edit::Batch(inverses))
+    }
+
     /// `Ok` if the region is missing or not locked: the check before changing it.
-    fn unlocked(&self, id: RegionId) -> Result<(), EditError> {
+    pub(super) fn unlocked(&self, id: RegionId) -> Result<(), EditError> {
         match self.region(id) {
             Some(r) if r.locked => Err(EditError::Locked(id)),
             _ => Ok(()),
         }
     }
 
-    fn region_mut(&mut self, id: RegionId) -> Result<&mut Region, EditError> {
+    pub(super) fn region_mut(&mut self, id: RegionId) -> Result<&mut Region, EditError> {
         self.regions
             .iter_mut()
             .find(|r| r.id == id)

@@ -21,7 +21,7 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 
 - [x] `opencalc-core/src/csv.rs` (410)
 - [x] `opencalc-core/src/parser.rs` (424)
-- [ ] `opencalc-core/src/edit/mod.rs` (507)
+- [x] `opencalc-core/src/edit/mod.rs` (507)
 - [ ] `opencalc-core/src/eval/node.rs` (500)
 - [x] `opencalc-core/src/parser/program.rs` (470)
 - [x] `opencalc-ui/src/layout.rs` (521)
@@ -39,7 +39,7 @@ No function-length limit exists. Split the first four; the last four are large m
 - [ ] `opencalc-ui/src/canvas/plot.rs:126` `chart` (~219 lines)
 - [ ] `opencalc-ui/src/canvas/plot/polar.rs:88` `draw` (~206 lines)
 - [ ] `opencalc-ui/src/canvas/editor.rs:39` `math` (~234 lines)
-- [ ] Review only: `opencalc-core/src/edit/mod.rs:198` `apply_inner` (~215 lines)
+- [x] `opencalc-core/src/edit/mod.rs` `apply_inner` now one-line arms calling `edit/content.rs`
 - [ ] Review only: `opencalc-core/src/expr/names.rs:42` `collect_names` (~203 lines)
 - [ ] Review only: `opencalc-core/src/eval.rs:181` `evaluate_cancellable` (~183 lines)
 - [ ] Review only: `opencalc-ui/src/app/dispatch.rs:70` `dispatch` (~176 lines)
