@@ -66,7 +66,7 @@ No function-length limit exists. Split the first four; the last four are large m
   - [x] `eval/calculus/solve.rs`
   - [x] `eval.rs`
 - [x] Reviewed the `let _ =` calls: 25 of the 40 are in tests; of the 15 in production code, 14 are best-effort cleanup, memory writes or edits that cannot fail (all commented). One hid a risk (batch rollback) and now has a `debug_assert`; one is a real gap, logged as TD-37 (clipboard write failure)
-- [ ] Consider splitting `opencalc-ui/src/smoke.rs` (1,743 lines) into topic files like the existing `smoke/` ones
+- [x] Split `opencalc-ui/src/smoke.rs` (1,743 to 839 lines): the math editor tests are `smoke/editor.rs`, manual mode and programs are `smoke/calculation.rs`; same 583 tests
 - [ ] Spot-check per-frame paint code for hot-path `.clone()` calls (373 in the workspace overall)
 
 ## Already in the register (not new)
