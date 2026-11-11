@@ -30,7 +30,7 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 - [x] `opencalc-ui/src/commands/id.rs` (405)
 - [x] `opencalc-ui/src/layout/source.rs` (410)
 - [x] `opencalc-ui/src/panels/colour_picker.rs` (469)
-- [ ] `opencalc-ui/src/ribbon/show.rs` (518)
+- [x] `opencalc-ui/src/ribbon/show.rs` (518)
 
 ### 2. Overlong functions
 No function-length limit exists. Split the first four; the last four are large matches and may be fine.

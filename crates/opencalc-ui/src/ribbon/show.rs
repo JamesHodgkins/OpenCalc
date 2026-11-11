@@ -1,14 +1,11 @@
 //! Laying out and drawing the ribbon.
 
-use eframe::egui::{
-    self, popup::popup_below_widget, Align2, Color32, CornerRadius, FontId, Id, PopupCloseBehavior,
-    Rect, Sense, Ui, Vec2,
-};
+use eframe::egui::{self, Align2, Color32, CornerRadius, FontId, Rect, Sense, Ui, Vec2};
 
+use super::cells::{large_split, rows_ui, small_item, CONTROL_LABEL_W, CONTROL_MIN_W, CONTROL_W};
 use super::widgets::{self as w, Look};
 use super::{
-    Cell, Column, CommandSource, Context, ControlHost, Item, Panel, Ribbon, RibbonOutput,
-    RibbonState, Split,
+    Column, CommandSource, Context, ControlHost, Item, Panel, Ribbon, RibbonOutput, RibbonState,
 };
 use crate::commands::CommandId;
 use crate::theme::{metrics, type_size, Theme};
@@ -74,10 +71,10 @@ fn gradient_tab(
 /// Everything a draw call needs, so helpers take one argument.
 pub(super) struct Cx<'a> {
     pub(super) theme: &'a Theme,
-    source: &'a dyn CommandSource,
+    pub(super) source: &'a dyn CommandSource,
     pub(super) state: &'a mut RibbonState,
-    out: &'a mut RibbonOutput,
-    host: &'a mut dyn ControlHost,
+    pub(super) out: &'a mut RibbonOutput,
+    pub(super) host: &'a mut dyn ControlHost,
 }
 
 impl Cx<'_> {
@@ -320,200 +317,6 @@ fn column_ui(ui: &mut Ui, cx: &mut Cx, col: &Column, id: ((usize, usize), usize)
             }
         }
     }
-}
-
-/// Width of one hosted control row, and of its label.
-const CONTROL_W: f32 = 168.0;
-const CONTROL_LABEL_W: f32 = 50.0;
-/// Narrowest a column of controls is: label, a colour button, and a gap.
-const CONTROL_MIN_W: f32 = 116.0;
-
-fn small_item(ui: &mut Ui, cx: &mut Cx, item: &Item, label: Option<&str>, width: f32) {
-    let look = cx.look(item.command);
-    let resp = w::small_button(ui, cx.theme, look, Some(item.icon), label, width);
-    if resp.on_hover_text(cx.tip(item)).clicked() {
-        cx.press(item, look);
-    }
-}
-
-/// Width of a run-time menu: fixed, so the ribbon does not shift as the selection
-/// changes what the menu reads.
-const MENU_W: f32 = 112.0;
-
-fn cell_width(cell: &Cell) -> f32 {
-    match cell {
-        Cell::Menu { .. } => MENU_W,
-        Cell::Icon(_) => w::SMALL_H,
-    }
-}
-
-fn split_label<'a>(split: &'a Split, pick: Option<&'a Item>) -> &'a str {
-    split
-        .label
-        .or(pick.map(|p| p.label))
-        .or(split.items.first().map(|i| i.label))
-        .unwrap_or("")
-}
-
-fn rows_ui(ui: &mut Ui, cx: &mut Cx, rows: &[Vec<Cell>]) {
-    let widths: Vec<Vec<f32>> = rows
-        .iter()
-        .map(|r| r.iter().map(cell_width).collect())
-        .collect();
-    let col_w = widths
-        .iter()
-        .map(|r| r.iter().sum::<f32>() + 2.0 * r.len().saturating_sub(1) as f32)
-        .fold(0.0, f32::max);
-    for (ri, row) in rows.iter().enumerate() {
-        // Every row is exactly one small-button high, whatever it holds.
-        let layout = egui::Layout::left_to_right(egui::Align::Center);
-        ui.allocate_ui_with_layout(Vec2::new(col_w, w::SMALL_H), layout, |ui| {
-            ui.spacing_mut().item_spacing = Vec2::new(2.0, 0.0);
-            let used: f32 =
-                widths[ri].iter().sum::<f32>() + 2.0 * row.len().saturating_sub(1) as f32;
-            // The last labelled cell takes the spare width so stacked rows line up.
-            let last_labelled = row.iter().rposition(|c| matches!(c, Cell::Menu { .. }));
-            for (ci, cell) in row.iter().enumerate() {
-                let extra = if Some(ci) == last_labelled {
-                    (col_w - used).max(0.0)
-                } else {
-                    0.0
-                };
-                let width = widths[ri][ci] + extra;
-                match cell {
-                    Cell::Icon(item) => small_item(ui, cx, item, None, width),
-                    Cell::Menu { menu, first } => menu_cell(ui, cx, menu, first, width),
-                }
-            }
-        });
-    }
-}
-
-/// The item a split currently runs: the last pick, else the first.
-fn current_pick<'a>(cx: &Cx, split: &'a Split) -> Option<&'a Item> {
-    let first = split.items.first()?;
-    let picked = cx.state.split_picks.get(&first.command);
-    Some(
-        picked
-            .and_then(|c| split.items.iter().find(|i| i.command == *c))
-            .unwrap_or(first),
-    )
-}
-
-/// The drop-down list of a split. Returns true if the popup is open.
-fn split_list(ui: &mut Ui, cx: &mut Cx, split: &Split, anchor: &egui::Response, popup: Id) {
-    let Some(first) = split.items.first() else {
-        return;
-    };
-    popup_below_widget(ui, popup, anchor, PopupCloseBehavior::CloseOnClick, |ui| {
-        ui.spacing_mut().item_spacing = Vec2::new(0.0, 2.0);
-        let width = split
-            .items
-            .iter()
-            .map(|i| w::small_width(ui, true, Some(i.label)))
-            .fold(120.0, f32::max);
-        for item in &split.items {
-            let look = cx.look(item.command);
-            let resp =
-                w::small_button(ui, cx.theme, look, Some(item.icon), Some(item.label), width);
-            if resp.on_hover_text(cx.tip(item)).clicked() && look.enabled {
-                cx.state.split_picks.insert(first.command, item.command);
-                cx.press(item, look);
-            }
-        }
-    });
-}
-
-fn large_split(ui: &mut Ui, cx: &mut Cx, split: &Split, id: ((usize, usize), usize)) {
-    let Some(pick) = current_pick(cx, split) else {
-        return;
-    };
-    let look = cx.look(pick.command);
-    let label = split_label(split, Some(pick));
-    let width = w::large_width(ui, label);
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, w::LARGE_H), Sense::hover());
-    let face = Rect::from_min_max(rect.min, egui::pos2(rect.max.x, rect.min.y + 40.0));
-    let list = Rect::from_min_max(egui::pos2(rect.min.x, rect.min.y + 40.0), rect.max);
-    let base = Id::new(("ribbon-large-split", id));
-    let face_resp = ui.interact(face, base.with("face"), look.sense());
-    let list_resp = ui.interact(list, base.with("list-btn"), Sense::click());
-    w::paint_state(ui, face, &face_resp, cx.theme, look);
-    w::paint_state(
-        ui,
-        list,
-        &list_resp,
-        cx.theme,
-        Look {
-            enabled: true,
-            active: false,
-        },
-    );
-    w::paint_large(ui, rect, cx.theme, look, pick.icon, label, true);
-    if face_resp.clone().on_hover_text(cx.tip(pick)).clicked() {
-        cx.press(pick, look);
-    }
-    let popup = base.with("list");
-    if list_resp.clicked() {
-        ui.memory_mut(|m| m.toggle_popup(popup));
-    }
-    split_list(ui, cx, split, &list_resp, popup);
-}
-
-/// A drop-down filled from the command source: its face reads what is chosen now
-/// (say the unit a selected result shows), and the list offers `first` and then
-/// whatever the source lists. With nothing to list it is dimmed.
-fn menu_cell(ui: &mut Ui, cx: &mut Cx, menu: &Item, first: &Item, width: f32) {
-    let (items, face) = cx.source.menu(menu.command);
-    let look = Look {
-        enabled: face.is_some() || !items.is_empty(),
-        active: false,
-    };
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, w::SMALL_H), Sense::hover());
-    let base = Id::new(("ribbon-menu", menu.command));
-    let resp = ui.interact(rect, base, look.sense());
-    w::paint_state(ui, rect, &resp, cx.theme, look);
-    let (body, arrow) = rect.split_left_right_at_x(rect.max.x - w::ARROW_W);
-    let text = face.clone().unwrap_or_else(|| menu.label.to_owned());
-    w::paint_small(ui, body, cx.theme, look, Some(menu.icon), Some(&text));
-    w::paint_arrow(ui, arrow, cx.theme, look);
-    let resp = resp.on_hover_text(menu.label);
-    let popup = base.with("list");
-    if resp.clicked() && look.enabled {
-        ui.memory_mut(|m| m.toggle_popup(popup));
-    }
-    popup_below_widget(ui, popup, &resp, PopupCloseBehavior::CloseOnClick, |ui| {
-        ui.spacing_mut().item_spacing = Vec2::new(0.0, 2.0);
-        let list: Vec<Item> = std::iter::once(Item::of(first.command))
-            .chain(items.iter().map(|c| Item::of(*c)))
-            .collect();
-        let width = list
-            .iter()
-            .map(|i| w::small_width(ui, true, Some(i.label)))
-            .fold(width, f32::max);
-        egui::ScrollArea::vertical()
-            .max_height(320.0)
-            .show(ui, |ui| {
-                for item in &list {
-                    // The unit showing now is marked.
-                    let look = Look {
-                        enabled: cx.look(item.command).enabled,
-                        active: face.as_deref() == Some(item.label)
-                            && item.command != first.command,
-                    };
-                    let resp = w::small_button(
-                        ui,
-                        cx.theme,
-                        look,
-                        Some(item.icon),
-                        Some(item.label),
-                        width,
-                    );
-                    if resp.clicked() && look.enabled {
-                        cx.press(item, look);
-                    }
-                }
-            });
-    });
 }
 
 #[cfg(test)]
