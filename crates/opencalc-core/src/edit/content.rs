@@ -147,6 +147,42 @@ impl Worksheet {
         Ok(Edit::SetShape { id, spec: old })
     }
 
+    /// Put a line's ends at `from` and `to`; its box and flips follow. The inverse
+    /// restores the old shape settings and box exactly.
+    pub(super) fn set_line_ends(
+        &mut self,
+        id: RegionId,
+        from: Point,
+        to: Point,
+    ) -> Result<Edit, EditError> {
+        self.unlocked(id)?;
+        let region = self.region_mut(id)?;
+        let RegionKind::Shape(spec) = &mut region.kind else {
+            return Err(EditError::WrongKind(id));
+        };
+        if spec.kind != crate::document::ShapeKind::Line {
+            return Err(EditError::WrongKind(id));
+        }
+        let finite = |p: Point| p.x.is_finite() && p.y.is_finite();
+        if !finite(from) || !finite(to) {
+            return Ok(Edit::Batch(Vec::new()));
+        }
+        let before = (spec.clone(), region.pos, region.size);
+        let (pos, size, flip_x, flip_y) = ShapeSpec::line_box(from, to);
+        spec.flip_x = flip_x;
+        spec.flip_y = flip_y;
+        region.pos = pos;
+        region.size = size;
+        Ok(Edit::Batch(vec![
+            Edit::SetShape { id, spec: before.0 },
+            Edit::SetRegionBox {
+                id,
+                pos: before.1,
+                size: before.2,
+            },
+        ]))
+    }
+
     pub(super) fn set_region_size(&mut self, id: RegionId, size: Size) -> Result<Edit, EditError> {
         self.unlocked(id)?;
         let region = self.region_mut(id)?;

@@ -73,6 +73,8 @@ pub enum ShapeControl {
     Width,
     Line,
     Corners,
+    StartHead,
+    EndHead,
 }
 
 impl Control {
@@ -85,6 +87,8 @@ impl Control {
                 ShapeControl::Width => "Width",
                 ShapeControl::Line => "Line",
                 ShapeControl::Corners => "Corners",
+                ShapeControl::StartHead => "Start",
+                ShapeControl::EndHead => "End",
             },
         }
     }
@@ -93,6 +97,10 @@ impl Control {
 /// Draws the controls of [`Column::Controls`]. Each is given a row of
 /// `widgets::SMALL_H` to draw its widget in, after its label.
 pub trait ControlHost {
+    /// The label shown before the control; it may depend on what is selected.
+    fn label(&self, control: Control) -> &'static str {
+        control.label()
+    }
     fn control(&mut self, ui: &mut Ui, theme: &Theme, control: Control);
 }
 

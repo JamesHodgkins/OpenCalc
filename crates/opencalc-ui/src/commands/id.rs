@@ -164,8 +164,11 @@ commands! {
     TableExportCsv: "table.export_csv", "Export CSV", icons::TABLE;
     InsertPicture: "insert.picture", "Picture", icons::PICTURE;
     InsertRectangle: "insert.rectangle", "Rectangle", icons::SQUARE;
-    InsertRoundedRectangle: "insert.rounded_rectangle", "Rounded rectangle", icons::ROUNDED;
     InsertEllipse: "insert.ellipse", "Ellipse", icons::CIRCLE;
+    InsertLine: "insert.line", "Line", icons::LINE;
+    InsertTriangle: "insert.triangle", "Triangle", icons::TRIANGLE;
+    InsertDiamond: "insert.diamond", "Diamond", icons::DIAMOND;
+    InsertPolygon: "insert.polygon", "Polygon", icons::POLYGON;
     InsertGreek: "insert.greek", "Greek letters", icons::GREEK;
     InsertMatrix: "insert.matrix", "Matrix", icons::TABLE;
     InsertRange: "insert.range", "Range", icons::LIST;
@@ -236,127 +239,31 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            ViewLabels
-            | LabelsClose
-            | GoToLabel(_)
-            | FileTypeRegister
-            | FileTypeRemove
-            | HelpShortcuts
-            | HelpShortcutsClose
-            | RegionTag
-            | LabelClose
-            | RegionLock
-            | ArrangeAlignH
-            | ArrangeAlignV
-            | FormatBold
-            | FormatItalic
-            | FormatUnderline
-            | FormatBorder
-            | UnitsShowInMenu
-            | UnitsDisplayReset
-            | FormatDecimalsMore
-            | FormatDecimalsLess
-            | FormatScientific
-            | FormatEngineering
-            | ClipboardPaste
-            | ClipboardCut
-            | ClipboardCopy
-            | ArrangeSeparate
-            | FileExportPdf
-            | FileExportPng
-            | EditFind
-            | EditReplace
-            | FindNext
-            | FindPrev
-            | FindReplaceOne
-            | FindReplaceAll
-            | FindClose
-            | UnitsDefine
-            | UnitsManage
-            | UnitsClose
-            | FileNew
-            | FileNewFromTemplate
-            | FileSaveAsTemplate
-            | FileOpen
-            | FileSave
-            | FileSaveAs
-            | DialogSave
-            | DialogDiscard
-            | DialogCancel
-            | DialogOk
-            | DialogRestore
-            | DialogDropRecovery
-            | OpenRecent(_)
-            | UnitsShowIn(_)
-            | GoToFinding(_)
-            | InsertMatrixSize(..)
-            | MatrixClose
-            | InsertMatrix
-            | InsertRange
-            | InsertSolveBlock
-            | InsertProgram
-            | CheckClose
-            | CalcCheck
-            | WarnNext
-            | WarnPrev
-            | FileClose
-            | FileExample
-            | AppQuit
-            | AppMenu
-            | AppMenuClose
-            | TabHome
-            | EditUndo
-            | EditRedo
-            | RegionDelete
-            | InsertMath
-            | InsertText
-            | InsertArea
-            | InsertPlot
-            | InsertTable
-            | PictureChoose
-            | TableImportCsv
-            | TableExportCsv
-            | InsertPicture
-            | CalcAll
-            | ViewZoomIn
-            | ViewZoomOut
-            | ViewZoomFit
-            | ViewZoom100
-            | ViewGrid
-            | ViewSnap
-            | CalcAuto
-            | ViewFunctions
-            | ViewResetLayout
-            | AppOptions
-            | AppOptionsClose
-            | AppOptionsDefaults
-            | FileClearRecent
-            | ThemeNeutral
-            | ThemeSlate
-            | UnitsSi
-            | UnitsUscs
-            | UnitsCgs
-            | HelpAbout
-            | HelpAboutClose
-            | SelectSheet(_)
-            | CloseSheet(_)
-            | ZoomTo(_)
-            | PagePaper(_)
-            | PageLandscape(_)
-            | PageMarginMm(_)
-            | DocPageSetup
-            | DocPageSetupClose
-            | ViewPageView
-            | ViewDraftView
-            | InsertGreek
-            | InsertSymbol(_)
-            | InsertRectangle
-            | InsertRoundedRectangle
-            | InsertEllipse
-            | ArrangeToFront
-            | ArrangeForward
-            | ArrangeBackward
-            | ArrangeToBack => true,
+            ViewLabels | LabelsClose | GoToLabel(_) | FileTypeRegister | FileTypeRemove
+            | HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
+            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | FormatUnderline
+            | FormatBorder | UnitsShowInMenu | UnitsDisplayReset | FormatDecimalsMore
+            | FormatDecimalsLess | FormatScientific | FormatEngineering | ClipboardPaste
+            | ClipboardCut | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng
+            | EditFind | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll
+            | FindClose | UnitsDefine | UnitsManage | UnitsClose | FileNew
+            | FileNewFromTemplate | FileSaveAsTemplate | FileOpen | FileSave | FileSaveAs
+            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
+            | DialogDropRecovery | OpenRecent(_) | UnitsShowIn(_) | GoToFinding(_)
+            | InsertMatrixSize(..) | MatrixClose | InsertMatrix | InsertRange
+            | InsertSolveBlock | InsertProgram | CheckClose | CalcCheck | WarnNext | WarnPrev
+            | FileClose | FileExample | AppQuit | AppMenu | AppMenuClose | TabHome | EditUndo
+            | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot
+            | InsertTable | PictureChoose | TableImportCsv | TableExportCsv | InsertPicture
+            | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid
+            | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
+            | AppOptionsClose | AppOptionsDefaults | FileClearRecent | ThemeNeutral
+            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
+            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
+            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
+            | InsertGreek | InsertSymbol(_) | InsertRectangle | InsertEllipse | InsertLine
+            | InsertTriangle | InsertDiamond | InsertPolygon | ArrangeToFront | ArrangeForward
+            | ArrangeBackward | ArrangeToBack => true,
             HelpGuide => false,
         }
     }

@@ -64,7 +64,7 @@ Categories: **Core** (required for v1), **Secondary** (nice to have), **Advanced
 | Plot region | Core | X-Y line and scatter. |
 | Table region | Secondary | Data input and output. |
 | Picture region (image embed) | Secondary | |
-| Shape regions (rectangle, rounded rectangle, ellipse) with fill and outline | Secondary | Palette colours with shades, or exact RGBA. |
+| Shape regions (rectangle with optional rounded corners, ellipse, triangle, diamond, polygon, line) with fill and outline | Secondary | Palette colours with shades, or exact RGBA. |
 | Draw order (bring to front, forward, backward, send to back) | Secondary | Separate from calculation order. |
 | Region tags and internal hyperlinks | Secondary | Lets equations reference each other by name. |
 | Locked areas and worksheet protection | Secondary | Stops accidental edits to a finished calculation. |

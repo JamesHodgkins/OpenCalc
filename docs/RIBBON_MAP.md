@@ -36,7 +36,7 @@ other product's ribbon (see `CLEAN_ROOM.md`). The ribbon is data in `ribbon/defs
 | | Programming | Solve block, Program (large) |
 | | Symbols | Greek letters (large, opens a flyout of letters) |
 | | Functions | Insert function (large, opens the Functions window) |
-| **Draw** | Shapes | Rectangle, Rounded rectangle, Ellipse (large; pick one, then drag on the page) |
+| **Draw** | Shapes | Rectangle, Ellipse, Triangle, Diamond, Polygon, Line (large; pick one, then drag on the page; Shift turns a line in 15 degree steps, Ctrl draws from the middle) |
 | | Order | Bring to front, Bring forward, Send backward, Send to back |
 | | Align | Align horizontally, Align vertically, Separate regions |
 | **Format** | Text | Bold, Italic, Underline |
@@ -58,7 +58,7 @@ that thing is selected, and comes forward once when it is drawn. Selecting it ag
 
 | Tab | Shown while | Groups |
 |---|---|---|
-| **Shape Format** | one shape is selected | Shape (kind, corner radius), Style (fill, outline, width, line style), Arrange (draw order, Lock, Delete) |
+| **Shape Format** | one shape is selected | Shape (kind, corner radius or a polygon's sides; a rectangle also has a corner grip on the page), Style (fill, outline, width, line style), Arrowheads (start and end of a line), Arrange (draw order, Lock, Delete) |
 
 Value controls (a colour, a number, a choice) are drawn by the app through `ControlHost`, because a
 ribbon item otherwise only runs a command. Fill and outline use a colour picker: Automatic, none, the
@@ -84,7 +84,6 @@ Planned, each replacing a floating window the same way: **Picture**, **Table** a
 
 ## Still to do
 
-- An Alt+click that picks what lies under a filled shape, and a right-click menu with the draw-order
+- A right-click menu with the draw-order
   commands.
 - Picture, Table and Plot contextual tabs (their floating windows go away as they arrive).
-- Lines and arrows in Draw > Shapes.

@@ -1,8 +1,10 @@
-//! Painting and hit-testing a shape region: a rectangle, rounded rectangle or
-//! ellipse, filled and outlined as its settings say.
+//! Painting and hit-testing a shape region: a rectangle (square or rounded
+//! corners), ellipse or line, filled and outlined as its settings say.
 
 use eframe::egui::{Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
-use opencalc_core::document::{Dash, Point, Region, RegionKind, ShapeKind, ShapeSpec, Size};
+use opencalc_core::document::{
+    Arrowhead, Dash, Point, Region, RegionKind, ShapeKind, ShapeSpec, Size,
+};
 
 use super::adapt::vec;
 use super::paint::Place;
@@ -42,18 +44,41 @@ fn stroke_of(spec: &ShapeSpec, text: Color32) -> Option<Color32> {
 
 /// The corners of the shape's outline, going round once. A rectangle is four
 /// points, a rounded one adds the arcs, an ellipse is a many-sided polygon.
-fn outline(kind: ShapeKind, rect: Rect, radius: f32) -> Vec<Pos2> {
+fn outline(kind: ShapeKind, rect: Rect, radius: f32, sides: u8) -> Vec<Pos2> {
     match kind {
-        ShapeKind::Rectangle => vec![
-            rect.left_top(),
-            rect.right_top(),
+        ShapeKind::Triangle => vec![
+            Pos2::new(rect.center().x, rect.top()),
             rect.right_bottom(),
             rect.left_bottom(),
         ],
-        ShapeKind::RoundedRectangle => {
+        ShapeKind::Diamond => vec![
+            Pos2::new(rect.center().x, rect.top()),
+            Pos2::new(rect.right(), rect.center().y),
+            Pos2::new(rect.center().x, rect.bottom()),
+            Pos2::new(rect.left(), rect.center().y),
+        ],
+        ShapeKind::Polygon => {
+            let n = sides.max(3) as usize;
+            let (c, rx, ry) = (rect.center(), rect.width() / 2.0, rect.height() / 2.0);
+            (0..n)
+                .map(|k| {
+                    let a =
+                        std::f32::consts::TAU * k as f32 / n as f32 - std::f32::consts::FRAC_PI_2;
+                    Pos2::new(c.x + rx * a.cos(), c.y + ry * a.sin())
+                })
+                .collect()
+        }
+        // A line is not a closed outline; it is painted by `paint_line`.
+        ShapeKind::Line => Vec::new(),
+        ShapeKind::Rectangle => {
             let r = radius.clamp(0.0, rect.width().min(rect.height()) / 2.0);
             if r <= 0.0 {
-                return outline(ShapeKind::Rectangle, rect, 0.0);
+                return vec![
+                    rect.left_top(),
+                    rect.right_top(),
+                    rect.right_bottom(),
+                    rect.left_bottom(),
+                ];
             }
             // Each corner's arc centre and the angle it starts from, going
             // clockwise on screen from the top-left.
@@ -82,6 +107,178 @@ fn outline(kind: ShapeKind, rect: Rect, radius: f32) -> Vec<Pos2> {
                 .collect()
         }
     }
+}
+
+/// Fifteen degrees, the steps a constrained line turns in.
+const ANGLE_STEP: f32 = std::f32::consts::PI / 12.0;
+
+/// `end` moved, keeping its distance from `start`, to the nearest multiple of
+/// fifteen degrees.
+pub(super) fn constrained(start: Pos2, end: Pos2) -> Pos2 {
+    let d = end - start;
+    let len = d.length();
+    if len == 0.0 {
+        return end;
+    }
+    let angle = (d.y.atan2(d.x) / ANGLE_STEP).round() * ANGLE_STEP;
+    start + Vec2::new(angle.cos(), angle.sin()) * len
+}
+
+/// The ends of a line drawn by dragging from `start` to `end` (document space):
+/// snapped to `grid` if there is one, or turned to a multiple of fifteen degrees
+/// with `constrain`; with `centre`, `start` is the middle. A click (almost no
+/// drag) gives a level line of the usual length, starting at the click or centred
+/// on it. Ends stay on the page (not left of or above it).
+pub(super) fn drawn_line(
+    start: Pos2,
+    end: Pos2,
+    grid: Option<f32>,
+    constrain: bool,
+    centre: bool,
+) -> (Point, Point) {
+    let dragged = (end - start).abs();
+    let (mut a, mut b) = if dragged.x < MIN_DRAG && dragged.y < MIN_DRAG {
+        let at = grid.map_or(start, |g| super::view::snap(start, g));
+        let half = DEFAULT_LINE / 2.0;
+        if centre {
+            (at - Vec2::new(half, 0.0), at + Vec2::new(half, 0.0))
+        } else {
+            (at, at + Vec2::new(DEFAULT_LINE, 0.0))
+        }
+    } else {
+        let snap_to = |p: Pos2| grid.map_or(p, |g| super::view::snap(p, g));
+        let a = snap_to(start);
+        let b = if constrain {
+            constrained(a, end)
+        } else {
+            snap_to(end)
+        };
+        if centre {
+            (a - (b - a), b)
+        } else {
+            (a, b)
+        }
+    };
+    a = Pos2::new(a.x.max(0.0), a.y.max(0.0));
+    b = Pos2::new(b.x.max(0.0), b.y.max(0.0));
+    (Point::new(a.x, a.y), Point::new(b.x, b.y))
+}
+
+/// An arrowhead's length, as a multiple of the line width.
+const HEAD_PER_WIDTH: f32 = 6.0;
+/// The usual length of a line made by a click, in document units.
+const DEFAULT_LINE: f32 = 160.0;
+
+/// Where one end of a line carries an arrowhead: the pieces to paint and how far
+/// the line itself must stop short of the end so it does not poke through.
+struct Head {
+    shapes: Vec<Shape>,
+    trim: f32,
+}
+
+/// The arrowhead of `kind` with its tip at `tip`, on a line arriving along `dir`
+/// (a unit vector pointing at the tip). `len` is its length and `width` the line's.
+fn head(kind: Arrowhead, tip: Pos2, dir: Vec2, len: f32, width: f32, colour: Color32) -> Head {
+    let side = Vec2::new(-dir.y, dir.x);
+    let back = tip - dir * len;
+    let fill = |points: Vec<Pos2>| Shape::convex_polygon(points, colour, Stroke::NONE);
+    match kind {
+        Arrowhead::None => Head {
+            shapes: Vec::new(),
+            trim: 0.0,
+        },
+        Arrowhead::Triangle => Head {
+            shapes: vec![fill(vec![
+                tip,
+                back + side * len * 0.4,
+                back - side * len * 0.4,
+            ])],
+            trim: len * 0.9,
+        },
+        Arrowhead::Open => {
+            let stroke = Stroke::new(width, colour);
+            Head {
+                shapes: vec![
+                    Shape::line_segment([tip, back + side * len * 0.4], stroke),
+                    Shape::line_segment([tip, back - side * len * 0.4], stroke),
+                ],
+                trim: 0.0,
+            }
+        }
+        Arrowhead::Circle => {
+            let r = len * 0.4;
+            Head {
+                shapes: vec![Shape::circle_filled(tip - dir * r, r, colour)],
+                trim: r,
+            }
+        }
+        Arrowhead::Diamond => {
+            let mid = tip - dir * (len / 2.0);
+            Head {
+                shapes: vec![fill(vec![
+                    tip,
+                    mid + side * len * 0.35,
+                    back,
+                    mid - side * len * 0.35,
+                ])],
+                trim: len / 2.0,
+            }
+        }
+    }
+}
+
+/// Paints a line from `a` to `b` (screen space) with the spec's heads and dashes.
+fn paint_line_between(
+    painter: &Painter,
+    spec: &ShapeSpec,
+    a: Pos2,
+    b: Pos2,
+    stroke_colour: Color32,
+    zoom: f32,
+) {
+    let width = (spec.stroke_width * zoom).max(0.0);
+    let span = b - a;
+    let length = span.length();
+    if length < 0.5 {
+        return;
+    }
+    let dir = span / length;
+    // Head length follows the line width, but a hairline still gets a visible head.
+    let len = HEAD_PER_WIDTH * spec.stroke_width.max(1.5) * zoom;
+    let at_start = head(spec.arrow_start, a, -dir, len, width, stroke_colour);
+    let at_end = head(spec.arrow_end, b, dir, len, width, stroke_colour);
+    // Never trim away more than the line has.
+    let room = length * 0.5;
+    let (from, to) = (
+        a + dir * at_start.trim.min(room),
+        b - dir * at_end.trim.min(room),
+    );
+    let stroke = Stroke::new(width, stroke_colour);
+    match dash_lengths(spec.dash, width, zoom) {
+        None => {
+            painter.add(Shape::line_segment([from, to], stroke));
+        }
+        Some((dash, gap)) => {
+            painter.extend(Shape::dashed_line(&[from, to], stroke, dash, gap));
+        }
+    }
+    painter.extend(at_start.shapes);
+    painter.extend(at_end.shapes);
+}
+
+/// The ends of a line region in screen space, given where its box starts on
+/// screen and the zoom.
+pub(super) fn line_ends_on_screen(
+    spec: &ShapeSpec,
+    size: Size,
+    top_left: Pos2,
+    zoom: f32,
+) -> (Pos2, Pos2) {
+    let (a, b) = spec.line_ends(Point::new(0.0, 0.0), size);
+    (
+        top_left + Vec2::new(a.x, a.y) * zoom,
+        top_left + Vec2::new(b.x, b.y) * zoom,
+    )
 }
 
 /// `(dash, gap)` lengths for a broken outline of `width`; none for a solid one.
@@ -130,7 +327,11 @@ pub(super) fn drawn_box(
 
 /// The outline of a shape being drawn, in the accent colour.
 pub(super) fn preview(painter: &Painter, kind: ShapeKind, rect: Rect, colour: Color32) {
-    let pts = outline(kind, rect, ShapeSpec::default().corner_radius);
+    if kind == ShapeKind::Line {
+        return;
+    }
+    let d = ShapeSpec::default();
+    let pts = outline(kind, rect, d.corner_radius, d.sides);
     let stroke = Stroke::new(1.5_f32, colour);
     painter.add(Shape::convex_polygon(
         pts.clone(),
@@ -158,6 +359,13 @@ pub(super) fn paint(
     }
     let rect = Rect::from_min_size(top_left, vec(r.size) * zoom);
     let stroke_colour = stroke_of(spec, env.paper.text);
+    if spec.kind == ShapeKind::Line {
+        if let Some(colour) = stroke_colour {
+            let (a, b) = line_ends_on_screen(spec, r.size, top_left, zoom);
+            paint_line_between(painter, spec, a, b, colour, zoom);
+        }
+        return vec(r.size);
+    }
     let width = (spec.stroke_width * zoom).max(0.0);
     // The outline is drawn inside the box, so the box is also the shape's extent.
     let inset = if stroke_colour.is_some() {
@@ -166,7 +374,7 @@ pub(super) fn paint(
         0.0
     };
     let body = rect.shrink(inset.min(rect.width().min(rect.height()) / 2.0));
-    let pts = outline(spec.kind, body, spec.corner_radius * zoom);
+    let pts = outline(spec.kind, body, spec.corner_radius * zoom, spec.sides);
     if let Some(fill) = fill_of(spec, env.paper.accent) {
         painter.add(Shape::convex_polygon(pts.clone(), fill, Stroke::NONE));
     }
@@ -186,6 +394,31 @@ pub(super) fn paint(
     vec(r.size)
 }
 
+/// Whether `p` is inside the polygon `pts` (even-odd rule).
+fn inside(pts: &[Pos2], p: Pos2) -> bool {
+    let mut odd = false;
+    let mut j = pts.len() - 1;
+    for i in 0..pts.len() {
+        let (a, b) = (pts[i], pts[j]);
+        if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
+            odd = !odd;
+        }
+        j = i;
+    }
+    odd
+}
+
+/// How far `p` is from the segment `a`-`b`.
+pub(super) fn distance_to_segment(p: Pos2, a: Pos2, b: Pos2) -> f32 {
+    let ab = b - a;
+    let len2 = ab.length_sq();
+    if len2 == 0.0 {
+        return p.distance(a);
+    }
+    let t = ((p - a).dot(ab) / len2).clamp(0.0, 1.0);
+    p.distance(a + ab * t)
+}
+
 /// Whether a click at `p` (document space) is on the shape whose box is `rect`.
 /// A shape with a visible fill is hit anywhere inside it; one without is hit only
 /// near its outline, so a large empty frame does not block what lies inside it.
@@ -195,7 +428,20 @@ pub(super) fn hits(spec: &ShapeSpec, rect: Rect, p: Pos2) -> bool {
         .is_some_and(|f| f.resolve([0, 0, 0, AUTO_FILL_ALPHA])[3] > 0);
     let reach = OUTLINE_REACH.max(spec.stroke_width / 2.0);
     match spec.kind {
-        ShapeKind::Rectangle | ShapeKind::RoundedRectangle => {
+        ShapeKind::Triangle | ShapeKind::Diamond | ShapeKind::Polygon => {
+            let pts = outline(spec.kind, rect, 0.0, spec.sides);
+            let near_edge = (0..pts.len())
+                .any(|i| distance_to_segment(p, pts[i], pts[(i + 1) % pts.len()]) <= reach);
+            near_edge || (filled && inside(&pts, p))
+        }
+        ShapeKind::Line => {
+            let (a, b) = spec.line_ends(
+                Point::new(rect.min.x, rect.min.y),
+                Size::new(rect.width(), rect.height()),
+            );
+            distance_to_segment(p, Pos2::new(a.x, a.y), Pos2::new(b.x, b.y)) <= reach
+        }
+        ShapeKind::Rectangle => {
             if !rect.expand(reach).contains(p) {
                 return false;
             }
@@ -338,14 +584,134 @@ mod tests {
     #[test]
     fn outlines_have_the_right_point_counts_and_stay_in_the_box() {
         let b = frame();
-        assert_eq!(outline(ShapeKind::Rectangle, b, 0.0).len(), 4);
-        assert_eq!(outline(ShapeKind::RoundedRectangle, b, 0.0).len(), 4);
-        for kind in [ShapeKind::RoundedRectangle, ShapeKind::Ellipse] {
-            let pts = outline(kind, b, 1000.0);
+        assert_eq!(outline(ShapeKind::Rectangle, b, 0.0, 6).len(), 4);
+        assert_eq!(outline(ShapeKind::Triangle, b, 0.0, 6).len(), 3);
+        assert_eq!(outline(ShapeKind::Diamond, b, 0.0, 6).len(), 4);
+        assert_eq!(outline(ShapeKind::Polygon, b, 0.0, 5).len(), 5);
+        for kind in [ShapeKind::Rectangle, ShapeKind::Ellipse] {
+            let pts = outline(kind, b, 1000.0, 6);
             assert!(pts.len() > 8);
             let bounds = b.expand(0.01);
             assert!(pts.iter().all(|p| bounds.contains(*p)), "{kind:?}");
         }
+    }
+
+    #[test]
+    fn a_triangle_is_hit_inside_its_slopes_not_in_the_empty_corners() {
+        // frame: x 100..300, y 100..200; the apex is at (200, 100).
+        let s = spec(ShapeKind::Triangle, true);
+        assert!(hits(&s, frame(), Pos2::new(200.0, 150.0)));
+        assert!(hits(&s, frame(), Pos2::new(110.0, 195.0)), "a base corner");
+        assert!(
+            !hits(&s, frame(), Pos2::new(110.0, 110.0)),
+            "above the left slope"
+        );
+        let empty = spec(ShapeKind::Triangle, false);
+        assert!(!hits(&empty, frame(), Pos2::new(200.0, 150.0)));
+        assert!(
+            hits(&empty, frame(), Pos2::new(200.0, 198.0)),
+            "on the base"
+        );
+    }
+
+    #[test]
+    fn a_diamond_and_a_polygon_are_hit_by_their_shape() {
+        let d = spec(ShapeKind::Diamond, true);
+        assert!(hits(&d, frame(), Pos2::new(200.0, 150.0)));
+        assert!(
+            !hits(&d, frame(), Pos2::new(110.0, 110.0)),
+            "the box corner"
+        );
+        let p = ShapeSpec {
+            sides: 3,
+            ..spec(ShapeKind::Polygon, true)
+        };
+        assert!(hits(&p, frame(), Pos2::new(200.0, 150.0)));
+        assert!(!hits(&p, frame(), Pos2::new(105.0, 105.0)));
+    }
+
+    #[test]
+    fn a_line_is_hit_near_the_line_and_not_near_its_box() {
+        let s = spec(ShapeKind::Line, false);
+        // The frame runs (100,100) to (300,200).
+        assert!(hits(&s, frame(), Pos2::new(200.0, 150.0)), "the middle");
+        assert!(hits(&s, frame(), Pos2::new(200.0, 154.0)));
+        assert!(!hits(&s, frame(), Pos2::new(200.0, 175.0)));
+        assert!(
+            !hits(&s, frame(), Pos2::new(110.0, 190.0)),
+            "the other corner"
+        );
+        assert!(!hits(&s, frame(), Pos2::new(330.0, 220.0)), "past the end");
+        let up = ShapeSpec { flip_y: true, ..s };
+        assert!(hits(&up, frame(), Pos2::new(110.0, 190.0)), "rising line");
+    }
+
+    #[test]
+    fn a_dragged_line_follows_the_pointer_and_a_click_makes_a_level_line() {
+        let a = Pos2::new(50.0, 60.0);
+        let (from, to) = drawn_line(a, Pos2::new(150.0, 160.0), None, false, false);
+        assert_eq!(
+            (from, to),
+            (Point::new(50.0, 60.0), Point::new(150.0, 160.0))
+        );
+        let (from, to) = drawn_line(a, a, None, false, false);
+        assert_eq!(
+            (from, to),
+            (Point::new(50.0, 60.0), Point::new(210.0, 60.0))
+        );
+        let (from, to) = drawn_line(a, a, None, false, true);
+        assert_eq!(
+            (from.x, to.x),
+            (0.0_f32.max(50.0 - 80.0), 130.0),
+            "centred, kept on the page"
+        );
+        let (from, to) = drawn_line(a, Pos2::new(250.0, 80.0), None, false, true);
+        assert_eq!(
+            from,
+            Point::new(0.0, 40.0),
+            "the mirror end is kept on the page"
+        );
+        assert_eq!(to, Point::new(250.0, 80.0));
+    }
+
+    #[test]
+    fn a_constrained_line_turns_to_a_multiple_of_fifteen_degrees_and_keeps_its_length() {
+        let a = Pos2::new(0.0, 0.0);
+        let out = constrained(a, Pos2::new(100.0, 10.0));
+        let angle = out.y.atan2(out.x).to_degrees();
+        assert!((angle - 15.0).abs() < 1e-3 || angle.abs() < 1e-3, "{angle}");
+        assert!((out.to_vec2().length() - Pos2::new(100.0, 10.0).to_vec2().length()).abs() < 1e-3);
+        let level = constrained(a, Pos2::new(100.0, 3.0));
+        assert!(level.y.abs() < 1e-3);
+        assert_eq!(constrained(a, a), a);
+    }
+
+    #[test]
+    fn heads_point_at_the_tip_and_the_line_stops_short_of_filled_ones() {
+        let c = Color32::BLACK;
+        let tip = Pos2::new(100.0, 0.0);
+        let dir = Vec2::new(1.0, 0.0);
+        assert!(head(Arrowhead::None, tip, dir, 10.0, 1.0, c)
+            .shapes
+            .is_empty());
+        let tri = head(Arrowhead::Triangle, tip, dir, 10.0, 1.0, c);
+        assert_eq!(tri.shapes.len(), 1);
+        assert!(tri.trim > 0.0 && tri.trim <= 10.0);
+        assert_eq!(
+            head(Arrowhead::Open, tip, dir, 10.0, 1.0, c).shapes.len(),
+            2
+        );
+        assert_eq!(head(Arrowhead::Open, tip, dir, 10.0, 1.0, c).trim, 0.0);
+        assert_eq!(
+            head(Arrowhead::Circle, tip, dir, 10.0, 1.0, c).shapes.len(),
+            1
+        );
+        assert_eq!(
+            head(Arrowhead::Diamond, tip, dir, 10.0, 1.0, c)
+                .shapes
+                .len(),
+            1
+        );
     }
 
     #[test]

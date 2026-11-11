@@ -4,7 +4,7 @@
 //! action. It never touches egui or the worker: anything that needs them comes
 //! back as an [`Effect`] for `App` to carry out.
 
-use opencalc_core::document::{RegionKind, ShapeKind};
+use opencalc_core::document::{RegionKind, ShapeKind, ShapeSpec};
 use opencalc_core::edit::Edit;
 use opencalc_core::registry::UnitSystem;
 
@@ -154,8 +154,11 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         InsertTable => insert(state, &mut fx, RegionKind::table()),
         InsertPicture => insert(state, &mut fx, RegionKind::picture()),
         InsertRectangle => arm_pen(state, ShapeKind::Rectangle),
-        InsertRoundedRectangle => arm_pen(state, ShapeKind::RoundedRectangle),
         InsertEllipse => arm_pen(state, ShapeKind::Ellipse),
+        InsertLine => arm_pen(state, ShapeKind::Line),
+        InsertTriangle => arm_pen(state, ShapeKind::Triangle),
+        InsertDiamond => arm_pen(state, ShapeKind::Diamond),
+        InsertPolygon => arm_pen(state, ShapeKind::Polygon),
         RegionDelete => with_eval_check(state, &mut fx, |s| {
             s.delete_selection();
         }),
@@ -221,8 +224,18 @@ pub fn apply_canvas(state: &mut AppState, sheet: usize, cmds: Vec<CanvasCmd>) ->
                 state.sheets[sheet].edit(edit);
             }
             CanvasCmd::Seal => state.sheets[sheet].seal(),
-            CanvasCmd::DrawShape { kind, pos, size } => {
-                state.sheets[sheet].insert_drawn(RegionKind::shape(kind), pos, size);
+            CanvasCmd::DrawShape {
+                kind,
+                pos,
+                size,
+                flip,
+            } => {
+                let spec = ShapeSpec {
+                    flip_x: flip.0,
+                    flip_y: flip.1,
+                    ..ShapeSpec::of(kind)
+                };
+                state.sheets[sheet].insert_drawn(RegionKind::Shape(Box::new(spec)), pos, size);
                 state.ribbon_focus = Some(crate::ribbon::Context::Shape);
             }
             CanvasCmd::TypeAhead(text) => {
@@ -511,8 +524,11 @@ mod tests {
             CommandId::InsertTable,
             CommandId::InsertPicture,
             CommandId::InsertRectangle,
-            CommandId::InsertRoundedRectangle,
             CommandId::InsertEllipse,
+            CommandId::InsertLine,
+            CommandId::InsertTriangle,
+            CommandId::InsertDiamond,
+            CommandId::InsertPolygon,
         ] {
             assert!(
                 run(&mut s, c).is_empty(),

@@ -306,7 +306,7 @@ fn column_ui(ui: &mut Ui, cx: &mut Cx, col: &Column, id: ((usize, usize), usize)
                             // without this a longer label pushes its widget right.
                             ui.set_min_size(Vec2::new(CONTROL_LABEL_W, w::SMALL_H));
                             ui.add(egui::Label::new(
-                                egui::RichText::new(control.label())
+                                egui::RichText::new(cx.host.label(*control))
                                     .size(type_size::SMALL)
                                     .color(cx.theme.text_weak),
                             ));

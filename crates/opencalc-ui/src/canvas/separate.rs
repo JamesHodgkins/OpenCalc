@@ -22,7 +22,13 @@ pub fn separate(regions: &[Region], sizes: &Sizes, grid: f32) -> Option<Vec<(Reg
     if regions.len() > MAX_REGIONS {
         return None;
     }
-    let mut order: Vec<(&Region, Rect)> = regions.iter().map(|r| (r, rect_of(r, sizes))).collect();
+    // Shapes are drawn over, under and around other regions on purpose (a frame round
+    // a result, an arrow to it), so they neither get pushed nor push.
+    let mut order: Vec<(&Region, Rect)> = regions
+        .iter()
+        .filter(|r| !matches!(r.kind, opencalc_core::document::RegionKind::Shape(_)))
+        .map(|r| (r, rect_of(r, sizes)))
+        .collect();
     order.sort_by(|a, b| {
         (a.1.min.y, a.1.min.x, a.0.id)
             .partial_cmp(&(b.1.min.y, b.1.min.x, b.0.id))
@@ -90,6 +96,21 @@ mod tests {
         let b = at(2, 50.0, 20.0, 100.0, 50.0);
         // Clear of a's bottom (50) plus the gap (12), rounded up to the grid (12): 72.
         assert_eq!(run(&[a, b]), [(2, 72.0)]);
+    }
+
+    #[test]
+    fn shapes_are_left_alone_and_push_nothing() {
+        // A frame drawn round a result overlaps it on purpose.
+        let a = at(1, 0.0, 0.0, 100.0, 50.0);
+        let mut frame = at(2, 0.0, 0.0, 120.0, 70.0);
+        frame.kind = RegionKind::shape(opencalc_core::document::ShapeKind::Rectangle);
+        let b = at(3, 50.0, 20.0, 100.0, 50.0);
+        assert_eq!(run(&[a.clone(), frame.clone()]), []);
+        assert_eq!(
+            run(&[frame, a, b]),
+            [(3, 72.0)],
+            "only the real overlap moves"
+        );
     }
 
     #[test]

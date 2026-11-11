@@ -134,23 +134,29 @@ because list order is creation order and decides which of several definitions of
 wins; reordering the drawing must never change a calculation. Colours are a palette colour
 with a shade, an exact RGBA value, or Automatic, as in common office programs.
 
-- [x] Core model (2026-11-11): `RegionKind::Shape` (rectangle, rounded rectangle, ellipse; fill, outline, width, corner radius, dash), `Colour`, `Region::z`, `Edit::SetShape` and `Edit::SetZ`, file format 3 (`FILE_FORMAT.md` 3e).
+- [x] Core model (2026-11-11): `RegionKind::Shape` (rectangle with optional rounded corners, ellipse; fill, outline, width, corner radius, dash), `Colour`, `Region::z`, `Edit::SetShape` and `Edit::SetZ`, file format 3 (`FILE_FORMAT.md` 3e).
 - [x] Painting and hit-testing (2026-11-11): back to front by `z`; an empty frame is hit only on its outline, so what lies inside stays reachable; shapes appear in PDF and PNG export.
 - [x] Insert > Shapes and draw order commands (Bring to front, Bring forward, Send backward, Send to back; Ctrl+] and Ctrl+[, with Shift for front and back).
 - [x] Shape settings with a palette colour picker (theme colours and shades, standard colours, RGBA and hex); dragging a value is one undo step. They live on a contextual **Shape Format** ribbon tab that appears while one shape is selected and comes forward when a shape is drawn (the floating Shape window is gone).
 - [x] Drag to draw a new shape (the shape insert commands arm a crosshair; drag sets the box, Escape or a click without a drag gives the default size).
 - [x] Resize handles (eight, on one selected shape, picture, plot or area; typeset regions size themselves) and drawing modifiers: Shift keeps equal sides or the original proportions, Ctrl works from the centre; one undo step per drag (`Edit::SetRegionBox`); a status-bar hint while the tool is out.
-- [ ] Alt+click to pick what lies under a filled shape; a right-click menu with the arrange commands.
-- [ ] Lines and arrows (needs end-point handles and its own hit-testing), polygons, rotation, grouping, gradients and shadows, text inside a shape.
-- [ ] Align and distribute that treat shapes like other regions; snap to a shape's edges.
+- [x] Alt+click to pick what lies under a filled shape (2026-11-11): the first goes to the region under the topmost, each further one a step down, wrapping to the top.
+- [ ] A right-click menu with the arrange commands (waits for a right-click menu).
+- [x] Lines and arrows (2026-11-11): a `Line` shape kind in the region's box with flip flags, a grip at each end (one undo step per drag, `Edit::SetLineEnds`), Shift turns it in 15 degree steps, hit-testing along the stroke, arrowheads (triangle, open, circle, diamond) at either end.
+- [x] Triangle, diamond and polygon (a side count) shapes (2026-11-11).
+- [ ] Rotation, grouping, gradients and shadows, text inside a shape.
+- [x] Shapes and lines align by their box like any region; Separate regions leaves shapes alone (a frame round a result overlaps it on purpose) (2026-11-11).
+- [x] Snap to a shape's edges (2026-11-11): while moving (any region), pulling a resize edge, or dragging a line end, an edge or middle within 6 pixels of a shape's edge or middle is pulled onto it, beating the grid on that axis, with a guide line; Alt turns it off with the grid.
+- [ ] Distribute (even spacing) for any regions.
 
 ## Ribbon redevelopment (M)
 
 - [x] Contextual tabs and hosted value controls (2026-11-11); the Shape Format tab.
 - [x] Ordinary tabs redone by task: Home (with Calculate and Check), Insert, Draw, Format, Units, View, Help; no tab with one or two buttons; each tab measured to fit the narrowest window (`RIBBON_MAP.md`).
 - [ ] Picture, Table and Plot contextual tabs, replacing their floating windows.
-- [ ] Alt+click to pick under a filled shape; a right-click menu with the draw-order commands.
-- [ ] Lines and arrows in Draw > Shapes.
+- [x] Alt+click to pick under a filled shape.
+- [ ] A right-click menu with the draw-order commands.
+- [x] Lines and arrows in Draw > Shapes.
 
 ## Out of scope for now
 

@@ -2,13 +2,13 @@
 //! press / drag / release gestures that select, move, resize and marquee regions.
 
 use eframe::egui::{self, PointerButton, Pos2, Rect, Ui, Vec2};
-use opencalc_core::document::{Region, RegionId, ShapeKind, Size};
+use opencalc_core::document::{Region, RegionId, RegionKind, ShapeKind, ShapeSpec, Size};
 use opencalc_core::edit::Edit;
 
 use super::adapt::{self, point, rect_of};
-use super::hit::{click_selection, drag_positions, hit_test, in_marquee};
+use super::hit::{click_selection, drag_positions, hit_stack, hit_test, in_marquee, pick_under};
 use super::view::snap;
-use super::{resize, shape, unit_slot, CanvasCmd, CanvasUi, CanvasView, Drag, Scene};
+use super::{grip, magnet, resize, shape, unit_slot, CanvasCmd, CanvasUi, CanvasView, Drag, Scene};
 
 /// Wheel pans, Ctrl+wheel (or pinch) zooms about the pointer, middle-drag pans.
 pub(super) fn navigate(ui: &Ui, resp: &egui::Response, origin: Pos2, view: &mut CanvasView) {
@@ -38,12 +38,23 @@ pub(super) fn resizable(r: &Region) -> bool {
     !r.locked && !r.kind.is_auto_sized()
 }
 
-/// The one selected region that shows resize handles, if there is one.
-fn handled<'a>(regions: &'a [Region], st: &CanvasUi) -> Option<&'a Region> {
+/// Whether the region shows the eight resize handles. A line does not: its two
+/// ends are grips instead.
+pub(super) fn has_handles(r: &Region) -> bool {
+    resizable(r) && !matches!(&r.kind, RegionKind::Shape(s) if s.kind == ShapeKind::Line)
+}
+
+/// The one selected region that shows grips (and, unless a line, resize handles).
+fn gripped<'a>(regions: &'a [Region], st: &CanvasUi) -> Option<&'a Region> {
     let [id] = st.selection.as_slice() else {
         return None;
     };
     regions.iter().find(|r| r.id == *id && resizable(r))
+}
+
+/// The one selected region that shows resize handles, if there is one.
+fn handled<'a>(regions: &'a [Region], st: &CanvasUi) -> Option<&'a Region> {
+    gripped(regions, st).filter(|r| has_handles(r))
 }
 
 /// The drawing tool: drag out a box for a shape. A click without a drag makes the
@@ -99,9 +110,21 @@ fn draw_with_pen(
         None
     };
     if let Some((start, end)) = finished {
-        let (pos, size) = shape::drawn_box(kind, start, end, grid, square, centre);
+        let (pos, size, flip) = if kind == ShapeKind::Line {
+            let (from, to) = shape::drawn_line(start, end, grid, square, centre);
+            let (pos, size, flip_x, flip_y) = ShapeSpec::line_box(from, to);
+            (pos, size, (flip_x, flip_y))
+        } else {
+            let (pos, size) = shape::drawn_box(kind, start, end, grid, square, centre);
+            (pos, size, (false, false))
+        };
         cmds.push(CanvasCmd::Seal);
-        cmds.push(CanvasCmd::DrawShape { kind, pos, size });
+        cmds.push(CanvasCmd::DrawShape {
+            kind,
+            pos,
+            size,
+            flip,
+        });
         cmds.push(CanvasCmd::Seal);
         st.pen = None;
         st.drag = None;
@@ -121,11 +144,11 @@ pub(super) fn pointer(
         return;
     }
     if st.drag.is_none() && resp.hovered() {
-        if let Some((_, h, _)) = ui
-            .input(|i| i.pointer.hover_pos())
-            .and_then(|p| handle_under(scene, st, p))
-        {
+        let hover = ui.input(|i| i.pointer.hover_pos());
+        if let Some((_, h, _)) = hover.and_then(|p| handle_under(scene, st, p)) {
             ui.ctx().set_cursor_icon(h.cursor());
+        } else if hover.is_some_and(|p| grip_under(scene, st, p).is_some()) {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
     }
     if resp.drag_started_by(PointerButton::Primary) {
@@ -160,6 +183,15 @@ fn handle_under(scene: &Scene, st: &CanvasUi, p: Pos2) -> Option<(RegionId, resi
     ))
 }
 
+/// The grip under the screen point `p`, with the region it belongs to.
+fn grip_under(scene: &Scene, st: &CanvasUi, p: Pos2) -> Option<(RegionId, grip::Grip)> {
+    let r = gripped(scene.regions, st)?;
+    let screen = scene
+        .view
+        .rect_to_screen(rect_of(r, &st.sizes), scene.origin);
+    Some((r.id, grip::grip_at(r, screen, scene.view.zoom, p)?))
+}
+
 /// A press that starts a drag: on a handle it resizes, on a region it moves the
 /// selection, on empty canvas it starts a marquee.
 fn begin_drag(ui: &Ui, scene: &Scene, st: &mut CanvasUi, press: Pos2) {
@@ -173,7 +205,18 @@ fn begin_drag(ui: &Ui, scene: &Scene, st: &mut CanvasUi, press: Pos2) {
     let extend = mods.shift || mods.command;
     let doc = view.screen_to_doc(press, origin);
     let grabbed = handle_under(scene, st, press);
+    let gripped = grip_under(scene, st, press);
     match hit_test(regions, &st.sizes, doc) {
+        _ if gripped.is_some() => {
+            st.drag = gripped.map(|(id, grip)| Drag::Grip {
+                id,
+                grip,
+                fixed: regions
+                    .iter()
+                    .find(|r| r.id == id)
+                    .map_or(Pos2::ZERO, |r| grip::fixed_end(grip, r)),
+            });
+        }
         _ if grabbed.is_some() => {
             st.drag = grabbed.map(|(id, handle, orig)| Drag::Resize { id, handle, orig });
         }
@@ -222,14 +265,43 @@ fn continue_drag(
     let to_doc = |p: Pos2| view.screen_to_doc(p, origin);
     let delta = resp.drag_delta() / view.zoom;
     let pos = resp.interact_pointer_pos();
+    st.guides.clear();
+    let mut guides = Vec::new();
+    let reach = magnet::REACH_PX / view.zoom;
     match &mut st.drag {
         Some(Drag::Move { origins, total }) => {
             *total += delta;
-            let grid = (env.snap && !mods.alt).then_some(st.grid.step());
-            let moves = drag_positions(origins, *total, grid)
-                .into_iter()
-                .map(|(id, p)| (id, point(p)))
-                .collect();
+            let snapping = env.snap && !mods.alt;
+            let grid = snapping.then_some(st.grid.step());
+            let mut moved = drag_positions(origins, *total, grid);
+            if snapping {
+                // The group's box where the pointer has put it; its edges are pulled
+                // onto other regions' edges, which beat the grid on that axis.
+                let ids: Vec<RegionId> = origins.iter().map(|(id, _)| *id).collect();
+                let boxes = origins.iter().filter_map(|(id, at)| {
+                    let r = scene.regions.iter().find(|r| r.id == *id)?;
+                    Some(Rect::from_min_size(
+                        *at + *total,
+                        rect_of(r, &st.sizes).size(),
+                    ))
+                });
+                if let Some(group) = boxes.reduce(|a, b| a.union(b)) {
+                    let t = magnet::targets(scene.regions, &ids, &st.sizes);
+                    let s = magnet::snap_rect(group, &t, magnet::REACH_PX / view.zoom);
+                    if let (Some(&(_, lead)), Some(&(_, gridded))) =
+                        (origins.first(), moved.first())
+                    {
+                        let on_grid = gridded - lead;
+                        let delta = Vec2::new(
+                            s.dx.map_or(on_grid.x, |d| total.x + d),
+                            s.dy.map_or(on_grid.y, |d| total.y + d),
+                        );
+                        moved = origins.iter().map(|&(id, at)| (id, at + delta)).collect();
+                    }
+                    guides = s.guides;
+                }
+            }
+            let moves = moved.into_iter().map(|(id, p)| (id, point(p))).collect();
             cmds.push(CanvasCmd::Edit(Edit::MoveRegions { moves }));
         }
         Some(Drag::Marquee { current, .. }) => {
@@ -239,12 +311,32 @@ fn continue_drag(
         }
         Some(Drag::Resize { id, handle, orig }) => {
             if let Some(p) = pos {
-                let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+                let snapping = env.snap && !mods.alt;
+                let grid = snapping.then_some(st.grid.step());
+                let keep_ratio = mods.shift && handle.is_corner();
+                let mut at = to_doc(p);
+                let mut grid_for_box = grid;
+                if snapping && !keep_ratio {
+                    // The pulled edge goes onto another region's edge if one is near,
+                    // else onto the grid.
+                    if let Some(g) = grid {
+                        at = snap(at, g);
+                    }
+                    let (on_x, on_y) = handle.pulls();
+                    let t = magnet::targets(scene.regions, &[*id], &st.sizes);
+                    let s = magnet::snap_point(to_doc(p), &t, reach, on_x, on_y);
+                    at = Pos2::new(
+                        s.dx.map_or(at.x, |d| to_doc(p).x + d),
+                        s.dy.map_or(at.y, |d| to_doc(p).y + d),
+                    );
+                    guides = s.guides;
+                    grid_for_box = None;
+                }
                 let b = resize::resized(
                     *orig,
                     *handle,
-                    to_doc(p),
-                    grid,
+                    at,
+                    grid_for_box,
                     mods.shift,
                     mods.ctrl || mods.command,
                 );
@@ -255,12 +347,53 @@ fn continue_drag(
                 }));
             }
         }
+        Some(Drag::Grip { id, grip, fixed }) => {
+            let region = scene.regions.iter().find(|r| r.id == *id);
+            if let (Some(p), Some(region)) = (pos, region) {
+                if let RegionKind::Shape(spec) = &region.kind {
+                    if let Some(is_start) = grip.line_end() {
+                        let snapping = env.snap && !mods.alt;
+                        let grid = snapping.then_some(st.grid.step());
+                        let t = magnet::targets(scene.regions, &[*id], &st.sizes);
+                        let (moved, g) = grip::line_end_dragged(
+                            *fixed,
+                            to_doc(p),
+                            grid,
+                            mods.shift,
+                            snapping.then_some((&t, reach)),
+                        );
+                        guides = g;
+                        let (from, to) = if is_start {
+                            (moved, *fixed)
+                        } else {
+                            (*fixed, moved)
+                        };
+                        cmds.push(CanvasCmd::Edit(Edit::SetLineEnds {
+                            id: *id,
+                            from: point(from),
+                            to: point(to),
+                        }));
+                    } else {
+                        let screen = view.rect_to_screen(rect_of(region, &st.sizes), scene.origin);
+                        let next = grip::dragged(*grip, spec, screen, view.zoom, p);
+                        if next != **spec {
+                            cmds.push(CanvasCmd::Edit(Edit::SetShape {
+                                id: *id,
+                                spec: Box::new(next),
+                            }));
+                        }
+                    }
+                }
+            }
+        }
         Some(Drag::Draw { .. }) | None => {}
     }
+    st.guides = guides;
 }
 
 /// The release that ends a drag: a marquee selects what it covers.
 fn end_drag(scene: &Scene, st: &mut CanvasUi) {
+    st.guides.clear();
     if let Some(Drag::Marquee {
         start,
         current,
@@ -319,7 +452,13 @@ fn click(
     } else if resp.clicked() {
         cmds.push(CanvasCmd::Seal);
         let doc = to_doc(pos);
-        let hit = hit_test(regions, &st.sizes, doc);
+        // Alt+click picks what lies under the topmost region there, and again goes
+        // further down: a way to reach a shape that is covered.
+        let hit = if mods.alt && !extend {
+            pick_under(&hit_stack(regions, &st.sizes, doc), &st.selection)
+        } else {
+            hit_test(regions, &st.sizes, doc)
+        };
         st.selection = click_selection(&st.selection, hit, extend);
         if hit != st.editing {
             st.editing = None;

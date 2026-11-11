@@ -28,6 +28,36 @@ pub fn hit_test(regions: &[Region], sizes: &Sizes, p: Pos2) -> Option<RegionId> 
         .map(|r| r.id)
 }
 
+/// Every region under `p`, topmost first (what Alt+click walks down through).
+pub fn hit_stack(regions: &[Region], sizes: &Sizes, p: Pos2) -> Vec<RegionId> {
+    back_to_front(regions)
+        .into_iter()
+        .rev()
+        .filter(|r| match &r.kind {
+            RegionKind::Shape(spec) => super::shape::hits(spec, rect_of(r, sizes), p),
+            _ => rect_of(r, sizes).contains(p),
+        })
+        .map(|r| r.id)
+        .collect()
+}
+
+/// The region an Alt+click picks from `stack` (topmost first): the one just under
+/// the single selected region if it is in the stack, wrapping to the top after the
+/// bottom one; otherwise the one under the topmost, which a plain click would pick.
+pub fn pick_under(stack: &[RegionId], selection: &[RegionId]) -> Option<RegionId> {
+    match stack {
+        [] => None,
+        [only] => Some(*only),
+        _ => match selection {
+            [one] => match stack.iter().position(|id| id == one) {
+                Some(i) => Some(stack[(i + 1) % stack.len()]),
+                None => Some(stack[1]),
+            },
+            _ => Some(stack[1]),
+        },
+    }
+}
+
 /// Regions touched by a marquee rectangle, in back-to-front order.
 pub fn in_marquee(regions: &[Region], sizes: &Sizes, marquee: Rect) -> Vec<RegionId> {
     back_to_front(regions)
@@ -114,6 +144,21 @@ mod tests {
         let sizes = Sizes::new();
         assert_eq!(hit_test(&s, &sizes, Pos2::new(230.0, 130.0)), Some(top));
         assert_eq!(hit_test(&s, &sizes, Pos2::new(50.0, 50.0)), Some(back));
+    }
+
+    #[test]
+    fn alt_click_walks_down_the_stack_and_wraps() {
+        let (s, back, top, _) = regions();
+        let sizes = Sizes::new();
+        let p = Pos2::new(230.0, 130.0);
+        let stack = hit_stack(&s, &sizes, p);
+        assert_eq!(stack, vec![top, back]);
+        assert_eq!(pick_under(&stack, &[]), Some(back), "under the topmost");
+        assert_eq!(pick_under(&stack, &[top]), Some(back));
+        assert_eq!(pick_under(&stack, &[back]), Some(top), "wraps to the top");
+        assert_eq!(pick_under(&stack, &[top, back]), Some(back));
+        assert_eq!(pick_under(&stack[..1], &[top]), Some(top), "only one there");
+        assert_eq!(pick_under(&[], &[top]), None);
     }
 
     #[test]

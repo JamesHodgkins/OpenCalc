@@ -150,8 +150,11 @@ fn draw() -> Tab {
                 "Shapes",
                 vec![
                     Column::Large(it(CommandId::InsertRectangle)),
-                    Column::Large(it(CommandId::InsertRoundedRectangle)),
                     Column::Large(it(CommandId::InsertEllipse)),
+                    Column::Large(it(CommandId::InsertLine)),
+                    Column::Large(it(CommandId::InsertTriangle)),
+                    Column::Large(it(CommandId::InsertDiamond)),
+                    Column::Large(it(CommandId::InsertPolygon)),
                 ],
             ),
             panel(
@@ -294,6 +297,13 @@ fn shape_format() -> Tab {
                 ],
             ),
             panel(
+                "Arrowheads",
+                vec![Column::Controls(vec![
+                    Control::Shape(S::StartHead),
+                    Control::Shape(S::EndHead),
+                ])],
+            ),
+            panel(
                 "Arrange",
                 vec![
                     stack(&[CommandId::ArrangeToFront, CommandId::ArrangeForward]),
@@ -428,7 +438,10 @@ mod tests {
         );
         assert_eq!(panel_titles("View"), ["Zoom", "Page", "Show", "Window"]);
         assert_eq!(panel_titles("Help"), ["Help"]);
-        assert_eq!(panel_titles("Shape Format"), ["Shape", "Style", "Arrange"]);
+        assert_eq!(
+            panel_titles("Shape Format"),
+            ["Shape", "Style", "Arrowheads", "Arrange"]
+        );
     }
 
     /// A tab with one control is a sign the ribbon is badly divided: every ordinary

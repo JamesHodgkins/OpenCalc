@@ -12,7 +12,9 @@ pub mod align;
 mod editor;
 mod errors;
 mod grid;
+pub mod grip;
 pub mod hit;
+pub mod magnet;
 mod overlay;
 pub(crate) mod page;
 pub(crate) mod paint;
@@ -78,6 +80,8 @@ pub enum CanvasCmd {
         kind: ShapeKind,
         pos: Point,
         size: Size,
+        /// A line only: starts at the right edge, starts at the bottom edge.
+        flip: (bool, bool),
     },
 }
 
@@ -92,6 +96,13 @@ enum Drag {
         id: RegionId,
         handle: resize::Handle,
         orig: Rect,
+    },
+    /// A grip of the selected shape being pulled (the corner radius of a rectangle).
+    /// `fixed` is the end of a line that stays put (document space).
+    Grip {
+        id: RegionId,
+        grip: grip::Grip,
+        fixed: Pos2,
     },
     /// A shape being drawn with the drawing tool.
     Draw { start: Pos2, current: Pos2 },
@@ -137,6 +148,8 @@ pub struct CanvasUi {
     /// Fit the page width into the viewport on the next frame (set when a
     /// worksheet is first shown).
     pub fit_pending: bool,
+    /// Lines to show where the drag in progress snapped to another region's edge.
+    guides: Vec<magnet::Guide>,
     drag: Option<Drag>,
 }
 
@@ -160,6 +173,7 @@ impl Default for CanvasUi {
             armed: true,
             sizes: Sizes::new(),
             fit_pending: true,
+            guides: Vec::new(),
             drag: None,
         }
     }
@@ -180,6 +194,7 @@ impl CanvasUi {
     /// Drop any drag in progress (after undo or redo changed the document under it).
     pub fn cancel_gesture(&mut self) {
         self.drag = None;
+        self.guides.clear();
     }
 }
 
@@ -244,20 +259,47 @@ pub fn show(
     }
 
     let outline = Stroke::new(1.5_f32, theme.accent);
+    // A lone resizable object gets a thin grey frame on its edge with round
+    // grips, as in Office; other selections keep the accent outline.
+    let grey = Stroke::new(1.0_f32, theme.text_weak);
     for id in &st.selection {
         if let Some(r) = regions.iter().find(|r| r.id == *id) {
-            let screen = view
-                .rect_to_screen(rect_of(r, &st.sizes), origin)
-                .expand(2.0);
-            painter.rect_stroke(screen, 2.0, outline, StrokeKind::Outside);
+            let inner = view.rect_to_screen(rect_of(r, &st.sizes), origin);
             if st.selection.len() == 1 && pointer::resizable(r) {
-                let inner = view.rect_to_screen(rect_of(r, &st.sizes), origin);
-                for h in resize::Handle::ALL {
-                    let square =
-                        Rect::from_center_size(h.point(inner), Vec2::splat(pointer::HANDLE_SIZE));
-                    painter.rect_filled(square, 1.0, theme.base);
-                    painter.rect_stroke(square, 1.0, outline, StrokeKind::Inside);
+                // A line has no box to pull: its two ends are its grips.
+                if pointer::has_handles(r) {
+                    painter.rect_stroke(inner, 0.0, grey, StrokeKind::Middle);
+                    for h in resize::Handle::ALL {
+                        let at = h.point(inner);
+                        let radius = pointer::HANDLE_SIZE / 2.0;
+                        painter.circle_filled(at, radius, eframe::egui::Color32::WHITE);
+                        painter.circle_stroke(
+                            at,
+                            radius,
+                            Stroke::new(1.0_f32, eframe::egui::Color32::BLACK),
+                        );
+                    }
                 }
+                for (g, at) in grip::grips(r, inner, view.zoom) {
+                    let radius = pointer::HANDLE_SIZE / 2.0;
+                    if g == grip::Grip::Corner {
+                        painter.circle_filled(at, radius, theme.accent);
+                        painter.circle_stroke(
+                            at,
+                            radius,
+                            Stroke::new(1.0_f32, eframe::egui::Color32::WHITE),
+                        );
+                    } else {
+                        painter.circle_filled(at, radius, eframe::egui::Color32::WHITE);
+                        painter.circle_stroke(
+                            at,
+                            radius,
+                            Stroke::new(1.0_f32, eframe::egui::Color32::BLACK),
+                        );
+                    }
+                }
+            } else {
+                painter.rect_stroke(inner.expand(2.0), 2.0, outline, StrokeKind::Outside);
             }
         }
     }
@@ -304,9 +346,33 @@ pub fn show(
 
     abandon::remove_if_empty(st, regions, &mut cmds);
     overlay::marquee(&painter, view, origin, st, theme);
+    for g in &st.guides {
+        let at = view.doc_to_screen(Pos2::new(g.at, g.at), origin);
+        let (a, b) = if g.vertical {
+            (Pos2::new(at.x, rect.top()), Pos2::new(at.x, rect.bottom()))
+        } else {
+            (Pos2::new(rect.left(), at.y), Pos2::new(rect.right(), at.y))
+        };
+        painter.line_segment(
+            [a, b],
+            Stroke::new(1.0_f32, theme.accent.gamma_multiply(0.8)),
+        );
+    }
     if let (Some(kind), Some(Drag::Draw { start, current })) = (st.pen, &st.drag) {
         let mods = ui.input(|i| i.modifiers);
         let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+        if kind == ShapeKind::Line {
+            let (from, to) = shape::drawn_line(
+                *start,
+                *current,
+                grid,
+                mods.shift,
+                mods.ctrl || mods.command,
+            );
+            let a = view.doc_to_screen(Pos2::new(from.x, from.y), origin);
+            let b = view.doc_to_screen(Pos2::new(to.x, to.y), origin);
+            painter.line_segment([a, b], Stroke::new(1.5_f32, theme.accent));
+        }
         let (pos, size) = shape::drawn_box(
             kind,
             *start,

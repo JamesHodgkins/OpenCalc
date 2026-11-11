@@ -20,7 +20,11 @@ pub const PICTURE: char = '\u{e0f9}'; // image
 pub const SHAPES: char = '\u{e4b7}'; // shapes
 pub const SQUARE: char = '\u{e16a}'; // square
 pub const CIRCLE: char = '\u{e07a}'; // circle
-pub const ROUNDED: char = '\u{e379}'; // rectangle-horizontal
+pub const LINE: char = '\u{e521}'; // slash
+pub const TRIANGLE: char = '\u{e191}'; // triangle
+pub const DIAMOND: char = '\u{e2d1}'; // diamond
+pub const POLYGON: char = '\u{e0f6}'; // hexagon
+
 pub const BRING_TO_FRONT: char = '\u{e4f3}'; // bring-to-front
 pub const SEND_TO_BACK: char = '\u{e4f7}'; // send-to-back
 pub const BRING_FORWARD: char = '\u{e04e}'; // arrow-up

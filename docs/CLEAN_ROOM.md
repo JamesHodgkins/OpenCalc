@@ -62,6 +62,15 @@ palette colours and shade percentages are our own choices and the code is writte
 from scratch. Lucide icons added for shapes and draw order come from the existing
 Lucide font (see the icon note above).
 
+2026-11-11: Lines, arrowheads and corner-rounding grips are standard drawing features (a line with
+grips at its two ends, filled or open arrowheads, a draggable point that rounds a rectangle's corners).
+The geometry is ordinary vector drawing and the code is written from scratch; the names (Line,
+Arrowheads, Start, End) are plain words, and the Lucide `slash` icon comes from the existing font.
+
+2026-11-11: Picking an object under another with Alt+click, and guide lines that pull an edge onto
+another object's edge, are common conventions in drawing programs. The code is written from scratch
+and the 6 pixel reach is our own choice.
+
 2026-11-11: The ribbon was redone from scratch, organised by task (Home, Insert, Draw, Format,
 Units, View, Help, and contextual tabs for a selected shape). Tab and group names are our own and
 no longer follow PTC's tab names; the earlier note that they did is superseded. Contextual tabs are a

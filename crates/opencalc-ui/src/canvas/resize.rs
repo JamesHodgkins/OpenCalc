@@ -47,6 +47,12 @@ impl Handle {
         }
     }
 
+    /// Whether the handle pulls on the x axis and on the y axis.
+    pub fn pulls(self) -> (bool, bool) {
+        let (dx, dy) = self.dir();
+        (dx != 0, dy != 0)
+    }
+
     pub fn is_corner(self) -> bool {
         let (dx, dy) = self.dir();
         dx != 0 && dy != 0

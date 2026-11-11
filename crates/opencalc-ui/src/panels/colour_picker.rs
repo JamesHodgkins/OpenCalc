@@ -15,8 +15,8 @@ use opencalc_core::document::{shade_mix, Colour, STANDARD_COLOURS, THEME_SHADES,
 
 use crate::theme::Theme;
 
-const SWATCH: f32 = 20.0;
-const GAP: f32 = 2.0;
+const SWATCH: f32 = 24.0;
+const GAP: f32 = 4.0;
 
 /// What the user chose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,7 +82,7 @@ fn swatch(ui: &mut Ui, rect: Rect, colour: Option<[u8; 4]>, theme: &Theme) {
     p.rect_stroke(
         rect,
         2.0,
-        Stroke::new(1.0_f32, theme.text_weak),
+        Stroke::new(1.0_f32, theme.border_strong),
         StrokeKind::Inside,
     );
 }
@@ -96,11 +96,17 @@ fn swatch_button(
     tip: &str,
 ) -> Response {
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(SWATCH), Sense::click());
-    swatch(ui, rect, Some(colour.resolve(auto)), theme);
-    if selected || resp.hovered() {
+    // Hovering grows the swatch a little, like the web picker's scale-110.
+    let drawn = if resp.hovered() {
+        rect.expand(1.2)
+    } else {
+        rect
+    };
+    swatch(ui, drawn, Some(colour.resolve(auto)), theme);
+    if selected {
         ui.painter().rect_stroke(
-            rect.expand(1.5),
-            2.0,
+            rect.expand(2.0),
+            3.0,
             Stroke::new(2.0_f32, theme.accent),
             StrokeKind::Outside,
         );
@@ -132,25 +138,41 @@ fn place_name(slot: u8, shade: u8) -> String {
     }
 }
 
-/// A full-width choice bar ("Automatic", "No fill") with its swatch.
+/// A small upper-case section heading.
+fn heading(ui: &mut Ui, text: &str, theme: &Theme) {
+    ui.label(
+        egui::RichText::new(text.to_uppercase())
+            .size(11.0)
+            .strong()
+            .color(theme.text_weak),
+    );
+}
+
+/// A full-width action row ("Automatic", "No fill") with its swatch on the left.
 fn bar(ui: &mut Ui, label: &str, face: Option<[u8; 4]>, selected: bool, theme: &Theme) -> bool {
     let (rect, resp) = ui.allocate_exact_size(
-        Vec2::new(ui.available_width().max(SWATCH * 10.0), 22.0),
+        Vec2::new(ui.available_width().max(SWATCH * 10.0), 28.0),
         Sense::click(),
     );
-    if resp.hovered() || selected {
+    if resp.hovered() {
+        ui.painter().rect_filled(rect, 4.0, theme.accent_hover);
+    }
+    if selected {
         ui.painter().rect_stroke(
             rect,
-            2.0,
+            4.0,
             Stroke::new(1.5_f32, theme.accent),
             StrokeKind::Inside,
         );
     }
-    let sw = Rect::from_min_size(rect.min + Vec2::new(4.0, 3.0), Vec2::new(24.0, 16.0));
+    let sw = Rect::from_center_size(
+        Pos2::new(rect.left() + 16.0, rect.center().y),
+        Vec2::splat(16.0),
+    );
     swatch(ui, sw, face, theme);
     ui.painter().text(
-        rect.center(),
-        egui::Align2::CENTER_CENTER,
+        Pos2::new(rect.left() + 34.0, rect.center().y),
+        egui::Align2::LEFT_CENTER,
         label,
         egui::FontId::proportional(13.0),
         theme.text,
@@ -204,28 +226,14 @@ pub fn button(
         PopupCloseBehavior::CloseOnClickOutside,
         |ui| {
             ui.set_min_width(SWATCH * 10.0 + GAP * 9.0 + 8.0);
-            ui.spacing_mut().item_spacing = Vec2::new(GAP, 4.0);
+            ui.spacing_mut().item_spacing = Vec2::new(GAP, GAP);
             let mut chosen = |c: Option<Colour>| {
                 pick = Some(Pick {
                     colour: c,
                     done: true,
                 });
             };
-            if bar(
-                ui,
-                "Automatic",
-                Some(auto),
-                current == Some(Colour::Auto),
-                theme,
-            ) {
-                chosen(Some(Colour::Auto));
-            }
-            if bar(ui, none_label, None, current.is_none(), theme) {
-                chosen(None);
-            }
-            ui.add_space(2.0);
-            ui.label(egui::RichText::new("Theme colours").strong());
-            ui.spacing_mut().item_spacing = Vec2::new(GAP, 0.0);
+            heading(ui, "Theme colours", theme);
             for shade in 0..THEME_SHADES {
                 ui.horizontal(|ui| {
                     for slot in 0..THEME_SLOTS {
@@ -238,13 +246,9 @@ pub fn button(
                         }
                     }
                 });
-                if shade == 0 {
-                    ui.add_space(5.0);
-                }
             }
-            ui.spacing_mut().item_spacing = Vec2::new(GAP, 4.0);
-            ui.add_space(2.0);
-            ui.label(egui::RichText::new("Standard colours").strong());
+            ui.separator();
+            heading(ui, "Standard colours", theme);
             ui.horizontal(|ui| {
                 for [r, g, b] in STANDARD_COLOURS.iter() {
                     let colour = Colour::rgb(*r, *g, *b);
@@ -257,8 +261,21 @@ pub fn button(
                 }
             });
             ui.separator();
-            if ui.button("More colours\u{2026}").clicked() {
-                let c = current.map_or(auto, |c| c.resolve(auto));
+            ui.spacing_mut().item_spacing = Vec2::new(GAP, 2.0);
+            if bar(
+                ui,
+                "Automatic",
+                Some(auto),
+                current == Some(Colour::Auto),
+                theme,
+            ) {
+                chosen(Some(Colour::Auto));
+            }
+            if bar(ui, none_label, None, current.is_none(), theme) {
+                chosen(None);
+            }
+            let c = current.map_or(auto, |c| c.resolve(auto));
+            if bar(ui, "More colours\u{2026}", Some(c), false, theme) {
                 ui.memory_mut(|m| {
                     m.data.insert_temp(dialog_key, Dialog::new(c));
                     m.close_popup();

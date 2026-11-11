@@ -103,7 +103,7 @@ Maintain readable contrast: target at least 4.5:1 for normal text, 3:1 for meani
 | Standard corner radius | 4 px |
 | Window corner radius | 6 px |
 | Compact tab row | 25–26 px |
-| Status row | 24 px |
+| Status row | 30 px |
 | Scrollbar width | 6 px |
 | Tool group height | 90 px reference (66 px large action + 16 px label row + margins) |
 

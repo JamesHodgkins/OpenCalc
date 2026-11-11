@@ -45,7 +45,9 @@ pub use rich::{
     adjust as adjust_runs, all_have as runs_all_have, normalise as normalise_runs,
     restyle as restyle_runs, Run, RunStyle, TEXT_COLOURS,
 };
-pub use shape::{Dash, ShapeKind, ShapeSpec, MAX_RADIUS, MAX_STROKE};
+pub use shape::{
+    Arrowhead, Dash, ShapeKind, ShapeSpec, MAX_RADIUS, MAX_SIDES, MAX_STROKE, MIN_SIDES,
+};
 pub use table::{TableColumn, TableSpec, MAX_CELLS, MAX_COLUMNS, MAX_TEXT as MAX_TABLE_TEXT};
 
 use crate::expr::Expr;

@@ -106,6 +106,13 @@ pub enum Edit {
         id: RegionId,
         spec: Box<ShapeSpec>,
     },
+    /// Move the two ends of a line shape. The box and the flips follow, so the line
+    /// is one step to drag and one to undo. `from` is the start, `to` the end.
+    SetLineEnds {
+        id: RegionId,
+        from: Point,
+        to: Point,
+    },
     /// Set the draw order (`z`) of regions. Each ID at most once. Display only, and
     /// allowed on a locked region: moving one region in front renumbers the others.
     SetZ {
@@ -213,6 +220,7 @@ impl Worksheet {
             Edit::SetTable { id, spec } => self.set_table(*id, spec),
             Edit::SetPicture { id, spec } => self.set_picture(*id, spec),
             Edit::SetShape { id, spec } => self.set_shape(*id, spec),
+            Edit::SetLineEnds { id, from, to } => self.set_line_ends(*id, *from, *to),
             Edit::SetRegionSize { id, size } => self.set_region_size(*id, *size),
             Edit::SetRegionBox { id, pos, size } => self.set_region_box(*id, *pos, *size),
             Edit::SetHeaders(h) => Ok(Edit::SetHeaders(Box::new(std::mem::replace(

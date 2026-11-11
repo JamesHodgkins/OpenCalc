@@ -77,6 +77,25 @@ mod tests {
     }
 
     #[test]
+    fn shapes_including_lines_align_by_their_box_like_any_region() {
+        use opencalc_core::document::ShapeKind;
+        let mut line = at(1, 10.0, 100.0);
+        line.kind = RegionKind::shape(ShapeKind::Line);
+        line.size = Size::new(80.0, 1.0);
+        let mut frame = at(2, 200.0, 40.0);
+        frame.kind = RegionKind::shape(ShapeKind::Rectangle);
+        let both = [RegionId(1), RegionId(2)];
+        assert_eq!(
+            align(&[line.clone(), frame.clone()], &both, true),
+            [(RegionId(1), Point::new(10.0, 40.0))]
+        );
+        assert_eq!(
+            align(&[line, frame], &both, false),
+            [(RegionId(2), Point::new(10.0, 40.0))]
+        );
+    }
+
+    #[test]
     fn only_the_selected_regions_count_and_one_is_not_enough() {
         let r = [at(1, 10.0, 100.0), at(2, 200.0, 40.0), at(3, 90.0, 5.0)];
         assert_eq!(align(&r, &[RegionId(1), RegionId(2)], true).len(), 1);

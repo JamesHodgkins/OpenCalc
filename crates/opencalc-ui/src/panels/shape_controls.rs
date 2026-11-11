@@ -5,7 +5,8 @@
 
 use eframe::egui::{self, Id, Ui};
 use opencalc_core::document::{
-    Dash, RegionId, RegionKind, ShapeKind, ShapeSpec, MAX_RADIUS, MAX_STROKE,
+    Arrowhead, Dash, RegionId, RegionKind, ShapeKind, ShapeSpec, MAX_RADIUS, MAX_SIDES, MAX_STROKE,
+    MIN_SIDES,
 };
 use opencalc_core::edit::Edit;
 
@@ -36,10 +37,13 @@ pub fn contexts(state: &AppState) -> Vec<Context> {
     found
 }
 
-const KINDS: [ShapeKind; 3] = [
+const KINDS: [ShapeKind; 6] = [
     ShapeKind::Rectangle,
-    ShapeKind::RoundedRectangle,
     ShapeKind::Ellipse,
+    ShapeKind::Triangle,
+    ShapeKind::Diamond,
+    ShapeKind::Polygon,
+    ShapeKind::Line,
 ];
 
 fn dash_label(d: Dash) -> &'static str {
@@ -77,6 +81,18 @@ impl ShapeControls<'_> {
 }
 
 impl ControlHost for ShapeControls<'_> {
+    fn label(&self, control: Control) -> &'static str {
+        // The row that sets a rectangle's corners sets a polygon's sides.
+        match (control, selected_shape(self.state)) {
+            (Control::Shape(ShapeControl::Corners), Some((_, s)))
+                if s.kind == ShapeKind::Polygon =>
+            {
+                "Sides"
+            }
+            _ => control.label(),
+        }
+    }
+
     fn control(&mut self, ui: &mut Ui, theme: &Theme, control: Control) {
         let Some((id, spec)) = selected_shape(self.state) else {
             return;
@@ -103,14 +119,20 @@ impl ControlHost for ShapeControls<'_> {
             ShapeControl::Fill => {
                 let a = theme.accent.to_srgba_unmultiplied();
                 let auto = [a[0], a[1], a[2], 48];
-                if let Some(p) = colour_picker::button(
-                    ui,
-                    colour_id(id, "fill"),
-                    spec.fill,
-                    auto,
-                    "No fill",
-                    theme,
-                ) {
+                // A line has no inside to fill.
+                let picked = ui
+                    .add_enabled_ui(spec.kind != ShapeKind::Line, |ui| {
+                        colour_picker::button(
+                            ui,
+                            colour_id(id, "fill"),
+                            spec.fill,
+                            auto,
+                            "No fill",
+                            theme,
+                        )
+                    })
+                    .inner;
+                if let Some(p) = picked {
                     next.fill = p.colour;
                     done = p.done;
                     changed = true;
@@ -156,8 +178,40 @@ impl ControlHost for ShapeControls<'_> {
                         }
                     });
             }
+            ShapeControl::StartHead | ShapeControl::EndHead => {
+                let start = control == ShapeControl::StartHead;
+                let current = if start {
+                    spec.arrow_start
+                } else {
+                    spec.arrow_end
+                };
+                ui.add_enabled_ui(spec.kind == ShapeKind::Line, |ui| {
+                    egui::ComboBox::from_id_salt(if start { "head-start" } else { "head-end" })
+                        .selected_text(current.label())
+                        .width(100.0)
+                        .show_ui(ui, |ui| {
+                            for a in Arrowhead::ALL {
+                                if ui.selectable_label(current == a, a.label()).clicked() {
+                                    if start {
+                                        next.arrow_start = a;
+                                    } else {
+                                        next.arrow_end = a;
+                                    }
+                                    changed = true;
+                                }
+                            }
+                        });
+                });
+            }
+            ShapeControl::Corners if spec.kind == ShapeKind::Polygon => {
+                let mut v = spec.sides;
+                let r = ui.add(egui::DragValue::new(&mut v).range(MIN_SIDES..=MAX_SIDES));
+                changed = r.changed() || r.drag_stopped() || r.lost_focus();
+                done = !r.dragged();
+                next.sides = v;
+            }
             ShapeControl::Corners => {
-                let rounded = spec.kind == ShapeKind::RoundedRectangle;
+                let rounded = spec.kind == ShapeKind::Rectangle;
                 let mut v = spec.corner_radius;
                 let r = ui.add_enabled(
                     rounded,

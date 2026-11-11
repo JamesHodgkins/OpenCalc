@@ -112,8 +112,11 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | TableExportCsv
             | InsertPicture
             | InsertRectangle
-            | InsertRoundedRectangle
             | InsertEllipse
+            | InsertLine
+            | InsertTriangle
+            | InsertDiamond
+            | InsertPolygon
             | ArrangeToFront
             | ArrangeForward
             | ArrangeBackward

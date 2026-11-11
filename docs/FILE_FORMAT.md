@@ -120,9 +120,21 @@ does not know. A text region with no `runs` is exactly a pre-rich-text region.
 ### 3e. Shapes and draw order (version 3)
 
 A shape region has the kind `{"Shape": {...}}`; every field is optional and a missing
-one takes its default: `kind` (`Rectangle`, `RoundedRectangle` or `Ellipse`), `fill`
+one takes its default: `kind` (`Rectangle`, `Ellipse`, `Triangle`, `Diamond`, `Polygon` or `Line`), `fill`
 and `stroke` (a colour, or `null` for none), `stroke_width` and `corner_radius` (document
-units, 0 to 40 and 0 to 1000), and `dash` (`Solid`, `Dashed` or `Dotted`).
+units, 0 to 40 and 0 to 1000; 0 is square corners, and it applies to a rectangle), and `dash` (`Solid`, `Dashed` or `Dotted`).
+
+A `Triangle` has its apex at the middle of the top edge of the box and its base along the
+bottom; a `Diamond` has its points at the middles of the four edges; a `Polygon` has `sides`
+(3 to 24, default 6) points evenly round the ellipse that fits the box, the first at the top.
+
+A `Line` runs corner to corner of the region's box: from the top left to the bottom
+right, or, with `flip_x` (start on the right) and `flip_y` (start at the bottom), the other
+ways round (both default to false and are left out when false). A box no more than one
+unit thick in a direction is a level or upright line through its middle. `arrow_start` and
+`arrow_end` (`None`, `Triangle`, `Open`, `Circle` or `Diamond`; default `None`) say what each
+end carries; the head's length is six times the line width. A line has no inside, so `fill`
+is unused; `corner_radius` is used only by a rectangle.
 
 A colour is `"Auto"` (the program's choice for the use), `{"Theme": {"slot": 4, "shade": 2}}`
 (a palette place: `slot` 0 to 9, `shade` 0 to 5, where 0 is the colour itself, 1 to 3 are
