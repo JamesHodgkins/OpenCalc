@@ -67,11 +67,11 @@ No function-length limit exists. Split the first four; the last four are large m
   - [x] `eval.rs`
 - [x] Reviewed the `let _ =` calls: 25 of the 40 are in tests; of the 15 in production code, 14 are best-effort cleanup, memory writes or edits that cannot fail (all commented). One hid a risk (batch rollback) and now has a `debug_assert`; one is a real gap, logged as TD-37 (clipboard write failure)
 - [x] Split `opencalc-ui/src/smoke.rs` (1,743 to 839 lines): the math editor tests are `smoke/editor.rs`, manual mode and programs are `smoke/calculation.rs`; same 583 tests
-- [ ] Spot-check per-frame paint code for hot-path `.clone()` calls (373 in the workspace overall)
+- [x] Spot-checked per-frame code for hot-path clones: none of region data; per frame it clones only the header strings and the window title (small). Frame time is already measured (0.8 ms for 200 regions)
 
 ## Already in the register (not new)
 
-- [ ] TD-26: add `cargo audit` / advisories check to CI
+- [ ] TD-26: advisories check run by hand and it FAILS (7 findings, all via eframe 0.31); needs an eframe upgrade before it can go in CI. Details in the register
 - [ ] TD-21: run the Linux build by hand on a desktop
 
 ## Done when
