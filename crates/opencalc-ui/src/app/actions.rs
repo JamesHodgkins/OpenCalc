@@ -1,12 +1,10 @@
-//! The small state changes that `dispatch` hands off to: page setup, zoom, drawing tools, inserts.
+//! The small state changes that `dispatch` hands off to: unit system, page setup, separating regions, the drawing tool and zoom.
 
-use opencalc_core::document::{PageSetup, RegionKind, ShapeKind};
+use opencalc_core::document::{PageSetup, ShapeKind};
 use opencalc_core::edit::Edit;
 use opencalc_core::registry::UnitSystem;
 
-use super::dispatch::{apply_canvas, with_eval_check, Effect};
 use super::state::AppState;
-use crate::canvas::CanvasCmd;
 
 /// Show results in another unit system. Display only, so no recalculation; it
 /// is an edit so it can be undone.
@@ -61,28 +59,6 @@ pub(super) fn separate_regions(state: &mut AppState) {
             sheet.seal();
         }
     }
-}
-
-/// Put `symbol` into the math region being edited, at the caret (replacing the
-/// selection), as an ordinary edit of its source. The editor picks it up.
-pub(super) fn insert_symbol(state: &mut AppState, sheet: usize, symbol: char) -> Vec<Effect> {
-    let canvas = &state.sheets[sheet].canvas;
-    let (Some(id), Some(field)) = (canvas.editing, canvas.field.as_ref()) else {
-        return Vec::new();
-    };
-    let mut after = field.clone();
-    after.insert(&symbol.to_string());
-    let edit = Edit::SetMathSource {
-        id,
-        source: after.text(),
-    };
-    apply_canvas(state, sheet, vec![CanvasCmd::Edit(edit)])
-}
-
-pub(super) fn insert(state: &mut AppState, fx: &mut Vec<Effect>, kind: RegionKind) {
-    with_eval_check(state, fx, |s| {
-        s.insert(kind);
-    });
 }
 
 /// Pick up the drawing tool: the next drag on the canvas draws this shape.

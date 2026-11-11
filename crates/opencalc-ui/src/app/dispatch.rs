@@ -8,9 +8,7 @@ use opencalc_core::document::{RegionKind, ShapeKind};
 use opencalc_core::edit::Edit;
 use opencalc_core::registry::UnitSystem;
 
-use super::actions::{
-    arm_pen, insert, insert_symbol, separate_regions, set_page, set_unit_system, zoom_by, zoom_to,
-};
+use super::actions::{arm_pen, separate_regions, set_page, set_unit_system, zoom_by, zoom_to};
 use super::filing::{dispatch_file, Then};
 use super::state::AppState;
 use crate::canvas::CanvasCmd;
@@ -292,17 +290,35 @@ pub(super) fn close_sheet(state: &mut AppState, i: usize) {
 
 /// Run `f` on the active sheet and ask for a recalculation if that changed what
 /// the evaluator would compute. Moving or resizing a region never does.
-pub(super) fn with_eval_check(
-    state: &mut AppState,
-    fx: &mut Vec<Effect>,
-    f: impl FnOnce(&mut OpenSheet),
-) {
+fn with_eval_check(state: &mut AppState, fx: &mut Vec<Effect>, f: impl FnOnce(&mut OpenSheet)) {
     let Some(i) = state.active else { return };
     let before = state.sheets[i].doc.eval_revision();
     f(&mut state.sheets[i]);
     if state.sheets[i].doc.eval_revision() != before {
         fx.push(Effect::Recalculate);
     }
+}
+
+/// Put `symbol` into the math region being edited, at the caret (replacing the
+/// selection), as an ordinary edit of its source. The editor picks it up.
+fn insert_symbol(state: &mut AppState, sheet: usize, symbol: char) -> Vec<Effect> {
+    let canvas = &state.sheets[sheet].canvas;
+    let (Some(id), Some(field)) = (canvas.editing, canvas.field.as_ref()) else {
+        return Vec::new();
+    };
+    let mut after = field.clone();
+    after.insert(&symbol.to_string());
+    let edit = Edit::SetMathSource {
+        id,
+        source: after.text(),
+    };
+    apply_canvas(state, sheet, vec![CanvasCmd::Edit(edit)])
+}
+
+fn insert(state: &mut AppState, fx: &mut Vec<Effect>, kind: RegionKind) {
+    with_eval_check(state, fx, |s| {
+        s.insert(kind);
+    });
 }
 
 #[cfg(test)]
