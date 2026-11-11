@@ -315,6 +315,14 @@ fn bad_element_assignments_are_errors() {
     let out = run(&["f := program\n    v[0] \u{2190} [1; 2]\n    1", "f ="]);
     assert!(failure(&out, 2).contains("single number"));
     match parse("f := program\n    f(1) \u{2190} 2\n    1") {
+        Expr::Error(e) => {
+            assert!(e.message.contains("one element"), "{}", e.message);
+            assert!(e.message.ends_with("on the left of '←'"), "{}", e.message);
+        }
+        other => panic!("{other:?}"),
+    }
+    // The base of an element must be a name too.
+    match parse("f := program\n    (1)[0] ← 2\n    1") {
         Expr::Error(e) => assert!(e.message.contains("one element"), "{}", e.message),
         other => panic!("{other:?}"),
     }

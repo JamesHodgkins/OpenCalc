@@ -10,16 +10,17 @@ use crate::units::{builtin_unit, offset_unit};
 /// `name(args)`: `if` with three arguments and `sqrt` with one become their own
 /// nodes; their children are still the arguments.
 pub(super) fn call(name: String, mut args: Vec<Expr>) -> Expr {
-    if name == "if" && args.len() == 3 {
-        let (otherwise, then, cond) = (args.pop(), args.pop(), args.pop());
-        if let (Some(cond), Some(then), Some(otherwise)) = (cond, then, otherwise) {
-            return Expr::Conditional {
-                cond: Box::new(cond),
-                then: Box::new(then),
-                otherwise: Box::new(otherwise),
-            };
+    if name == "if" {
+        match <[Expr; 3]>::try_from(args) {
+            Ok([cond, then, otherwise]) => {
+                return Expr::Conditional {
+                    cond: Box::new(cond),
+                    then: Box::new(then),
+                    otherwise: Box::new(otherwise),
+                }
+            }
+            Err(back) => args = back,
         }
-        unreachable!("three arguments were checked");
     }
     if name == "sqrt" && args.len() == 1 {
         if let Some(radicand) = args.pop() {

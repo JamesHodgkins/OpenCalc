@@ -98,6 +98,14 @@ impl Series {
         self.data.iter().map(|z| Scalar::new(*z, self.dim))
     }
 
+    /// Every element negated. The length and dimension are unchanged, so this cannot fail.
+    pub fn negated(&self) -> Series {
+        Series {
+            data: self.data.iter().map(|z| -*z).collect(),
+            dim: self.dim,
+        }
+    }
+
     /// Apply `f` to every element.
     pub fn map(
         &self,

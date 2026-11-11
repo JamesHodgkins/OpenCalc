@@ -118,10 +118,7 @@ impl Value {
         match self {
             Value::Scalar(s) => Value::Scalar(s.negated()),
             Value::Matrix(m) => Value::Matrix(m.map(|z| -z)),
-            Value::Series(r) => Value::Series(
-                Series::new(r.elements().iter().map(|z| -*z).collect(), r.dim)
-                    .expect("negation keeps the length"),
-            ),
+            Value::Series(r) => Value::Series(r.negated()),
             Value::Function { .. } | Value::Text(_) => self.clone(),
         }
     }

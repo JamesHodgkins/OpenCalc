@@ -279,7 +279,7 @@ fn over_list(f: &FunctionDef, list: &Series) -> Result<Value> {
     for element in list.scalars() {
         match (f.run)(&[Value::Scalar(element)])? {
             Value::Scalar(s) => out.push(s),
-            _ => unreachable!("these functions return a number"),
+            _ => return Err(ValueError::Unsupported(format!("{} of a list", f.name)).into()),
         }
     }
     Ok(Value::Series(Series::from_scalars(&out)?))

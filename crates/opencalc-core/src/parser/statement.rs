@@ -4,6 +4,9 @@ use super::lexer::Tok;
 use super::Parser;
 use crate::expr::Expr;
 
+/// What is wrong with the left of a `\u{2190}` that is not a name or one element of one.
+const LEFT_OF_ARROW: &str = "only a name, or one element of one, can be on the left of '\u{2190}'";
+
 impl Parser {
     /// One statement, whose line is indented `indent`.
     pub(super) fn statement(&mut self, indent: usize) -> Result<Expr, String> {
@@ -134,7 +137,7 @@ impl Parser {
         })
     }
 
-    /// `name \u{2190} value`, or an expression.
+    /// `name \u\u{2190} value`, or an expression.
     pub(super) fn simple(&mut self, from: usize) -> Result<Expr, String> {
         let mark = self.log.len();
         let first = self.range_expr(true)?;
@@ -143,17 +146,11 @@ impl Parser {
         }
         let (target, indices) = match first {
             Expr::Name(target) => (target, None),
-            Expr::Index { base, indices } if matches!(*base, Expr::Name(_)) => {
-                let Expr::Name(target) = *base else {
-                    unreachable!("the base was checked to be a name")
-                };
-                (target, Some(indices))
-            }
-            _ => {
-                return Err(
-                    "only a name, or one element of one, can be on the left of '\u{2190}'".into(),
-                )
-            }
+            Expr::Index { base, indices } => match *base {
+                Expr::Name(target) => (target, Some(indices)),
+                _ => return Err(LEFT_OF_ARROW.into()),
+            },
+            _ => return Err(LEFT_OF_ARROW.into()),
         };
         let name_end = self.log.len();
         self.pos += 1;

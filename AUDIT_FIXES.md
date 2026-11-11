@@ -54,11 +54,11 @@ No function-length limit exists. Split the first four; the last four are large m
 
 ## Minor
 
-- [ ] Remove the production `unwrap`/`expect` in `opencalc-ui/src/logo.rs` and `opencalc-core/src/value/mod.rs` (the five in `benches/recalc.rs` are acceptable)
-- [ ] Remove or justify the `unreachable!` calls:
-  - [ ] `opencalc-core/src/functions.rs:282`
-  - [ ] `opencalc-core/src/parser/forms.rs:22`
-  - [ ] `opencalc-core/src/parser/program.rs:436`
+- [x] Production `unwrap`/`expect`: `value/mod.rs` one removed (`Series::negated`); the logo one stays (the PNG is embedded at build time); the bench ones are acceptable
+- [x] Remove or justify the `unreachable!` calls (all three removed):
+  - [x] `opencalc-core/src/functions.rs:282` (now an error)
+  - [x] `opencalc-core/src/parser/forms.rs:22` (`try_from` into an array)
+  - [x] `opencalc-core/src/parser/program.rs:436` (now `parser/statement.rs`, matched directly)
 - [ ] Share one constructor for the `RefCell` locals context, now repeated in:
   - [ ] `eval/node.rs`
   - [ ] `eval/calculus.rs`
