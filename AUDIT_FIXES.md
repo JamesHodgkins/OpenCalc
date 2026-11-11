@@ -43,7 +43,7 @@ No function-length limit exists. Split the first four; the last four are large m
 - [x] `opencalc-core/src/expr/names.rs` `collect_names` (call forms moved to `call_names`)
 - [x] `opencalc-core/src/eval.rs` `evaluate_cancellable` (planning steps moved to `eval/plan.rs`; stack and perf tests pass)
 - [x] `opencalc-ui/src/app/dispatch.rs` `dispatch` (view and window commands moved to `app/view.rs`; the rest is a flat command table)
-- [ ] Decide whether to add a function-length check to `scripts/check.ps1`
+- [x] Function-length check added to `scripts/check.ps1` (150 lines, no exceptions list; `paint::math` and `table::paint` were fixed first)
 
 ### 3. `docs/TECH_DEBT.md` out of date
 - [ ] Re-audit the engine entries (last reviewed 2026-11-08)

@@ -31,7 +31,6 @@ pub(super) fn paint(
         zoom,
         skip_content,
     } = place;
-    let theme = env.paper;
     let size = type_size::BODY * zoom;
     let font = FontId::proportional(size);
     let small = FontId::proportional(size * 0.82);
@@ -53,14 +52,6 @@ pub(super) fn paint(
         .columns
         .iter()
         .any(|c| !c.header.is_empty() || !c.unit.is_empty());
-    let head = |j: usize| {
-        let c = &spec.columns[j];
-        match (c.header.is_empty(), c.unit.is_empty()) {
-            (_, true) => c.header.clone(),
-            (true, false) => format!("[{}]", c.unit),
-            (false, false) => format!("{} [{}]", c.header, c.unit),
-        }
-    };
     let widths: Vec<f32> = (0..spec.cols())
         .map(|j| {
             let cells = spec
@@ -69,7 +60,7 @@ pub(super) fn paint(
                 .map(|row| width_of(&row[j], &font))
                 .fold(0.0_f32, f32::max);
             let h = if has_head {
-                width_of(&head(j), &small)
+                width_of(&header_text(spec, j), &small)
             } else {
                 0.0
             };
@@ -98,77 +89,140 @@ pub(super) fn paint(
     let total_h = title_h + head_h + row_h * spec.row_count() as f32 + message_h;
 
     if !skip_content {
-        let blank = spec.name.trim().is_empty();
-        painter.text(
-            top_left + Vec2::new(pad, title_h * 0.5),
-            Align2::LEFT_CENTER,
-            &title,
-            font.clone(),
-            if blank {
-                theme.text_disabled
-            } else {
-                theme.text
-            },
-        );
-        let top = top_left.y + title_h;
-        let rule = Stroke::new(1.0_f32, theme.border);
-        let mut x = top_left.x;
-        for (j, w) in widths.iter().enumerate() {
-            if has_head {
-                painter.text(
-                    Pos2::new(x + w - pad, top + head_h * 0.5),
-                    Align2::RIGHT_CENTER,
-                    head(j),
-                    small.clone(),
-                    theme.text_weak,
-                );
-            }
-            for (i, row) in spec.rows.iter().enumerate() {
-                let y = top + head_h + row_h * (i as f32 + 0.5);
-                painter.text(
-                    Pos2::new(x + w - pad, y),
-                    Align2::RIGHT_CENTER,
-                    &row[j],
-                    font.clone(),
-                    theme.text,
-                );
-            }
-            x += w;
-        }
-        // Brackets, as a matrix is written, either side of the cells.
-        let body = Rect::from_min_max(
-            Pos2::new(top_left.x, top),
-            Pos2::new(
-                top_left.x + grid_w,
-                top + head_h + row_h * spec.row_count() as f32,
-            ),
-        );
-        if has_head {
-            painter.hline(body.x_range(), top + head_h, rule);
-        }
-        let tick = 5.0 * zoom;
-        for (x, dir) in [(body.left(), 1.0), (body.right(), -1.0)] {
-            painter.vline(x, body.y_range(), rule);
-            painter.hline(
-                x.min(x + dir * tick)..=x.max(x + dir * tick),
-                body.top(),
-                rule,
-            );
-            painter.hline(
-                x.min(x + dir * tick)..=x.max(x + dir * tick),
-                body.bottom(),
-                rule,
-            );
-        }
-        if let Some(m) = &message {
-            painter.text(
-                Pos2::new(top_left.x + pad, body.bottom() + message_h * 0.5),
-                Align2::LEFT_CENTER,
-                format!("{} {m}", crate::icons::WARNING),
-                small,
-                theme.error,
-            );
-        }
+        let measured = Measured {
+            widths,
+            grid_w,
+            title,
+            message,
+            title_h,
+            head_h,
+            message_h,
+            row_h,
+            pad,
+            zoom,
+            has_head,
+            font,
+            small,
+        };
+        draw(painter, env, spec, top_left, measured);
     }
     Vec2::new(total_w, total_h) / zoom
+}
+
+/// The heading of column `j`: its name and unit as `name [unit]`.
+fn header_text(spec: &TableSpec, j: usize) -> String {
+    let c = &spec.columns[j];
+    match (c.header.is_empty(), c.unit.is_empty()) {
+        (_, true) => c.header.clone(),
+        (true, false) => format!("[{}]", c.unit),
+        (false, false) => format!("{} [{}]", c.header, c.unit),
+    }
+}
+
+/// What measuring a table found, which drawing it needs.
+struct Measured {
+    widths: Vec<f32>,
+    grid_w: f32,
+    title: String,
+    message: Option<String>,
+    title_h: f32,
+    head_h: f32,
+    message_h: f32,
+    row_h: f32,
+    pad: f32,
+    zoom: f32,
+    has_head: bool,
+    font: FontId,
+    small: FontId,
+}
+
+/// Draw the name, headings, cells, brackets and any error message.
+fn draw(painter: &Painter, env: &Env, spec: &TableSpec, top_left: Pos2, m: Measured) {
+    let Measured {
+        widths,
+        grid_w,
+        title,
+        message,
+        title_h,
+        head_h,
+        message_h,
+        row_h,
+        pad,
+        zoom,
+        has_head,
+        font,
+        small,
+    } = m;
+    let theme = env.paper;
+    let blank = spec.name.trim().is_empty();
+    painter.text(
+        top_left + Vec2::new(pad, title_h * 0.5),
+        Align2::LEFT_CENTER,
+        &title,
+        font.clone(),
+        if blank {
+            theme.text_disabled
+        } else {
+            theme.text
+        },
+    );
+    let top = top_left.y + title_h;
+    let rule = Stroke::new(1.0_f32, theme.border);
+    let mut x = top_left.x;
+    for (j, w) in widths.iter().enumerate() {
+        if has_head {
+            painter.text(
+                Pos2::new(x + w - pad, top + head_h * 0.5),
+                Align2::RIGHT_CENTER,
+                header_text(spec, j),
+                small.clone(),
+                theme.text_weak,
+            );
+        }
+        for (i, row) in spec.rows.iter().enumerate() {
+            let y = top + head_h + row_h * (i as f32 + 0.5);
+            painter.text(
+                Pos2::new(x + w - pad, y),
+                Align2::RIGHT_CENTER,
+                &row[j],
+                font.clone(),
+                theme.text,
+            );
+        }
+        x += w;
+    }
+    // Brackets, as a matrix is written, either side of the cells.
+    let body = Rect::from_min_max(
+        Pos2::new(top_left.x, top),
+        Pos2::new(
+            top_left.x + grid_w,
+            top + head_h + row_h * spec.row_count() as f32,
+        ),
+    );
+    if has_head {
+        painter.hline(body.x_range(), top + head_h, rule);
+    }
+    let tick = 5.0 * zoom;
+    for (x, dir) in [(body.left(), 1.0), (body.right(), -1.0)] {
+        painter.vline(x, body.y_range(), rule);
+        painter.hline(
+            x.min(x + dir * tick)..=x.max(x + dir * tick),
+            body.top(),
+            rule,
+        );
+        painter.hline(
+            x.min(x + dir * tick)..=x.max(x + dir * tick),
+            body.bottom(),
+            rule,
+        );
+    }
+    if let Some(m) = &message {
+        painter.text(
+            Pos2::new(top_left.x + pad, body.bottom() + message_h * 0.5),
+            Align2::LEFT_CENTER,
+            format!("{} {m}", crate::icons::WARNING),
+            small,
+            theme.error,
+        );
+    }
 }

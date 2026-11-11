@@ -203,49 +203,9 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
                 Some(plain(f, &text, theme.warning, size))
             }
             Beside::Value(v) => {
-                let colour = if env.stale {
-                    theme.text_weak
-                } else {
-                    theme.text
-                };
-                // While a unit is typed, the number already reads in it once it
-                // is a unit of the right kind (unit_in ignores anything else).
-                let format = match &typing {
-                    Some(t) => m.format().with_custom_unit(Some(t.clone())),
-                    None => m.format(),
-                };
-                match crate::format::scalar_parts(v, env.units, &format) {
-                    // A quantity: the number, then its unit typeset (a raised 2,
-                    // not a caret), which is also where the unit is changed by
-                    // clicking it.
-                    Some((number, unit)) if !unit.is_empty() => {
-                        let ts = Typesetter::new(f, colour);
-                        let head = plain(f, &format!("= {number}"), colour, size);
-                        let gap = ts.gap(size * 0.25);
-                        let tail = match &typing {
-                            // Blank room the size of the text, where the box types.
-                            Some(t) => {
-                                let mut room = ts.text(t, size);
-                                room.ops.clear();
-                                room.w = room.w.max(size) + size * 0.4;
-                                if t.is_empty() {
-                                    room.h = size;
-                                    room.baseline = size * 0.78;
-                                }
-                                room
-                            }
-                            None => ts.unit(&unit, size),
-                        };
-                        slot = Some((head.w + gap.w, tail.w, unit));
-                        Some(ts.row(vec![head, gap, tail]))
-                    }
-                    _ => Some(plain(
-                        f,
-                        &format!("= {}", format_value_with(v, env.units, &m.format())),
-                        colour,
-                        size,
-                    )),
-                }
+                let (answer, unit_slot) = answer_beside(f, env, m, v, typing.as_deref(), size);
+                slot = unit_slot;
+                Some(answer)
             }
             Beside::Failed(e) => Some(warn(e.to_string(), typed.w)),
         };
@@ -267,27 +227,88 @@ fn math(ui: &Ui, painter: &Painter, env: &Env, r: &Region, m: &MathRegion, place
     let res_h = res.as_ref().map_or(0.0, |l| l.h);
     let content_w = lay.w + gap + res_w;
     let content_h = lay.h.max(res_h);
-    if !skip_content {
+    if skip_content {
+        super::unit_slot::forget(ui.ctx(), r.id);
+    } else {
         let origin = top_left + Vec2::splat(pad);
         lay.paint(painter, origin, theme.text);
         errors::paint(painter, &bands, origin, theme.error, zoom);
-        if let Some(res) = res {
-            let at = origin + Vec2::new(lay.w + gap, lay.baseline - res.baseline);
-            res.paint(painter, at, theme.text);
-            match slot {
-                Some((x, w, label)) => {
-                    let rect = Rect::from_min_size(at + Vec2::new(x, 0.0), Vec2::new(w, res.h));
-                    super::unit_slot::paint(ui, painter, env, r, rect, label, size);
+        match res {
+            Some(res) => {
+                let at = origin + Vec2::new(lay.w + gap, lay.baseline - res.baseline);
+                res.paint(painter, at, theme.text);
+                match slot {
+                    Some((x, w, label)) => {
+                        let rect = Rect::from_min_size(at + Vec2::new(x, 0.0), Vec2::new(w, res.h));
+                        super::unit_slot::paint(ui, painter, env, r, rect, label, size);
+                    }
+                    None => super::unit_slot::forget(ui.ctx(), r.id),
                 }
-                None => super::unit_slot::forget(ui.ctx(), r.id),
             }
-        } else {
-            super::unit_slot::forget(ui.ctx(), r.id);
+            None => super::unit_slot::forget(ui.ctx(), r.id),
         }
-    } else {
-        super::unit_slot::forget(ui.ctx(), r.id);
     }
     Vec2::new(content_w + 2.0 * pad, content_h + 2.0 * pad) / zoom
+}
+
+/// Where the unit of a result sits beside it: the offset of the unit in the answer,
+/// its width, and its text.
+type UnitSlot = (f32, f32, String);
+
+/// The answer shown beside an evaluation region. A quantity is its number and then
+/// its unit typeset (a raised 2, not a caret), which is also where the unit is
+/// changed by clicking it; `typing` is the unit being typed there, if any.
+fn answer_beside(
+    f: &eframe::egui::epaint::text::Fonts,
+    env: &Env,
+    m: &MathRegion,
+    v: &opencalc_core::value::Value,
+    typing: Option<&str>,
+    size: f32,
+) -> (Layout, Option<UnitSlot>) {
+    let colour = if env.stale {
+        env.paper.text_weak
+    } else {
+        env.paper.text
+    };
+    // While a unit is typed, the number already reads in it once it is a unit of
+    // the right kind (unit_in ignores anything else).
+    let format = match typing {
+        Some(t) => m.format().with_custom_unit(Some(t.to_owned())),
+        None => m.format(),
+    };
+    match crate::format::scalar_parts(v, env.units, &format) {
+        Some((number, unit)) if !unit.is_empty() => {
+            let ts = Typesetter::new(f, colour);
+            let head = plain(f, &format!("= {number}"), colour, size);
+            let gap = ts.gap(size * 0.25);
+            let tail = match typing {
+                // Blank room the size of the text, where the box types.
+                Some(t) => {
+                    let mut room = ts.text(t, size);
+                    room.ops.clear();
+                    room.w = room.w.max(size) + size * 0.4;
+                    if t.is_empty() {
+                        room.h = size;
+                        room.baseline = size * 0.78;
+                    }
+                    room
+                }
+                None => ts.unit(&unit, size),
+            };
+            let slot = (head.w + gap.w, tail.w, unit);
+            (ts.row(vec![head, gap, tail]), Some(slot))
+        }
+        _ => (
+            plain(
+                f,
+                &format!("= {}", format_value_with(v, env.units, &m.format())),
+                colour,
+                size,
+            ),
+            None,
+        ),
+    }
 }
 
 fn text(painter: &Painter, theme: &Theme, r: &Region, text: &str, place: Place) -> Vec2 {
