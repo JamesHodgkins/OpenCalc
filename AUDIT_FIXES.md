@@ -35,7 +35,7 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 ### 2. Overlong functions
 No function-length limit exists. Split the first four; the last four are large matches and may be fine.
 
-- [ ] `opencalc-core/src/parser/lexer.rs:46` `tokenize` (~229 lines)
+- [x] `opencalc-core/src/parser/lexer.rs` `tokenize` (now a loop over `symbol`, `text`, `number`, `unknown`)
 - [ ] `opencalc-ui/src/canvas/plot.rs:126` `chart` (~219 lines)
 - [ ] `opencalc-ui/src/canvas/plot/polar.rs:88` `draw` (~206 lines)
 - [ ] `opencalc-ui/src/canvas/editor.rs:39` `math` (~234 lines)
