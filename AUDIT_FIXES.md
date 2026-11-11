@@ -26,7 +26,7 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 - [x] `opencalc-core/src/parser/program.rs` (470)
 - [ ] `opencalc-ui/src/layout.rs` (521)
 - [x] `opencalc-ui/src/app/dispatch.rs` (404)
-- [ ] `opencalc-ui/src/canvas/mod.rs` (608)
+- [x] `opencalc-ui/src/canvas/mod.rs` (608)
 - [x] `opencalc-ui/src/commands/id.rs` (405)
 - [x] `opencalc-ui/src/layout/source.rs` (410)
 - [x] `opencalc-ui/src/panels/colour_picker.rs` (469)
