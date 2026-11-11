@@ -46,11 +46,11 @@ No function-length limit exists. Split the first four; the last four are large m
 - [x] Function-length check added to `scripts/check.ps1` (150 lines, no exceptions list; `paint::math` and `table::paint` were fixed first)
 
 ### 3. `docs/TECH_DEBT.md` out of date
-- [ ] Re-audit the engine entries (last reviewed 2026-11-08)
-- [ ] Add entries for solve blocks, programs and typeset program editing
-- [ ] Split TD-29 into one row per decision
-- [ ] Split TD-30 into one row per decision
-- [ ] Update the "Last reviewed" date
+- [x] Re-audit the engine entries (TD-06, 08, 10, 19 corrected against the code; others checked only as noted in the commit message)
+- [x] Add entries for solve blocks, programs and typeset program editing (TD-33, TD-34, TD-35)
+- [x] Split TD-29 into one row per decision (TD-29.1 to 29.10; TD-30, 31 and 32 split too)
+- [x] Split TD-30 into one row per decision (TD-30.1 to 30.7)
+- [x] Update the "Last reviewed" date
 
 ## Minor
 
