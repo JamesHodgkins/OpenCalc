@@ -13,6 +13,7 @@ mod calculus;
 mod graph;
 mod meter;
 mod node;
+mod plan;
 mod plot;
 mod program;
 mod undefined;
@@ -186,118 +187,19 @@ pub fn evaluate_cancellable(
 ) -> Output {
     let mut out = Output::default();
 
-    // Variables and functions are separate namespaces. For each name the last
-    // definition in layout order wins.
-    let mut var_definers: HashMap<&str, Vec<RegionId>> = HashMap::new();
-    let mut fn_definers: HashMap<&str, Vec<RegionId>> = HashMap::new();
-    for (id, expr) in regions {
-        match expr {
-            Expr::Assign {
-                kind: AssignKind::Define,
-                target,
-                ..
-            } => var_definers.entry(target.as_str()).or_default().push(*id),
-            Expr::MultiDefine { targets, .. } => {
-                for t in targets.iter() {
-                    var_definers.entry(t.as_str()).or_default().push(*id);
-                }
-            }
-            Expr::FunctionDef { name, .. } => fn_definers.entry(&**name).or_default().push(*id),
-            _ => {}
-        }
-    }
-    for definers in [&var_definers, &fn_definers] {
-        let mut names: Vec<&&str> = definers.keys().collect();
-        names.sort();
-        for name in names {
-            let ids = &definers[*name];
-            if ids.len() > 1 {
-                out.warnings.push(Warning::Redefinition {
-                    name: (**name).to_owned(),
-                    regions: ids.clone(),
-                });
-            }
-        }
-    }
+    // For each name the last definition in layout order wins.
+    let definers = plan::Definers::of(regions);
+    out.warnings.extend(definers.redefinitions());
     out.warnings.extend(undefined::undefined_evaluations(
         regions.iter().map(|(id, e)| (*id, e)),
-        &|n| var_definers.contains_key(n) || fn_definers.contains_key(n),
+        &|n| definers.defines(n),
         units,
     ));
-    let last = |definers: &HashMap<&str, Vec<RegionId>>| -> HashMap<String, RegionId> {
-        definers
-            .iter()
-            .filter_map(|(n, ids)| ids.last().map(|id| ((*n).to_owned(), *id)))
-            .collect()
-    };
-    let (var_winner, fn_winner) = (last(&var_definers), last(&fn_definers));
-
-    // Edges: region index -> indices of the regions it depends on: the definers
-    // of the variables it reads and of the functions it calls.
-    let index_of: HashMap<RegionId, usize> = regions
-        .iter()
-        .enumerate()
-        .map(|(i, (id, _))| (*id, i))
-        .collect();
-    let edges: Vec<Vec<usize>> = regions
-        .iter()
-        .map(|(_, e)| {
-            let variables = e.free_names();
-            let functions = e.called_names();
-            let reads = variables.iter().filter_map(|n| var_winner.get(n));
-            let calls = functions.iter().filter_map(|n| fn_winner.get(n));
-            reads.chain(calls).map(|id| index_of[id]).collect()
-        })
-        .collect();
-
+    let (var_winner, fn_winner) = definers.winners();
+    let edges = plan::dependency_edges(regions, &var_winner, &fn_winner);
     let components = tarjan(&edges);
-    // A cycle made only of function definitions is recursion, which is allowed: a
-    // definition's body runs when the function is called, not when it is defined,
-    // so nothing has to be evaluated before anything else. A cycle that includes a
-    // variable (`x := f(1)` with `f` reading `x`) is still circular.
-    let only_functions = |component: &[usize]| {
-        component
-            .iter()
-            .all(|&i| matches!(regions[i].1, Expr::FunctionDef { .. }))
-    };
-    let circular = |i: usize, component: &[usize]| {
-        (component.len() > 1 || edges[i].contains(&i)) && !only_functions(component)
-    };
-    let in_cycle: Vec<bool> = {
-        let mut flags = vec![false; regions.len()];
-        for component in &components {
-            for &i in component {
-                flags[i] = circular(i, component);
-            }
-        }
-        flags
-    };
-
-    // Winning definitions of functions, ready to be called.
-    let fns: Fns = regions
-        .iter()
-        .enumerate()
-        .filter_map(|(i, (id, e))| match e {
-            Expr::FunctionDef {
-                name,
-                params,
-                defaults,
-                body,
-            } if fn_winner.get(&**name) == Some(id) => {
-                let circular = in_cycle[i];
-                Some((
-                    &**name,
-                    UserFn {
-                        params,
-                        defaults,
-                        body,
-                        circular,
-                    },
-                ))
-            }
-            _ => None,
-        })
-        .collect();
+    let in_cycle = plan::cycle_flags(regions, &edges, &components);
+    let fns = plan::winning_fns(regions, &fn_winner, &in_cycle);
 
     let mut env: Env = HashMap::new();
     for component in &components {
