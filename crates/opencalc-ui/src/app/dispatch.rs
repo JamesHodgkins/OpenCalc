@@ -8,7 +8,7 @@ use opencalc_core::document::{RegionKind, ShapeKind};
 use opencalc_core::edit::Edit;
 use opencalc_core::registry::UnitSystem;
 
-use super::actions::{arm_pen, separate_regions, set_page, set_unit_system, zoom_by, zoom_to};
+use super::actions::{arm_pen, separate_regions, set_page, set_unit_system};
 use super::filing::{dispatch_file, Then};
 use super::state::AppState;
 use crate::canvas::CanvasCmd;
@@ -102,6 +102,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
     if let Some(fx) = super::inserting::dispatch_insert(state, command) {
         return Some(fx);
     }
+    if let Some(fx) = super::view::dispatch_view(state, command) {
+        return Some(fx);
+    }
     if let Some(fx) = super::labels::dispatch_labels(state, command) {
         return Some(fx);
     }
@@ -175,22 +178,6 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         UnitsSi => set_unit_system(state, UnitSystem::Si),
         UnitsUscs => set_unit_system(state, UnitSystem::Uscs),
         UnitsCgs => set_unit_system(state, UnitSystem::Cgs),
-
-        ViewZoomIn => zoom_by(state, 1.25),
-        ViewZoomOut => zoom_by(state, 1.0 / 1.25),
-        ViewZoom100 => zoom_to(state, 1.0),
-        ZoomTo(percent) => zoom_to(state, f32::from(percent) / 100.0),
-        ViewZoomFit => {
-            let size = state.viewport.size();
-            if let Some(i) = state.active {
-                let sheet = &mut state.sheets[i];
-                if let Some(bounds) = sheet.bounds() {
-                    sheet.view.fit(bounds, size, 24.0);
-                }
-            }
-        }
-        ViewGrid => state.show_grid = !state.show_grid,
-        ViewSnap => state.snap = !state.snap,
         CalcAuto => {
             // Back to automatic: bring the numbers up to date at once. (Stale is
             // only ever true in manual mode, so ask before switching.)
@@ -200,25 +187,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
                 fx.push(Effect::CalculateNow);
             }
         }
-        ViewFunctions => state.show_functions = !state.show_functions,
-        ViewResetLayout => {
-            state.show_functions = false;
-            state.layout_gen += 1;
-            fx.push(Effect::ResetDockWidths);
-        }
         // The ribbon opens the Result unit list itself; its face runs nothing.
         UnitsShowInMenu => {}
-        UnitsDefine | UnitsManage => state.units_open = true,
-        UnitsClose => state.units_open = false,
-        DocPageSetup => state.page_setup_open = true,
-        DocPageSetupClose => {
-            state.page_setup_open = false;
-            if let Some(i) = state.active {
-                state.sheets[i].seal();
-            }
-        }
-        ViewPageView => state.draft = false,
-        ViewDraftView => state.draft = true,
         PagePaper(paper) => set_page(state, true, |p| p.paper = paper),
         PageLandscape(landscape) => set_page(state, true, |p| p.landscape = landscape),
         // A drag over the margin box is one undo step (the run merges).

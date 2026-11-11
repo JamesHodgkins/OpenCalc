@@ -42,7 +42,7 @@ No function-length limit exists. Split the first four; the last four are large m
 - [x] `opencalc-core/src/edit/mod.rs` `apply_inner` now one-line arms calling `edit/content.rs`
 - [x] `opencalc-core/src/expr/names.rs` `collect_names` (call forms moved to `call_names`)
 - [x] `opencalc-core/src/eval.rs` `evaluate_cancellable` (planning steps moved to `eval/plan.rs`; stack and perf tests pass)
-- [ ] Review only: `opencalc-ui/src/app/dispatch.rs:70` `dispatch` (~176 lines)
+- [x] `opencalc-ui/src/app/dispatch.rs` `dispatch` (view and window commands moved to `app/view.rs`; the rest is a flat command table)
 - [ ] Decide whether to add a function-length check to `scripts/check.ps1`
 
 ### 3. `docs/TECH_DEBT.md` out of date

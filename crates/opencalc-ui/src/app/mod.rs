@@ -24,6 +24,7 @@ mod options;
 mod recovery;
 mod state;
 mod templates;
+mod view;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
