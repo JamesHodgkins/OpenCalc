@@ -14,22 +14,22 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 - [x] `cargo fmt --all`
 - [x] `cargo fmt --all --check` passes
 - [ ] `powershell -File scripts/check.ps1` passes end to end (fmt, clippy, tests and perf pass; the file-size step fails, see 1b)
-- [ ] Commit or stash the 54 files of uncommitted work (1,926 insertions, 456 deletions)
+- [x] Commit the uncommitted work (checkpoint commit on branch `audit-fixes`)
 
 ### 1b. File-size gate fails (found while running item 1)
 `scripts/line_limit_exceptions.txt` is empty, but 12 files exceed 400 production lines. Split each below the limit, or list it in the exceptions file as a ratchet.
 
 - [x] `opencalc-core/src/csv.rs` (410)
-- [ ] `opencalc-core/src/parser.rs` (424)
+- [x] `opencalc-core/src/parser.rs` (424)
 - [ ] `opencalc-core/src/edit/mod.rs` (507)
 - [ ] `opencalc-core/src/eval/node.rs` (500)
-- [ ] `opencalc-core/src/parser/program.rs` (470)
+- [x] `opencalc-core/src/parser/program.rs` (470)
 - [ ] `opencalc-ui/src/layout.rs` (521)
 - [x] `opencalc-ui/src/app/dispatch.rs` (404)
 - [ ] `opencalc-ui/src/canvas/mod.rs` (608)
 - [x] `opencalc-ui/src/commands/id.rs` (405)
 - [x] `opencalc-ui/src/layout/source.rs` (410)
-- [ ] `opencalc-ui/src/panels/colour_picker.rs` (469)
+- [x] `opencalc-ui/src/panels/colour_picker.rs` (469)
 - [ ] `opencalc-ui/src/ribbon/show.rs` (518)
 
 ### 2. Overlong functions
