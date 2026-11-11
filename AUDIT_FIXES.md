@@ -36,7 +36,7 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 No function-length limit exists. Split the first four; the last four are large matches and may be fine.
 
 - [x] `opencalc-core/src/parser/lexer.rs` `tokenize` (now a loop over `symbol`, `text`, `number`, `unknown`)
-- [ ] `opencalc-ui/src/canvas/plot.rs:126` `chart` (~219 lines)
+- [x] `opencalc-ui/src/canvas/plot.rs` `chart` (now `plot/cartesian.rs`: plotting_area, ticks, series, captions)
 - [ ] `opencalc-ui/src/canvas/plot/polar.rs:88` `draw` (~206 lines)
 - [ ] `opencalc-ui/src/canvas/editor.rs:39` `math` (~234 lines)
 - [x] `opencalc-core/src/edit/mod.rs` `apply_inner` now one-line arms calling `edit/content.rs`
