@@ -11,7 +11,14 @@ pub type Step = fn(Value) -> Result<Value, LoadError>;
 
 /// The steps for released versions. `STEPS[n - 1]` goes from version `n` to
 /// `n + 1`, so its length is `FORMAT_VERSION - 1`.
-pub const STEPS: &[Step] = &[v1_to_v2];
+pub const STEPS: &[Step] = &[v1_to_v2, v2_to_v3];
+
+/// Version 3 added shape regions and the draw order (`z`) of a region. Both are
+/// optional with defaults, so a version 2 worksheet reads unchanged; the number
+/// moves so an older program refuses the file instead of dropping the shapes.
+fn v2_to_v3(value: Value) -> Result<Value, LoadError> {
+    Ok(value)
+}
 
 /// Version 2 added plot options and series styles. Both are optional with
 /// defaults, so a version 1 worksheet reads unchanged; the version number moves so

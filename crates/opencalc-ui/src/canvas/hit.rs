@@ -2,25 +2,36 @@
 //! All in document space, all pure, so tested without a window.
 
 use eframe::egui::{Pos2, Rect, Vec2};
-use opencalc_core::document::{Region, RegionId};
+use opencalc_core::document::{Region, RegionId, RegionKind};
 
 use super::adapt::{rect_of, Sizes};
 use super::view::snap;
 
-/// The topmost region containing `p`. Regions are stored back to front, so
-/// search from the end.
+/// The regions in the order they are painted, back to front: by draw order (`z`),
+/// then list order. The list itself is calculation order and is never reordered.
+pub fn back_to_front(regions: &[Region]) -> Vec<&Region> {
+    let mut order: Vec<&Region> = regions.iter().collect();
+    order.sort_by_key(|r| r.z); // stable: equal draw order keeps list order
+    order
+}
+
+/// The topmost region containing `p`. A shape without a fill is hit only near its
+/// outline (see `shape::hits`), so what lies inside an empty frame stays reachable.
 pub fn hit_test(regions: &[Region], sizes: &Sizes, p: Pos2) -> Option<RegionId> {
-    regions
-        .iter()
+    back_to_front(regions)
+        .into_iter()
         .rev()
-        .find(|r| rect_of(r, sizes).contains(p))
+        .find(|r| match &r.kind {
+            RegionKind::Shape(spec) => super::shape::hits(spec, rect_of(r, sizes), p),
+            _ => rect_of(r, sizes).contains(p),
+        })
         .map(|r| r.id)
 }
 
 /// Regions touched by a marquee rectangle, in back-to-front order.
 pub fn in_marquee(regions: &[Region], sizes: &Sizes, marquee: Rect) -> Vec<RegionId> {
-    regions
-        .iter()
+    back_to_front(regions)
+        .into_iter()
         .filter(|r| rect_of(r, sizes).intersects(marquee))
         .map(|r| r.id)
         .collect()
@@ -83,6 +94,7 @@ mod tests {
             border: false,
             runs: Vec::new(),
             label: String::new(),
+            z: 0,
         }
     }
 
@@ -102,6 +114,33 @@ mod tests {
         let sizes = Sizes::new();
         assert_eq!(hit_test(&s, &sizes, Pos2::new(230.0, 130.0)), Some(top));
         assert_eq!(hit_test(&s, &sizes, Pos2::new(50.0, 50.0)), Some(back));
+    }
+
+    #[test]
+    fn a_higher_draw_order_wins_whatever_the_list_order() {
+        let (mut s, back, top, _) = regions();
+        s[0].z = 5;
+        let sizes = Sizes::new();
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(230.0, 130.0)), Some(back));
+        let order: Vec<_> = back_to_front(&s).iter().map(|r| r.id).collect();
+        assert_eq!(order[2], back);
+        assert_eq!(order[0], top);
+    }
+
+    #[test]
+    fn an_empty_frame_over_a_region_lets_a_click_through_to_it() {
+        let (mut s, back, ..) = regions();
+        let frame = opencalc_core::document::ShapeSpec {
+            fill: None,
+            ..Default::default()
+        };
+        s.push(region(9, 0.0, 0.0, RegionKind::Shape(Box::new(frame))));
+        let sizes = Sizes::new();
+        assert_eq!(hit_test(&s, &sizes, Pos2::new(50.0, 50.0)), Some(back));
+        assert_eq!(
+            hit_test(&s, &sizes, Pos2::new(1.0, 50.0)),
+            Some(RegionId(9))
+        );
     }
 
     #[test]

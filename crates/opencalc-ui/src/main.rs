@@ -16,6 +16,7 @@ mod logo;
 mod number_format;
 mod panels;
 mod ribbon;
+mod settings;
 mod sheet;
 #[cfg(test)]
 mod smoke;
@@ -53,14 +54,19 @@ fn main() -> eframe::Result {
         "OpenCalc",
         options,
         Box::new(|cc| {
-            let palette = cc
-                .storage
-                .and_then(|s| s.get_string("palette"))
-                .map_or(theme::PaletteKey::Neutral, |k| {
-                    theme::PaletteKey::from_key(&k)
-                });
+            let mut state = app::AppState::new(theme::PaletteKey::Neutral);
+            if let Some(storage) = cc.storage {
+                // Before settings were stored as a whole, only the theme was.
+                if let Some(key) = storage.get_string("palette") {
+                    settings::read_text(&format!("theme={key}"), &mut state);
+                }
+                if let Some(text) = storage.get_string(settings::STORAGE_KEY) {
+                    settings::read_text(&text, &mut state);
+                }
+            }
+            state.renew_blank_sheet();
             let _ = window.set(cc.egui_ctx.clone());
-            let mut app = app::App::new(cc.egui_ctx.clone(), palette);
+            let mut app = app::App::with_state(cc.egui_ctx.clone(), state);
             app.listen_for_files(later_files);
             app.state.recent = cc
                 .storage

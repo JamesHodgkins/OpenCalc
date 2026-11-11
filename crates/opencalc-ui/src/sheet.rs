@@ -7,12 +7,13 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{Pos2, Rect};
-use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind, Worksheet};
+use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind, Size, Worksheet};
 use opencalc_core::edit::{Edit, EditError, History};
 
 use crate::canvas::adapt::{point, rect_of};
-use crate::canvas::view::{snap, GRID};
+use crate::canvas::view::snap;
 use crate::canvas::{CanvasUi, CanvasView};
+use crate::settings::GridSpacing;
 
 pub struct OpenSheet {
     pub doc: Worksheet,
@@ -38,6 +39,13 @@ pub struct OpenSheet {
     pub calculated: Option<u64>,
 }
 
+/// Round a point right and down onto the grid. A point already on it (within
+/// rounding error) stays where it is.
+fn ceil_snap(p: Pos2, grid: f32) -> Pos2 {
+    let up = |v: f32| ((v / grid) - 1e-3).ceil() * grid;
+    Pos2::new(up(p.x), up(p.y))
+}
+
 static NEXT_KEY: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
 impl OpenSheet {
@@ -45,14 +53,13 @@ impl OpenSheet {
         OpenSheet::from_doc(Worksheet::new(title))
     }
 
-    fn from_doc(doc: Worksheet) -> OpenSheet {
+    pub(crate) fn from_doc(doc: Worksheet) -> OpenSheet {
         // The first input goes at the top left of the page margin, rounded in to
         // the snap grid so it sits inside the margin, not across its edge.
         let margin = doc.page().margin();
-        let corner = (margin / GRID).ceil() * GRID;
         let doc_revision = doc.revision();
         let mut canvas = CanvasUi::default();
-        canvas.insert_at = Pos2::new(corner, corner);
+        canvas.insert_at = ceil_snap(Pos2::new(margin, margin), canvas.grid.step());
         OpenSheet {
             doc,
             history: History::default(),
@@ -73,9 +80,21 @@ impl OpenSheet {
         s.path = path;
         // New regions go below what is already there, not on top of it.
         if let Some(bottom) = s.bounds().map(|b| b.max.y) {
-            s.canvas.insert_at = snap(Pos2::new(s.canvas.insert_at.x, bottom + 12.0), GRID);
+            s.canvas.insert_at = snap(
+                Pos2::new(s.canvas.insert_at.x, bottom + 12.0),
+                s.canvas.grid.step(),
+            );
         }
         s
+    }
+
+    /// Use another snap grid. The insertion point moves onto it, rounding right and
+    /// down so it stays inside the margin and clear of what is above it.
+    pub fn set_grid(&mut self, grid: GridSpacing) {
+        if self.canvas.grid != grid {
+            self.canvas.grid = grid;
+            self.canvas.insert_at = ceil_snap(self.canvas.insert_at, grid.step());
+        }
     }
 
     /// Whether the worksheet has changes that are not on disk.
@@ -240,7 +259,10 @@ impl OpenSheet {
         let editable = kind.is_editable();
         let id = self.add(kind, point(at));
         let height = self.doc.region(id).map_or(40.0, |r| r.size.h);
-        self.canvas.insert_at = snap(Pos2::new(at.x, at.y + height + 12.0), GRID);
+        self.canvas.insert_at = snap(
+            Pos2::new(at.x, at.y + height + 12.0),
+            self.canvas.grid.step(),
+        );
         self.canvas.selection = vec![id];
         if editable {
             self.canvas.editing = Some(id);
@@ -250,6 +272,23 @@ impl OpenSheet {
             self.canvas.editing = None;
             self.canvas.field = None;
         }
+        id
+    }
+
+    /// Add a region the user drew with a given box and select it, as one undo step.
+    pub fn insert_drawn(&mut self, kind: RegionKind, pos: Point, size: Size) -> RegionId {
+        self.history.seal();
+        let mut region = self.doc.new_region(kind, pos);
+        region.size = size;
+        let id = region.id;
+        let index = self.doc.regions().len();
+        self.edit(Edit::InsertRegions {
+            regions: vec![(index, region)],
+        });
+        self.history.seal();
+        self.canvas.selection = vec![id];
+        self.canvas.editing = None;
+        self.canvas.field = None;
         id
     }
 

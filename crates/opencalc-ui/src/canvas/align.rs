@@ -47,6 +47,7 @@ mod tests {
             border: false,
             runs: Vec::new(),
             label: String::new(),
+            z: 0,
         }
     }
 

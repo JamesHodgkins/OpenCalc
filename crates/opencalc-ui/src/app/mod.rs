@@ -19,6 +19,7 @@ pub mod formatting;
 mod frame;
 pub mod inserting;
 pub mod labels;
+mod options;
 mod recovery;
 mod state;
 mod templates;
@@ -32,7 +33,7 @@ use opencalc_core::worker::Worker;
 use crate::commands::{CommandId, Registry};
 use crate::ribbon::defs::opencalc_ribbon;
 use crate::ribbon::{Ribbon, RibbonState};
-use crate::theme::{self, PaletteKey};
+use crate::theme;
 pub use clipboard::{Clipboard, MemoryClipboard, NativeClipboard};
 use dispatch::{dispatch, Effect};
 pub use files::{Files, NativeFiles};
@@ -72,7 +73,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(ctx: egui::Context, palette: PaletteKey) -> App {
+    #[cfg(test)]
+    pub fn new(ctx: egui::Context, palette: crate::theme::PaletteKey) -> App {
         App::with_state(ctx, AppState::new(palette))
     }
 
@@ -87,6 +89,8 @@ impl App {
     pub fn with_files(ctx: egui::Context, state: AppState, files: Box<dyn Files>) -> App {
         crate::fonts::install(&ctx);
         theme::apply(&ctx, &state.theme);
+        ctx.set_zoom_factor(state.settings.zoom_factor());
+        let autosave_every = state.settings.recovery_every().unwrap_or(recovery::EVERY);
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
         let mut app = App {
             state,
@@ -103,12 +107,19 @@ impl App {
             export_shrink: 1.0,
             autosave: false,
             recovery_dir: None,
-            autosave_every: recovery::EVERY,
+            autosave_every,
             last_autosave: 0.0,
             recovery_files: HashMap::new(),
         };
         app.recalculate();
         app
+    }
+
+    /// Take new settings as the Options window would hand them over.
+    #[cfg(test)]
+    pub fn change_settings(&mut self, ctx: &egui::Context, next: crate::settings::Settings) {
+        let effects = options::set_settings(&mut self.state, next);
+        self.run_effects(ctx, effects);
     }
 
     /// Open, as tabs, the files that later copies of the program send here.
@@ -203,6 +214,12 @@ impl App {
                 Effect::Recalculate if self.state.holds_back_recalc() => {}
                 Effect::Recalculate | Effect::CalculateNow => self.recalculate(),
                 Effect::ApplyTheme => theme::apply(ctx, &self.state.theme),
+                Effect::ApplySettings => {
+                    ctx.set_zoom_factor(self.state.settings.zoom_factor());
+                    if let Some(every) = self.state.settings.recovery_every() {
+                        self.autosave_every = every;
+                    }
+                }
                 Effect::Quit => {
                     self.allow_close = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -235,6 +252,11 @@ impl App {
 
 impl eframe::App for App {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string(
+            crate::settings::STORAGE_KEY,
+            crate::settings::to_text(&self.state),
+        );
+        // Kept for an older version run after this one.
         storage.set_string("palette", self.state.palette.key().to_owned());
         let recent: Vec<String> = self
             .state

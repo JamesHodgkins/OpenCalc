@@ -3,8 +3,10 @@
 //! A [`Worksheet`] is changed only through [`crate::edit::Edit`]s, so undo,
 //! autosave and the file format share one choke point (rule R3).
 
+mod colour;
 mod geometry;
 mod header;
+mod order;
 mod page;
 mod picture;
 mod plot;
@@ -12,12 +14,18 @@ mod plot_style;
 mod region;
 mod result_format;
 mod rich;
+mod shape;
 mod table;
 
 use serde::{Deserialize, Serialize};
 
+pub use colour::{
+    shade_mix, Colour, STANDARD as STANDARD_COLOURS, THEME as THEME_COLOURS, THEME_SHADES,
+    THEME_SLOTS,
+};
 pub use geometry::{Point, Size};
 pub use header::{expand as expand_page_text, HeaderFooter, PageText, MAX_HEADER_CHARS};
+pub use order::Arrange;
 pub use page::{
     Background, PageSetup, PaperSize, Tint, MARGIN_RANGE_MM, PATTERN_SPACING, UNITS_PER_MM,
 };
@@ -37,6 +45,7 @@ pub use rich::{
     adjust as adjust_runs, all_have as runs_all_have, normalise as normalise_runs,
     restyle as restyle_runs, Run, RunStyle, TEXT_COLOURS,
 };
+pub use shape::{Dash, ShapeKind, ShapeSpec, MAX_RADIUS, MAX_STROKE};
 pub use table::{TableColumn, TableSpec, MAX_CELLS, MAX_COLUMNS, MAX_TEXT as MAX_TABLE_TEXT};
 
 use crate::expr::Expr;
@@ -156,6 +165,7 @@ impl Worksheet {
         let id = RegionId(self.next_id);
         self.next_id += 1;
         let size = kind.default_size();
+        let z = self.top_z();
         Region {
             id,
             pos,
@@ -166,6 +176,7 @@ impl Worksheet {
             border: false,
             runs: Vec::new(),
             label: String::new(),
+            z,
         }
     }
 

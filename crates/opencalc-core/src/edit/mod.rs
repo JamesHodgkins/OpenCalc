@@ -12,7 +12,8 @@ mod history;
 
 use crate::document::{
     adjust_runs, clean_label, normalise_runs, FontStyle, HeaderFooter, PageSetup, PictureSpec,
-    PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Run, Size, TableSpec, Worksheet,
+    PlotSpec, Point, Region, RegionId, RegionKind, ResultFormat, Run, ShapeSpec, Size, TableSpec,
+    Worksheet,
 };
 use crate::registry::{RegistryError, UnitRegistry, UnitSystem};
 use crate::units::UnitDef;
@@ -77,10 +78,18 @@ pub enum Edit {
         id: RegionId,
         size: Size,
     },
+    /// A region's position and size together, as set by dragging a resize handle
+    /// (the top-left corner moves when the left or top edge is dragged). The size
+    /// is kept usable: finite, at least 1 and no more than the file limit.
+    SetRegionBox {
+        id: RegionId,
+        pos: Point,
+        size: Size,
+    },
     /// Replace what a plot region plots (its sources, title and labels).
     SetPlot {
         id: RegionId,
-        spec: PlotSpec,
+        spec: Box<PlotSpec>,
     },
     /// Replace a table region's contents (name, columns and cells).
     SetTable {
@@ -91,6 +100,16 @@ pub enum Edit {
     SetPicture {
         id: RegionId,
         spec: Box<PictureSpec>,
+    },
+    /// Replace a shape region's kind, colours and outline.
+    SetShape {
+        id: RegionId,
+        spec: Box<ShapeSpec>,
+    },
+    /// Set the draw order (`z`) of regions. Each ID at most once. Display only, and
+    /// allowed on a locked region: moving one region in front renumbers the others.
+    SetZ {
+        moves: Vec<(RegionId, i32)>,
     },
     /// Display results in another unit system. Does not change any value.
     SetUnitSystem(UnitSystem),
@@ -280,8 +299,11 @@ impl Worksheet {
                 let RegionKind::Plot(current) = &mut region.kind else {
                     return Err(EditError::WrongKind(*id));
                 };
-                let old = std::mem::replace(current, spec.clone());
-                Ok(Edit::SetPlot { id: *id, spec: old })
+                let old = std::mem::replace(current, PlotSpec::clone(spec));
+                Ok(Edit::SetPlot {
+                    id: *id,
+                    spec: Box::new(old),
+                })
             }
             Edit::SetTable { id, spec } => {
                 self.unlocked(*id)?;
@@ -301,11 +323,48 @@ impl Worksheet {
                 let old = std::mem::replace(current, spec.clone());
                 Ok(Edit::SetPicture { id: *id, spec: old })
             }
+            Edit::SetShape { id, spec } => {
+                self.unlocked(*id)?;
+                let region = self.region_mut(*id)?;
+                let RegionKind::Shape(current) = &mut region.kind else {
+                    return Err(EditError::WrongKind(*id));
+                };
+                let old = std::mem::replace(current, Box::new((**spec).clone().repaired()));
+                Ok(Edit::SetShape { id: *id, spec: old })
+            }
+            Edit::SetZ { moves } => self.set_z(moves),
             Edit::SetRegionSize { id, size } => {
                 self.unlocked(*id)?;
                 let region = self.region_mut(*id)?;
                 let old = std::mem::replace(&mut region.size, *size);
                 Ok(Edit::SetRegionSize { id: *id, size: old })
+            }
+            Edit::SetRegionBox { id, pos, size } => {
+                self.unlocked(*id)?;
+                let region = self.region_mut(*id)?;
+                let usable = |v: f32| {
+                    if v.is_finite() {
+                        v.clamp(1.0, crate::persist::MAX_EXTENT)
+                    } else {
+                        1.0
+                    }
+                };
+                let coord = |v: f32| {
+                    if v.is_finite() {
+                        v.clamp(-crate::persist::MAX_COORD, crate::persist::MAX_COORD)
+                    } else {
+                        0.0
+                    }
+                };
+                let old_pos =
+                    std::mem::replace(&mut region.pos, Point::new(coord(pos.x), coord(pos.y)));
+                let old_size =
+                    std::mem::replace(&mut region.size, Size::new(usable(size.w), usable(size.h)));
+                Ok(Edit::SetRegionBox {
+                    id: *id,
+                    pos: old_pos,
+                    size: old_size,
+                })
             }
             Edit::SetHeaders(h) => Ok(Edit::SetHeaders(Box::new(std::mem::replace(
                 &mut self.headers,
@@ -408,6 +467,23 @@ impl Worksheet {
         }
         self.regions.retain(|r| !ids.contains(&r.id));
         Ok(Edit::InsertRegions { regions: removed })
+    }
+
+    fn set_z(&mut self, moves: &[(RegionId, i32)]) -> Result<Edit, EditError> {
+        for (k, (id, _)) in moves.iter().enumerate() {
+            if moves[..k].iter().any(|(other, _)| other == id) {
+                return Err(EditError::Duplicate(*id));
+            }
+            if self.region(*id).is_none() {
+                return Err(EditError::NoSuchRegion(*id));
+            }
+        }
+        let mut undo = Vec::with_capacity(moves.len());
+        for (id, z) in moves {
+            let region = self.region_mut(*id)?;
+            undo.push((*id, std::mem::replace(&mut region.z, *z)));
+        }
+        Ok(Edit::SetZ { moves: undo })
     }
 
     fn move_regions(&mut self, moves: &[(RegionId, Point)]) -> Result<Edit, EditError> {

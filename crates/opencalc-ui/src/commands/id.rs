@@ -129,6 +129,8 @@ commands! {
     AppMenu: "app.menu", "File menu", icons::FILE_TEXT;
     AppMenuClose: "app.menu_close", "Close File menu", icons::CLOSE;
     AppOptionsClose: "app.options_close", "Close Options", icons::CLOSE;
+    AppOptionsDefaults: "app.options_defaults", "Restore defaults", icons::REFRESH;
+    FileClearRecent: "file.clear_recent", "Clear recent list", icons::DELETE;
     FileTypeRegister: "app.file_type_register", "Open .ocx files with OpenCalc", icons::FILE_NEW;
     FileTypeRemove: "app.file_type_remove", "Stop opening .ocx files with OpenCalc", icons::CLOSE;
     ThemeNeutral: "theme.neutral", "Neutral", icons::THEME;
@@ -161,6 +163,9 @@ commands! {
     TableImportCsv: "table.import_csv", "Import CSV", icons::TABLE;
     TableExportCsv: "table.export_csv", "Export CSV", icons::TABLE;
     InsertPicture: "insert.picture", "Picture", icons::PICTURE;
+    InsertRectangle: "insert.rectangle", "Rectangle", icons::SQUARE;
+    InsertRoundedRectangle: "insert.rounded_rectangle", "Rounded rectangle", icons::ROUNDED;
+    InsertEllipse: "insert.ellipse", "Ellipse", icons::CIRCLE;
     InsertGreek: "insert.greek", "Greek letters", icons::GREEK;
     InsertMatrix: "insert.matrix", "Matrix", icons::TABLE;
     InsertRange: "insert.range", "Range", icons::LIST;
@@ -179,6 +184,10 @@ commands! {
     ArrangeAlignH: "arrange.align_h", "Align horizontally", icons::ALIGN_H;
     ArrangeAlignV: "arrange.align_v", "Align vertically", icons::ALIGN_V;
     ArrangeSeparate: "arrange.separate", "Separate regions", icons::SEPARATE;
+    ArrangeToFront: "arrange.to_front", "Bring to front", icons::BRING_TO_FRONT;
+    ArrangeForward: "arrange.forward", "Bring forward", icons::BRING_FORWARD;
+    ArrangeBackward: "arrange.backward", "Send backward", icons::SEND_BACKWARD;
+    ArrangeToBack: "arrange.to_back", "Send to back", icons::SEND_TO_BACK;
     // Units.
     UnitsSi: "units.si", "SI", icons::RULER;
     UnitsUscs: "units.uscs", "USCS", icons::RULER;
@@ -262,30 +271,127 @@ impl CommandId {
     pub fn is_implemented(self) -> bool {
         use CommandId::*;
         match self {
-            ViewLabels | LabelsClose | GoToLabel(_) | FileTypeRegister | FileTypeRemove
-            | HelpShortcuts | HelpShortcutsClose | RegionTag | LabelClose | RegionLock
-            | ArrangeAlignH | ArrangeAlignV | FormatBold | FormatItalic | FormatUnderline
-            | FormatBorder | UnitsShowInMenu | UnitsDisplayReset | FormatDecimalsMore
-            | FormatDecimalsLess | FormatScientific | FormatEngineering | ClipboardPaste
-            | ClipboardCut | ClipboardCopy | ArrangeSeparate | FileExportPdf | FileExportPng
-            | EditFind | EditReplace | FindNext | FindPrev | FindReplaceOne | FindReplaceAll
-            | FindClose | UnitsDefine | UnitsManage | UnitsClose | FileNew
-            | FileNewFromTemplate | FileSaveAsTemplate | FileOpen | FileSave | FileSaveAs
-            | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
-            | DialogDropRecovery | OpenRecent(_) | UnitsShowIn(_) | GoToFinding(_)
-            | InsertMatrixSize(..) | MatrixClose | InsertMatrix | InsertRange
-            | InsertSolveBlock | InsertProgram | CheckClose | CalcCheck | WarnNext | WarnPrev
-            | FileClose | FileExample | AppQuit | AppMenu | AppMenuClose | TabHome | EditUndo
-            | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot
-            | InsertTable | PictureChoose | TableImportCsv | TableExportCsv | InsertPicture
-            | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid
-            | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
-            | AppOptionsClose | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs
-            | HelpAbout | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_)
-            | PagePaper(_) | PageLandscape(_) | PageMarginMm(_) | DocPageSetup
-            | DocPageSetupClose | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) => {
-                true
-            }
+            ViewLabels
+            | LabelsClose
+            | GoToLabel(_)
+            | FileTypeRegister
+            | FileTypeRemove
+            | HelpShortcuts
+            | HelpShortcutsClose
+            | RegionTag
+            | LabelClose
+            | RegionLock
+            | ArrangeAlignH
+            | ArrangeAlignV
+            | FormatBold
+            | FormatItalic
+            | FormatUnderline
+            | FormatBorder
+            | UnitsShowInMenu
+            | UnitsDisplayReset
+            | FormatDecimalsMore
+            | FormatDecimalsLess
+            | FormatScientific
+            | FormatEngineering
+            | ClipboardPaste
+            | ClipboardCut
+            | ClipboardCopy
+            | ArrangeSeparate
+            | FileExportPdf
+            | FileExportPng
+            | EditFind
+            | EditReplace
+            | FindNext
+            | FindPrev
+            | FindReplaceOne
+            | FindReplaceAll
+            | FindClose
+            | UnitsDefine
+            | UnitsManage
+            | UnitsClose
+            | FileNew
+            | FileNewFromTemplate
+            | FileSaveAsTemplate
+            | FileOpen
+            | FileSave
+            | FileSaveAs
+            | DialogSave
+            | DialogDiscard
+            | DialogCancel
+            | DialogOk
+            | DialogRestore
+            | DialogDropRecovery
+            | OpenRecent(_)
+            | UnitsShowIn(_)
+            | GoToFinding(_)
+            | InsertMatrixSize(..)
+            | MatrixClose
+            | InsertMatrix
+            | InsertRange
+            | InsertSolveBlock
+            | InsertProgram
+            | CheckClose
+            | CalcCheck
+            | WarnNext
+            | WarnPrev
+            | FileClose
+            | FileExample
+            | AppQuit
+            | AppMenu
+            | AppMenuClose
+            | TabHome
+            | EditUndo
+            | EditRedo
+            | RegionDelete
+            | InsertMath
+            | InsertText
+            | InsertArea
+            | InsertPlot
+            | InsertTable
+            | PictureChoose
+            | TableImportCsv
+            | TableExportCsv
+            | InsertPicture
+            | CalcAll
+            | ViewZoomIn
+            | ViewZoomOut
+            | ViewZoomFit
+            | ViewZoom100
+            | ViewGrid
+            | ViewSnap
+            | CalcAuto
+            | ViewFunctions
+            | ViewResetLayout
+            | AppOptions
+            | AppOptionsClose
+            | AppOptionsDefaults
+            | FileClearRecent
+            | ThemeNeutral
+            | ThemeSlate
+            | UnitsSi
+            | UnitsUscs
+            | UnitsCgs
+            | HelpAbout
+            | HelpAboutClose
+            | SelectSheet(_)
+            | CloseSheet(_)
+            | ZoomTo(_)
+            | PagePaper(_)
+            | PageLandscape(_)
+            | PageMarginMm(_)
+            | DocPageSetup
+            | DocPageSetupClose
+            | ViewPageView
+            | ViewDraftView
+            | InsertGreek
+            | InsertSymbol(_)
+            | InsertRectangle
+            | InsertRoundedRectangle
+            | InsertEllipse
+            | ArrangeToFront
+            | ArrangeForward
+            | ArrangeBackward
+            | ArrangeToBack => true,
             HelpGuide => false,
         }
     }

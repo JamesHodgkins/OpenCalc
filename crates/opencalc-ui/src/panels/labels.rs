@@ -25,7 +25,12 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
         .collapsible(false)
         .resizable(true)
         .default_width(360.0)
-        .anchor(Align2::RIGHT_BOTTOM, [-16.0, -40.0])
+        .pivot(Align2::RIGHT_BOTTOM)
+        .default_pos(super::default_pos(
+            ctx,
+            Align2::RIGHT_BOTTOM,
+            [-16.0, -40.0],
+        ))
         .show(ctx, |ui| {
             if list.is_empty() {
                 ui.label(

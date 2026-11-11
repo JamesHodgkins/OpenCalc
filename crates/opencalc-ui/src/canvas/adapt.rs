@@ -45,6 +45,7 @@ pub fn kind_icon(kind: &RegionKind) -> char {
         RegionKind::Plot(_) => icons::PLOT,
         RegionKind::Table(_) => icons::TABLE,
         RegionKind::Picture(_) => icons::PICTURE,
+        RegionKind::Shape(_) => icons::SHAPES,
     }
 }
 
@@ -64,6 +65,7 @@ mod tests {
             border: false,
             runs: Vec::new(),
             label: String::new(),
+            z: 0,
         }
     }
 

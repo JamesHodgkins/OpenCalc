@@ -111,6 +111,13 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | TableImportCsv
             | TableExportCsv
             | InsertPicture
+            | InsertRectangle
+            | InsertRoundedRectangle
+            | InsertEllipse
+            | ArrangeToFront
+            | ArrangeForward
+            | ArrangeBackward
+            | ArrangeToBack
             | ViewZoomIn
             | ViewZoomOut
             | ViewZoomFit
@@ -135,7 +142,16 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
         && (ctx.has_selection
             || !matches!(
                 command,
-                RegionDelete | ClipboardCut | ClipboardCopy | RegionLock | RegionTag | FormatBorder
+                RegionDelete
+                    | ClipboardCut
+                    | ClipboardCopy
+                    | RegionLock
+                    | RegionTag
+                    | FormatBorder
+                    | ArrangeToFront
+                    | ArrangeForward
+                    | ArrangeBackward
+                    | ArrangeToBack
             ))
         && (ctx.selects_math
             || !matches!(

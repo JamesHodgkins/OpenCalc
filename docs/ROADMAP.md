@@ -127,6 +127,31 @@ Needs Phase 1 (booleans, text) and Phase 2 (cancellation). Design and open decis
 - [ ] Scripted controls: combo box, list box, slider, check box, radio button, button, text box.
 - [ ] Scripting bridge (Python first); needs a sandbox and a security review before code.
 
+## Drawing shapes (M)
+
+Design decisions: draw order is a `z` number on each region, kept apart from list order,
+because list order is creation order and decides which of several definitions of one name
+wins; reordering the drawing must never change a calculation. Colours are a palette colour
+with a shade, an exact RGBA value, or Automatic, as in common office programs.
+
+- [x] Core model (2026-11-11): `RegionKind::Shape` (rectangle, rounded rectangle, ellipse; fill, outline, width, corner radius, dash), `Colour`, `Region::z`, `Edit::SetShape` and `Edit::SetZ`, file format 3 (`FILE_FORMAT.md` 3e).
+- [x] Painting and hit-testing (2026-11-11): back to front by `z`; an empty frame is hit only on its outline, so what lies inside stays reachable; shapes appear in PDF and PNG export.
+- [x] Insert > Shapes and draw order commands (Bring to front, Bring forward, Send backward, Send to back; Ctrl+] and Ctrl+[, with Shift for front and back).
+- [x] Shape settings with a palette colour picker (theme colours and shades, standard colours, RGBA and hex); dragging a value is one undo step. They live on a contextual **Shape Format** ribbon tab that appears while one shape is selected and comes forward when a shape is drawn (the floating Shape window is gone).
+- [x] Drag to draw a new shape (the shape insert commands arm a crosshair; drag sets the box, Escape or a click without a drag gives the default size).
+- [x] Resize handles (eight, on one selected shape, picture, plot or area; typeset regions size themselves) and drawing modifiers: Shift keeps equal sides or the original proportions, Ctrl works from the centre; one undo step per drag (`Edit::SetRegionBox`); a status-bar hint while the tool is out.
+- [ ] Alt+click to pick what lies under a filled shape; a right-click menu with the arrange commands.
+- [ ] Lines and arrows (needs end-point handles and its own hit-testing), polygons, rotation, grouping, gradients and shadows, text inside a shape.
+- [ ] Align and distribute that treat shapes like other regions; snap to a shape's edges.
+
+## Ribbon redevelopment (M)
+
+- [x] Contextual tabs and hosted value controls (2026-11-11); the Shape Format tab.
+- [x] Ordinary tabs redone by task: Home (with Calculate and Check), Insert, Draw, Format, Units, View, Help; no tab with one or two buttons; each tab measured to fit the narrowest window (`RIBBON_MAP.md`).
+- [ ] Picture, Table and Plot contextual tabs, replacing their floating windows.
+- [ ] Alt+click to pick under a filled shape; a right-click menu with the draw-order commands.
+- [ ] Lines and arrows in Draw > Shapes.
+
 ## Out of scope for now
 
 Symbolic engine (`->`), `pdesolve`, DOE, signal/image-processing library, Fourier and
@@ -138,6 +163,8 @@ statistics-library items can move up if the Phase 1 function work goes quickly.
 
 | Date | Change |
 |---|---|
+| 2026-11-11 | Drawing shapes: rectangle, rounded rectangle and ellipse regions with fill and outline (palette or RGBA colours), draw order commands, Shape window, file format 3. |
+| 2026-11-10 | Options window: theme, interface size, grid spacing, grid and snap, defaults for new worksheets (unit system and page), recovery interval, clear recent list; settings kept between sessions. |
 | 2026-11-10 | Phase 2: Given / Find solve block (Stage 2), as a form inside a math region. |
 | 2026-11-10 | Phase 6 complete: typeset editing of programs; text values and `on error e`. |
 | 2026-11-10 | Phase 6: recursion; element assignment. |

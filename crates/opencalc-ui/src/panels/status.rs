@@ -28,6 +28,15 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                 .color(theme.text_weak)
                 .size(type_size::BODY),
         );
+        if state.active_sheet().is_some_and(|s| s.canvas.pen.is_some()) {
+            ui.label(
+                RichText::new(
+                    "Drag to draw. Shift: equal sides. Ctrl: from the centre. Esc: cancel.",
+                )
+                .color(theme.accent)
+                .size(type_size::BODY),
+            );
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if state.active.is_none() {
                 return;

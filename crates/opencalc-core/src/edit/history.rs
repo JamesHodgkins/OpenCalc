@@ -21,8 +21,10 @@ enum RunKey {
     Text(RegionId),
     Runs(RegionId),
     Size(RegionId),
+    Box(RegionId),
     Plot(RegionId),
     Table(RegionId),
+    Shape(RegionId),
     Page,
     Headers,
     Format(RegionId),
@@ -42,8 +44,10 @@ impl RunKey {
             Edit::SetText { id, .. } => Some(RunKey::Text(*id)),
             Edit::SetRuns { id, .. } => Some(RunKey::Runs(*id)),
             Edit::SetRegionSize { id, .. } => Some(RunKey::Size(*id)),
+            Edit::SetRegionBox { id, .. } => Some(RunKey::Box(*id)),
             Edit::SetPlot { id, .. } => Some(RunKey::Plot(*id)),
             Edit::SetTable { id, .. } => Some(RunKey::Table(*id)),
+            Edit::SetShape { id, .. } => Some(RunKey::Shape(*id)),
             Edit::SetPageSetup(_) => Some(RunKey::Page),
             Edit::SetHeaders(_) => Some(RunKey::Headers),
             Edit::SetResultFormat { id, .. } => Some(RunKey::Format(*id)),
@@ -51,6 +55,7 @@ impl RunKey {
             Edit::InsertRegions { .. }
             | Edit::DeleteRegions { .. }
             | Edit::SetPicture { .. }
+            | Edit::SetZ { .. }
             | Edit::SetBorder { .. }
             | Edit::SetFontStyle { .. }
             | Edit::SetLocked { .. }

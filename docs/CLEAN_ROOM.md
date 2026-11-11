@@ -25,6 +25,8 @@ clean-room rules in `SPEC.md` section 9.1.
 | 2026-11-08 | SMath Studio forum and plugin pages on data import (`importData`, Xlsx Import/Export plugin, Data Exchange plugin); search-result summaries, pages not opened | That CSV import is a function with decimal and separator arguments, and that Excel is a separate plugin | Behaviour only; nothing copied. Used to confirm `DATA_IO.md` choices |
 | 2026-11-08 | SMath Studio forum threads and bug tracker on temperature units (search-result summaries; pages not opened) | The idea of separate delta units for temperature differences, and the trap that `-5 degC` reads as `-(5 degC)` | Behaviour only, from public forum posts of 2012 to 2019; nothing copied. The owner states Mathcad also stores temperature in kelvin (not verified from PTC documentation) |
 | 2026-11-08 | PTC Community forum threads on angle units in Mathcad Prime (search-result summaries; pages not opened) | That a bare number is radians, that `deg` is an alias for pi/180, and that inverse functions give radians | User-reported behaviour from public forum posts, not PTC documentation; nothing copied |
+| 2026-11-10 | PTC Mathcad Prime help: Mathcad Options and License Settings (r9 to r12), https://support.ptc.com/help/mathcad/r12.0/en/PTC_Mathcad_Help/mathcad_options_and_license_settings.html; Setting Calculation Options and Formatting the Result Display (search-result summaries); PTC Community posts on Mathcad 15 Tools > Preferences auto-save (search-result summaries) | What an engineering worksheet app puts in its application options, for the Options window | Public documentation and user posts; nothing copied. Prime's application options are few (templates, help location, integrations); calculation and result format are worksheet settings there. Mathcad 15 kept auto-save in its preferences |
+| 2026-11-10 | SMath Studio forum posts on Tools > Options (decimal places, exponential threshold, fractions) and its version history (search-result summaries; one forum page opened) | Same purpose | User posts; nothing copied. SMath keeps result precision in application options, applying to every worksheet; OpenCalc did not follow that, so worksheets look the same on every computer |
 | 2026-11-08 | PTC Mathcad help: system of equations functions (find, minerr), https://support.ptc.com/help/mathcad/r11.0/en/PTC_Mathcad_Help/system_of_equations_functions.html; PTC Community posts on solve-block tolerances (search-result summaries) | Solve-block rules: a guess for each unknown, scalar or vector result, Levenberg-Marquardt, minerr returning the best point reached | Public documentation and user-reported behaviour; nothing copied. Which inequality operators are allowed and what find returns on failure are not stated there, so those are repository decisions (`SOLVE_BLOCKS.md`) |
 
 ## Code provenance
@@ -52,3 +54,15 @@ augmented-Lagrangian method for constraints, and the Dormand-Prince 5(4)
 embedded Runge-Kutta pair (its coefficients are the standard published ones,
 checked by tests that they sum as the method requires). No code from QUADPACK,
 Numerical Recipes or any other library was copied.
+
+2026-11-11: Shape regions and draw order are standard drawing features. The colour
+picker's layout (a row of theme colours over lighter and darker shades, a row of
+standard colours, and exact values) is a common convention in office programs; the
+palette colours and shade percentages are our own choices and the code is written
+from scratch. Lucide icons added for shapes and draw order come from the existing
+Lucide font (see the icon note above).
+
+2026-11-11: The ribbon was redone from scratch, organised by task (Home, Insert, Draw, Format,
+Units, View, Help, and contextual tabs for a selected shape). Tab and group names are our own and
+no longer follow PTC's tab names; the earlier note that they did is superseded. Contextual tabs are a
+common convention in office programs; the code is written from scratch.

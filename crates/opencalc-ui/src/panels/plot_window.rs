@@ -49,7 +49,10 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Vec<CanvasCmd>) {
 
 /// Replace the plot's spec with `spec`, as one undo step.
 fn send(out: &mut Vec<CanvasCmd>, id: RegionId, spec: PlotSpec) {
-    out.push(CanvasCmd::Edit(Edit::SetPlot { id, spec }));
+    out.push(CanvasCmd::Edit(Edit::SetPlot {
+        id,
+        spec: Box::new(spec),
+    }));
     out.push(CanvasCmd::Seal);
 }
 
@@ -78,7 +81,7 @@ fn field(
     if response.changed() {
         out.push(CanvasCmd::Edit(Edit::SetPlot {
             id,
-            spec: make(&buffer),
+            spec: Box::new(make(&buffer)),
         }));
     }
     if response.lost_focus() {

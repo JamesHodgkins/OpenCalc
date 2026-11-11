@@ -261,7 +261,7 @@ fn a_format_1_file_is_upgraded_to_2_when_saved_and_keeps_its_plots() {
             s
         })
         .unwrap();
-    assert!(manifest.contains("\"format_version\":2"), "{manifest}");
+    assert!(manifest.contains("\"format_version\":3"), "{manifest}");
     assert_eq!(load_bytes(&saved).unwrap().worksheet, old.worksheet);
 }
 
@@ -458,7 +458,7 @@ fn unknown_entries_and_fields_are_ignored() {
 #[test]
 fn a_newer_format_is_refused_by_name() {
     let bytes = zip_of(&[
-        ("manifest.json", br#"{"format_version":3}"#),
+        ("manifest.json", br#"{"format_version":4}"#),
         ("worksheet.json", b"{}"),
     ]);
     let err = load_bytes(&bytes).unwrap_err();
@@ -466,8 +466,8 @@ fn a_newer_format_is_refused_by_name() {
         matches!(
             err,
             LoadError::TooNew {
-                found: 3,
-                supported: 2
+                found: 4,
+                supported: 3
             }
         ),
         "{err}"

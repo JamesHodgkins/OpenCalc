@@ -6,6 +6,7 @@ use super::geometry::{Point, Size};
 use super::picture::PictureSpec;
 use super::plot::PlotSpec;
 use super::result_format::ResultFormat;
+use super::shape::{ShapeKind, ShapeSpec};
 use super::table::TableSpec;
 use crate::expr::Expr;
 use crate::parser::parse;
@@ -100,6 +101,8 @@ pub enum RegionKind {
     Table(Box<TableSpec>),
     /// Boxed for the same reason as the table.
     Picture(Box<PictureSpec>),
+    /// A drawn shape. Boxed like the others.
+    Shape(Box<ShapeSpec>),
 }
 
 impl RegionKind {
@@ -117,6 +120,11 @@ impl RegionKind {
         RegionKind::Picture(Box::default())
     }
 
+    /// A shape of `kind` with the usual colours.
+    pub fn shape(kind: ShapeKind) -> RegionKind {
+        RegionKind::Shape(Box::new(ShapeSpec::of(kind)))
+    }
+
     /// A blank table.
     pub fn table() -> RegionKind {
         RegionKind::Table(Box::default())
@@ -131,6 +139,7 @@ impl RegionKind {
             RegionKind::Plot(_) => "Plot",
             RegionKind::Table(_) => "Table",
             RegionKind::Picture(_) => "Picture",
+            RegionKind::Shape(s) => s.kind.label(),
         }
     }
 
@@ -143,6 +152,7 @@ impl RegionKind {
             RegionKind::Plot(_) | RegionKind::Table(_) | RegionKind::Picture(_) => {
                 Size::new(260.0, 170.0)
             }
+            RegionKind::Shape(_) => Size::new(160.0, 100.0),
         }
     }
 
@@ -202,6 +212,14 @@ pub struct Region {
     /// region while editing, never on the printed page.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub label: String,
+    /// Draw order: a higher number is painted later, so lies on top. Equal numbers
+    /// keep list order. Never affects calculation (see `order`).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub z: i32,
+}
+
+fn is_zero(z: &i32) -> bool {
+    *z == 0
 }
 
 /// Longest label the program sets, in characters.

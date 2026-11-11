@@ -100,6 +100,7 @@ pub(super) fn setup(name: &str, state: AppState) -> Rig {
             app,
             time: 0.0,
             copied: None,
+            held: Default::default(),
         },
         script,
         dir,
@@ -562,6 +563,28 @@ fn restart(name: &str, dir: &Path, app_dir: Option<PathBuf>) -> Rig {
     next.h.app.enable_autosave(app_dir);
     next.h.app.autosave_every = 1.0;
     next
+}
+
+#[test]
+fn turning_recovery_files_off_writes_none_and_removes_those_written() {
+    let mut t = setup("auto-off", blank());
+    let dir = t.autosave();
+    t.type_into_active("a := 1");
+    t.tick();
+    assert_eq!(Rig::files_in(&dir).len(), 1, "on: the change is kept");
+
+    let mut off = t.state().settings;
+    off.recovery = 0;
+    let ctx = t.h.ctx.clone();
+    t.h.app.change_settings(&ctx, off);
+    t.tick();
+    assert!(Rig::files_in(&dir).is_empty(), "off: the old file goes");
+    t.type_into_active("b := 2");
+    t.tick();
+    assert!(
+        Rig::files_in(&dir).is_empty(),
+        "off: nothing new is written"
+    );
 }
 
 #[test]

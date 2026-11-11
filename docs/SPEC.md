@@ -64,6 +64,8 @@ Categories: **Core** (required for v1), **Secondary** (nice to have), **Advanced
 | Plot region | Core | X-Y line and scatter. |
 | Table region | Secondary | Data input and output. |
 | Picture region (image embed) | Secondary | |
+| Shape regions (rectangle, rounded rectangle, ellipse) with fill and outline | Secondary | Palette colours with shades, or exact RGBA. |
+| Draw order (bring to front, forward, backward, send to back) | Secondary | Separate from calculation order. |
 | Region tags and internal hyperlinks | Secondary | Lets equations reference each other by name. |
 | Locked areas and worksheet protection | Secondary | Stops accidental edits to a finished calculation. |
 | Ruler and guidelines | Secondary | |
@@ -221,6 +223,7 @@ pub enum RegionKind {
     Plot(PlotRegion),
     Table(TableRegion),
     Picture(PictureRegion),
+    Shape(ShapeSpec),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -407,6 +410,8 @@ pub struct Evaluator {
 
 **The File menu** (`panels/app_menu.rs`) drops from the app button. The left column lists New worksheet, Open, Save, Save As, Export and Close worksheet, each with its icon and shortcut, then Options, About and Quit at its foot under a divider. The right pane shows the recent worksheets (numbered 1 to 9 and 0, with the folder under the name, and "Open" on any already open), or, while New, Save As or Export is chosen, that command's choices, each with a line saying what it does. The left row whose pane shows takes the pane's `raised` tone and joins it, with a short accent bar. Resting the pointer on a row for 0.15 s opens its pane; a click on a row runs it (Export, which runs nothing itself, opens its pane). Keys: Up and Down move, Right enters the pane, Left leaves it, Enter or Space runs, a digit opens that recent worksheet, Escape closes. Running any command closes the menu.
 
+**The Options window** (`panels/options.rs`, settings in `settings.rs`) opens from Options in the File menu. A list of sections on the left (General, Worksheet, New worksheets, Files), the chosen section's settings on the right, each a row of name, control and one line saying what it does. Changes apply at once and are kept between sessions; there is no OK or Cancel, only Restore defaults and Close. General: theme, interface size (80% to 150%; worksheet zoom is separate), a link to the keyboard shortcuts. Worksheet: grid spacing (1/16, 1/8 or 1/4 in, 2 or 5 mm; the stronger line falls on each inch or centimetre), show grid, snap to grid. New worksheets: the unit system, paper, orientation, margin and background pattern a worksheet made with New starts with; an open worksheet keeps its own. Files: how often recovery files are written (15 s to 5 min, or off), clearing the recent list, and the `.ocx` file type where the system allows it. Settings belong to the computer, never to a worksheet, so nothing in them changes what a worksheet calculates or how it looks elsewhere. They are stored as `key=value` lines; a value that does not parse is ignored.
+
 ### 4.1a Floating and overlay rules
 - Popups and menus use the `panel_raised` tone, a 2 px margin and 22 px rows. Lists over 12 rows scroll.
 - Popups close on a click outside them or on Escape.
@@ -527,7 +532,7 @@ Outline colours: `border` `#474747` (neutral) or `#4A5466` (slate); `border_stro
 
 **Red is used for both the accent and errors.** The rule that keeps them apart: `accent` is only for fills and selection; `error` is only for error text and icons. Errors are also marked with an icon, so they never rely on colour alone. The contrast test in section 4.9 checks `accent_text` and `error` against every tone.
 
-Palettes are persisted by key (`neutral`, `slate`). Preferences offers both.
+Palettes are persisted by key (`neutral`, `slate`). The Options window offers both.
 
 **Metrics.**
 - Spacing unit 8 px. Everything is a multiple of it.
@@ -627,7 +632,7 @@ pub struct RibbonOutput { pub clicked: Option<&'static str>, pub slots: Vec<(&'s
 | Tab | Panels |
 |---|---|
 | Home | Clipboard (Paste split, Cut, Copy), Edit (Undo, Redo, Find, Replace), Region (Delete, Lock, Tag) |
-| Insert | Math (Math region), Text (Text region), Layout (Area, Plot, Table, Picture), Symbols (Greek toolbar in a flyout) |
+| Insert | Math (Math region), Text (Text region), Layout (Area, Plot, Table, Picture, Shapes), Symbols (Greek toolbar in a flyout) |
 | Format | Font (Bold, Italic, size split), Number (decimal places, scientific, engineering), Arrange (align, separate regions) |
 | Units | Unit System (SI, USCS, CGS split), Convert (display unit), Custom (define unit, manage units) |
 | Calculate | Recalculate (all, changed), Check (run warnings), Warnings (list, next, previous) |
@@ -803,7 +808,7 @@ If either takes much longer than expected, revise the design before building on 
 - [ ] PDF and PNG export.
 - [ ] Copy regions to clipboard as images.
 - [ ] Separate overlapping regions; align; area region.
-- [ ] Preferences: precision, number format, default unit system, shortcut remapping.
+- [ ] Preferences: precision, number format, default unit system, shortcut remapping. **Partly done (2026-11-10):** the Options window (section 4.1) sets the theme, interface size, grid spacing, recovery interval and the unit system and page of new worksheets. Not done: default precision and number format (these change how a worksheet looks, so they should be worksheet settings, as in Mathcad, not computer ones) and shortcut remapping.
 - [ ] Headless `opencalc check`.
 - [ ] Packaging for Windows, macOS and Linux.
 - [ ] User guide and file-format spec.

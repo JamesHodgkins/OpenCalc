@@ -6,7 +6,6 @@ use eframe::egui::Rect;
 use opencalc_core::document::{Point, Region, RegionId};
 
 use super::adapt::{rect_of, Sizes};
-use super::view::GRID;
 
 /// Space left between regions that were pushed apart, in document units.
 pub const GAP: f32 = 12.0;
@@ -19,7 +18,7 @@ fn overlap(a: Rect, b: Rect) -> bool {
 
 /// The new top-left of each region that has to move, or `None` if there are too
 /// many regions. A region is moved onto the grid, so the result stays tidy.
-pub fn separate(regions: &[Region], sizes: &Sizes) -> Option<Vec<(RegionId, Point)>> {
+pub fn separate(regions: &[Region], sizes: &Sizes, grid: f32) -> Option<Vec<(RegionId, Point)>> {
     if regions.len() > MAX_REGIONS {
         return None;
     }
@@ -35,7 +34,7 @@ pub fn separate(regions: &[Region], sizes: &Sizes) -> Option<Vec<(RegionId, Poin
         let mut rect = original;
         // Each push moves it strictly down, past one more region, so this ends.
         while let Some(above) = placed.iter().find(|p| overlap(**p, rect)) {
-            let top = ((above.max.y + GAP) / GRID).ceil() * GRID;
+            let top = ((above.max.y + GAP) / grid).ceil() * grid;
             rect = rect.translate(eframe::egui::vec2(0.0, top - rect.min.y));
         }
         if rect != original {
@@ -65,11 +64,12 @@ mod tests {
             border: false,
             runs: Vec::new(),
             label: String::new(),
+            z: 0,
         }
     }
 
     fn run(regions: &[Region]) -> Vec<(u64, f32)> {
-        separate(regions, &Sizes::new())
+        separate(regions, &Sizes::new(), 12.0)
             .unwrap()
             .into_iter()
             .map(|(id, p)| (id.0, p.y))
@@ -104,7 +104,7 @@ mod tests {
         let pile: Vec<Region> = (0..6)
             .map(|i| at(i + 1, 10.0, 10.0 + i as f32, 80.0, 30.0))
             .collect();
-        let moves = separate(&pile, &Sizes::new()).unwrap();
+        let moves = separate(&pile, &Sizes::new(), 12.0).unwrap();
         let mut after = pile.clone();
         for (id, p) in &moves {
             after.iter_mut().find(|r| r.id == *id).unwrap().pos = *p;
@@ -140,6 +140,6 @@ mod tests {
         let many: Vec<Region> = (0..=MAX_REGIONS as u64)
             .map(|i| at(i + 1, 0.0, 0.0, 1.0, 1.0))
             .collect();
-        assert!(separate(&many, &Sizes::new()).is_none());
+        assert!(separate(&many, &Sizes::new(), 12.0).is_none());
     }
 }

@@ -34,10 +34,12 @@ mod headers;
 mod insert;
 mod instance;
 mod label;
+mod options;
 mod pictures;
 mod plot_view;
 mod plots;
 mod rich_text;
+mod shapes;
 mod tables;
 mod templates;
 mod text_edit;
@@ -99,6 +101,8 @@ struct Harness {
     time: f64,
     /// The last text the app put on the clipboard.
     copied: Option<String>,
+    /// Modifier keys held down for every frame (set by a test, like holding Shift).
+    held: Modifiers,
 }
 
 impl Harness {
@@ -114,6 +118,7 @@ impl Harness {
             app,
             time: 0.0,
             copied: None,
+            held: Modifiers::NONE,
         }
     }
 
@@ -123,6 +128,7 @@ impl Harness {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1280.0, 780.0))),
             time: Some(self.time),
             events,
+            modifiers: self.held,
             ..Default::default()
         };
         let app = &mut self.app;
@@ -410,7 +416,10 @@ fn edit_plot(h: &mut Harness, spec: PlotSpec) {
     let id = plot_id(h);
     let i = h.app.state.active.expect("a sheet");
     let cmds = vec![
-        crate::canvas::CanvasCmd::Edit(Edit::SetPlot { id, spec }),
+        crate::canvas::CanvasCmd::Edit(Edit::SetPlot {
+            id,
+            spec: Box::new(spec),
+        }),
         crate::canvas::CanvasCmd::Seal,
     ];
     let fx = crate::app::dispatch::apply_canvas(&mut h.app.state, i, cmds);
@@ -491,7 +500,7 @@ fn clicking_selects_and_dragging_moves_a_region() {
     );
     let moved = h.region_pos(F);
     // Snapped to the grid, and moved about (100, 60) from where it began.
-    let grid = crate::canvas::view::GRID;
+    let grid = h.sheet().canvas.grid.step();
     assert_eq!(moved.x % grid, 0.0);
     assert_eq!(moved.y % grid, 0.0);
     assert!(
@@ -1312,13 +1321,26 @@ fn clicking_a_flyout_that_floats_over_the_canvas_does_not_end_editing() {
     h.settle();
     let id = h.new_math();
     h.type_text("x:=");
-    // The Greek flyout (Math tab, Symbols panel) hangs below the ribbon, over the page.
-    h.app.ribbon_state.open_panel = Some((0, 5));
+    // The Greek flyout (Insert tab, Symbols group) hangs below the ribbon, over the page.
+    let tab = h
+        .app
+        .ribbon
+        .tabs
+        .iter()
+        .position(|t| t.title == "Insert")
+        .unwrap();
+    let panel = h.app.ribbon.tabs[tab]
+        .panels
+        .iter()
+        .position(|p| p.title == "Symbols")
+        .unwrap();
+    h.app.ribbon_state.active_tab = tab;
+    h.app.ribbon_state.open_panel = Some((tab, panel));
     h.frame();
     h.frame();
     let flyout = h
         .ctx
-        .memory(|m| m.area_rect(egui::Id::new(("ribbon-flyout", (0usize, 5usize)))))
+        .memory(|m| m.area_rect(egui::Id::new(("ribbon-flyout", (tab, panel)))))
         .expect("the flyout is open");
     assert!(
         flyout.max.y > 100.0,

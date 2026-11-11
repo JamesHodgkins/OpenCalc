@@ -38,7 +38,12 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, typed: &mut Vec
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
-        .anchor(Align2::RIGHT_BOTTOM, [-16.0, -40.0])
+        .pivot(Align2::RIGHT_BOTTOM)
+        .default_pos(super::default_pos(
+            ctx,
+            Align2::RIGHT_BOTTOM,
+            [-16.0, -40.0],
+        ))
         .show(ctx, |ui| body(ui, state, out, typed));
     if !open {
         out.push(CommandId::FindClose);

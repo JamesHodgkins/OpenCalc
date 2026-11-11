@@ -47,7 +47,8 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, edits: &mut Vec
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
-        .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+        .pivot(Align2::CENTER_CENTER)
+        .default_pos(super::default_pos(ctx, Align2::CENTER_CENTER, [0.0, 0.0]))
         .show(ctx, |ui| {
             ui.label("A short name to find this region by.");
             let before = form.text.clone();

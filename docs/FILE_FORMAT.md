@@ -1,4 +1,4 @@
-# The OpenCalc file format (`.ocx`), version 2
+# The OpenCalc file format (`.ocx`), version 3
 
 This describes what is in a worksheet file, so other tools can read or write one.
 The code that does it is `opencalc-core/src/persist*`. The examples below are
@@ -25,7 +25,7 @@ suit version control. A reader must not rely on that.
 ## 2. The manifest
 
 ```json manifest
-{"format_version":2,"app":"opencalc 0.0.1"}
+{"format_version":3,"app":"opencalc 0.0.1"}
 ```
 
 - `format_version` (whole number, at least 1) is the version of `worksheet.json`.
@@ -116,6 +116,23 @@ plain. `colour` is 0 to 7, an index into the text palette (red, blue, green, ora
 purple, teal, grey, brown). A run adds to the region's own `style` (bold or italic
 for all of it). A reader trims runs to the length of the text and drops colours it
 does not know. A text region with no `runs` is exactly a pre-rich-text region.
+
+### 3e. Shapes and draw order (version 3)
+
+A shape region has the kind `{"Shape": {...}}`; every field is optional and a missing
+one takes its default: `kind` (`Rectangle`, `RoundedRectangle` or `Ellipse`), `fill`
+and `stroke` (a colour, or `null` for none), `stroke_width` and `corner_radius` (document
+units, 0 to 40 and 0 to 1000), and `dash` (`Solid`, `Dashed` or `Dotted`).
+
+A colour is `"Auto"` (the program's choice for the use), `{"Theme": {"slot": 4, "shade": 2}}`
+(a palette place: `slot` 0 to 9, `shade` 0 to 5, where 0 is the colour itself, 1 to 3 are
+lighter and 4 to 5 are darker) or `{"Rgba": [47, 107, 214, 255]}` (exact; alpha 255 is
+opaque). A place outside the palette reads as `"Auto"`. Numbers out of range are
+brought into range.
+
+Any region may have `z` beside `kind`: its draw order. A higher number is painted later,
+so lies on top; regions with the same number keep their order in the list. It is left
+out when 0 and never affects calculation, which follows list order.
 
 ### 3c. Pictures (version 2)
 

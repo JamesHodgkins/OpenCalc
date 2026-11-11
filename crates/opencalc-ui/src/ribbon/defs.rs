@@ -1,12 +1,12 @@
-//! The OpenCalc ribbon as data (`docs/RIBBON_MAP.md`): Mathcad-style tabs.
+//! The OpenCalc ribbon as data (`docs/RIBBON_MAP.md`).
 //!
 //! Items name a command only; their label and icon come from the command table.
-//! Tab names follow PTC's public guides; which commands sit where is our own
-//! grouping (see `docs/UI_ALIGNMENT.md`).
+//! The tabs are organised by task (Home, Insert, Draw, Format, Units, View, Help),
+//! with contextual tabs for the selected thing; the grouping is our own.
 
 use crate::commands::{greek_symbols, CommandId};
 
-use super::{Cell, Column, Item, Panel, Ribbon, Split, Tab};
+use super::{Cell, Column, Context, Item, Panel, Ribbon, Split, Tab};
 
 fn it(command: CommandId) -> Item {
     Item::of(command)
@@ -27,40 +27,25 @@ fn stack(commands: &[CommandId]) -> Column {
 pub fn opencalc_ribbon() -> Ribbon {
     Ribbon {
         tabs: vec![
-            math(),
-            functions(),
-            matrices(),
-            plots(),
-            math_formatting(),
-            calculation(),
-            document(),
+            home(),
+            insert(),
+            draw(),
+            format(),
+            units(),
+            view(),
             help(),
+            shape_format(),
         ],
     }
 }
 
-/// Regions, clipboard, symbols and units.
-fn math() -> Tab {
-    let greek: Vec<Item> = greek_symbols()
-        .map(|c| it(CommandId::InsertSymbol(c)))
-        .collect();
+/// Everyday work: the clipboard, new regions, finding, region housekeeping and
+/// calculating. Nothing here is rare, so it is the tab the program opens on.
+fn home() -> Tab {
     Tab {
-        title: "Math",
+        title: "Home",
+        context: None,
         panels: vec![
-            panel(
-                "Regions",
-                vec![
-                    Column::Large(it(CommandId::InsertMath)),
-                    Column::Large(it(CommandId::InsertText)),
-                ],
-            ),
-            panel(
-                "Programming",
-                vec![
-                    Column::Large(it(CommandId::InsertSolveBlock)),
-                    Column::Large(it(CommandId::InsertProgram)),
-                ],
-            ),
             panel(
                 "Clipboard",
                 vec![
@@ -69,6 +54,13 @@ fn math() -> Tab {
                         items: vec![it(CommandId::ClipboardPaste)],
                     }),
                     stack(&[CommandId::ClipboardCut, CommandId::ClipboardCopy]),
+                ],
+            ),
+            panel(
+                "Regions",
+                vec![
+                    Column::Large(it(CommandId::InsertMath)),
+                    Column::Large(it(CommandId::InsertText)),
                 ],
             ),
             panel(
@@ -83,13 +75,139 @@ fn math() -> Tab {
                     CommandId::RegionTag,
                 ])],
             ),
+            panel(
+                "Calculate",
+                vec![
+                    Column::Large(it(CommandId::CalcAll)),
+                    stack(&[CommandId::CalcAuto]),
+                ],
+            ),
+            panel(
+                "Check",
+                vec![
+                    Column::Large(it(CommandId::CalcCheck)),
+                    stack(&[CommandId::WarnNext, CommandId::WarnPrev]),
+                ],
+            ),
+        ],
+    }
+}
+
+/// Things that are added to a worksheet besides plain maths and text: data,
+/// graphics, programs, symbols and functions.
+fn insert() -> Tab {
+    let greek: Vec<Item> = greek_symbols()
+        .map(|c| it(CommandId::InsertSymbol(c)))
+        .collect();
+    Tab {
+        title: "Insert",
+        context: None,
+        panels: vec![
+            panel(
+                "Data",
+                vec![
+                    Column::Large(it(CommandId::InsertMatrix)),
+                    Column::Large(it(CommandId::InsertRange)),
+                    Column::Large(it(CommandId::InsertTable)),
+                ],
+            ),
+            panel(
+                "Objects",
+                vec![
+                    Column::Large(it(CommandId::InsertPlot)),
+                    Column::Large(it(CommandId::InsertPicture)),
+                    Column::Large(it(CommandId::InsertArea)),
+                ],
+            ),
+            panel(
+                "Programming",
+                vec![
+                    Column::Large(it(CommandId::InsertSolveBlock)),
+                    Column::Large(it(CommandId::InsertProgram)),
+                ],
+            ),
             Panel {
                 title: "Symbols",
                 columns: vec![Column::Large(it(CommandId::InsertGreek))],
                 extra: greek,
             },
             panel(
-                "Unit System",
+                "Functions",
+                vec![Column::Large(it(CommandId::ViewFunctions))],
+            ),
+        ],
+    }
+}
+
+/// Drawing and laying out: shapes, the order they are painted in, and aligning
+/// regions. (More drawing tools, such as lines, belong here as they arrive.)
+fn draw() -> Tab {
+    Tab {
+        title: "Draw",
+        context: None,
+        panels: vec![
+            panel(
+                "Shapes",
+                vec![
+                    Column::Large(it(CommandId::InsertRectangle)),
+                    Column::Large(it(CommandId::InsertRoundedRectangle)),
+                    Column::Large(it(CommandId::InsertEllipse)),
+                ],
+            ),
+            panel(
+                "Order",
+                vec![
+                    stack(&[CommandId::ArrangeToFront, CommandId::ArrangeForward]),
+                    stack(&[CommandId::ArrangeBackward, CommandId::ArrangeToBack]),
+                ],
+            ),
+            panel(
+                "Align",
+                vec![stack(&[
+                    CommandId::ArrangeAlignH,
+                    CommandId::ArrangeAlignV,
+                    CommandId::ArrangeSeparate,
+                ])],
+            ),
+        ],
+    }
+}
+
+/// How things look: text style, how numbers are shown, and borders.
+fn format() -> Tab {
+    Tab {
+        title: "Format",
+        context: None,
+        panels: vec![
+            panel(
+                "Text",
+                vec![Column::Rows(vec![vec![
+                    Cell::Icon(it(CommandId::FormatBold)),
+                    Cell::Icon(it(CommandId::FormatItalic)),
+                    Cell::Icon(it(CommandId::FormatUnderline)),
+                ]])],
+            ),
+            panel(
+                "Numbers",
+                vec![
+                    stack(&[CommandId::FormatDecimalsMore, CommandId::FormatDecimalsLess]),
+                    stack(&[CommandId::FormatScientific, CommandId::FormatEngineering]),
+                ],
+            ),
+            panel("Region", vec![Column::Large(it(CommandId::FormatBorder))]),
+        ],
+    }
+}
+
+/// Units: the system results are shown in, the unit of one result, and the
+/// worksheet's own units.
+fn units() -> Tab {
+    Tab {
+        title: "Units",
+        context: None,
+        panels: vec![
+            panel(
+                "Unit system",
                 vec![Column::LargeSplit(Split {
                     label: None,
                     items: vec![
@@ -100,103 +218,25 @@ fn math() -> Tab {
                 })],
             ),
             panel(
-                "Result Unit",
+                "Result unit",
                 vec![Column::Rows(vec![vec![Cell::Menu {
                     menu: it(CommandId::UnitsShowInMenu),
                     first: it(CommandId::UnitsDisplayReset),
                 }]])],
             ),
             panel(
-                "Custom Units",
+                "Custom units",
                 vec![stack(&[CommandId::UnitsDefine, CommandId::UnitsManage])],
             ),
         ],
     }
 }
 
-fn functions() -> Tab {
+/// How the worksheet is shown: zoom, page, guides and windows.
+fn view() -> Tab {
     Tab {
-        title: "Functions",
-        panels: vec![panel(
-            "Insert",
-            vec![Column::Large(it(CommandId::ViewFunctions))],
-        )],
-    }
-}
-
-fn matrices() -> Tab {
-    Tab {
-        title: "Matrices/Tables",
-        panels: vec![
-            panel(
-                "Matrix",
-                vec![
-                    Column::Large(it(CommandId::InsertMatrix)),
-                    Column::Large(it(CommandId::InsertRange)),
-                ],
-            ),
-            panel("Table", vec![Column::Large(it(CommandId::InsertTable))]),
-        ],
-    }
-}
-
-fn plots() -> Tab {
-    Tab {
-        title: "Plots",
-        panels: vec![panel(
-            "Insert",
-            vec![Column::Large(it(CommandId::InsertPlot))],
-        )],
-    }
-}
-
-fn math_formatting() -> Tab {
-    Tab {
-        title: "Math Formatting",
-        panels: vec![
-            panel(
-                "Result",
-                vec![
-                    stack(&[CommandId::FormatDecimalsMore, CommandId::FormatDecimalsLess]),
-                    stack(&[CommandId::FormatScientific, CommandId::FormatEngineering]),
-                ],
-            ),
-            panel(
-                "Font",
-                vec![Column::Rows(vec![vec![
-                    Cell::Icon(it(CommandId::FormatBold)),
-                    Cell::Icon(it(CommandId::FormatItalic)),
-                    Cell::Icon(it(CommandId::FormatUnderline)),
-                ]])],
-            ),
-            panel("Region", vec![Column::Large(it(CommandId::FormatBorder))]),
-        ],
-    }
-}
-
-fn calculation() -> Tab {
-    Tab {
-        title: "Calculation",
-        panels: vec![
-            panel(
-                "Calculate",
-                vec![
-                    Column::Large(it(CommandId::CalcAll)),
-                    stack(&[CommandId::CalcAuto]),
-                ],
-            ),
-            panel("Check", vec![Column::Large(it(CommandId::CalcCheck))]),
-            panel(
-                "Errors",
-                vec![stack(&[CommandId::WarnNext, CommandId::WarnPrev])],
-            ),
-        ],
-    }
-}
-
-fn document() -> Tab {
-    Tab {
-        title: "Document",
+        title: "View",
+        context: None,
         panels: vec![
             panel(
                 "Zoom",
@@ -225,18 +265,42 @@ fn document() -> Tab {
                 ])],
             ),
             panel(
-                "Arrange",
-                vec![stack(&[
-                    CommandId::ArrangeAlignH,
-                    CommandId::ArrangeAlignV,
-                    CommandId::ArrangeSeparate,
+                "Window",
+                vec![Column::Large(it(CommandId::ViewResetLayout))],
+            ),
+        ],
+    }
+}
+
+/// Contextual: the settings of the selected shape.
+fn shape_format() -> Tab {
+    use crate::ribbon::{Control, ShapeControl as S};
+    Tab {
+        title: "Shape Format",
+        context: Some(Context::Shape),
+        panels: vec![
+            panel(
+                "Shape",
+                vec![Column::Controls(vec![
+                    Control::Shape(S::Kind),
+                    Control::Shape(S::Corners),
                 ])],
             ),
             panel(
-                "Insert",
-                vec![stack(&[CommandId::InsertArea, CommandId::InsertPicture])],
+                "Style",
+                vec![
+                    Column::Controls(vec![Control::Shape(S::Fill), Control::Shape(S::Outline)]),
+                    Column::Controls(vec![Control::Shape(S::Width), Control::Shape(S::Line)]),
+                ],
             ),
-            panel("Window", vec![stack(&[CommandId::ViewResetLayout])]),
+            panel(
+                "Arrange",
+                vec![
+                    stack(&[CommandId::ArrangeToFront, CommandId::ArrangeForward]),
+                    stack(&[CommandId::ArrangeBackward, CommandId::ArrangeToBack]),
+                    stack(&[CommandId::RegionLock, CommandId::RegionDelete]),
+                ],
+            ),
         ],
     }
 }
@@ -244,6 +308,7 @@ fn document() -> Tab {
 fn help() -> Tab {
     Tab {
         title: "Help",
+        context: None,
         panels: vec![panel(
             "Help",
             vec![
@@ -261,14 +326,25 @@ mod tests {
     use std::collections::HashSet;
 
     fn all_items(r: &Ribbon) -> Vec<&Item> {
+        items_of(r.tabs.iter().collect())
+    }
+
+    /// The items of the ordinary tabs: each command sits in exactly one of them. A
+    /// contextual tab repeats commands for the thing selected, as other apps do.
+    fn ordinary_items(r: &Ribbon) -> Vec<&Item> {
+        items_of(r.tabs.iter().filter(|t| t.context.is_none()).collect())
+    }
+
+    fn items_of(tabs: Vec<&Tab>) -> Vec<&Item> {
         let mut v = Vec::new();
-        for p in r.tabs.iter().flat_map(|t| &t.panels) {
+        for p in tabs.into_iter().flat_map(|t| &t.panels) {
             v.extend(p.extra.iter());
             for c in &p.columns {
                 match c {
                     Column::Large(i) => v.push(i),
                     Column::LargeSplit(s) => v.extend(s.items.iter()),
                     Column::Stack(is) => v.extend(is.iter()),
+                    Column::Controls(_) => {}
                     Column::Rows(rows) => {
                         for cell in rows.iter().flatten() {
                             match cell {
@@ -293,53 +369,209 @@ mod tests {
     }
 
     #[test]
-    fn the_tabs_are_mathcads() {
+    fn the_tabs_are_organised_by_task() {
         let titles: Vec<_> = opencalc_ribbon().tabs.iter().map(|t| t.title).collect();
         assert_eq!(
             titles,
             [
-                "Math",
-                "Functions",
-                "Matrices/Tables",
-                "Plots",
-                "Math Formatting",
-                "Calculation",
-                "Document",
-                "Help"
+                "Home",
+                "Insert",
+                "Draw",
+                "Format",
+                "Units",
+                "View",
+                "Help",
+                "Shape Format"
             ]
         );
     }
 
     #[test]
+    fn a_contextual_tab_shows_only_while_its_context_is_selected() {
+        let r = opencalc_ribbon();
+        let shape = r
+            .tabs
+            .iter()
+            .position(|t| t.context == Some(Context::Shape))
+            .unwrap();
+        assert!(!r.visible(&[]).contains(&shape));
+        assert!(r.visible(&[Context::Shape]).contains(&shape));
+        assert_eq!(r.visible(&[]).len() + 1, r.tabs.len());
+        // The tab on show falls back to the first when its context goes.
+        assert_eq!(r.current(shape, &[]), 0);
+        assert_eq!(r.current(shape, &[Context::Shape]), shape);
+        assert_eq!(r.current(2, &[]), 2, "an ordinary tab is left alone");
+    }
+
+    #[test]
     fn the_panels_are_as_documented_in_the_ribbon_map() {
         assert_eq!(
-            panel_titles("Math"),
+            panel_titles("Home"),
             [
-                "Regions",
-                "Programming",
                 "Clipboard",
+                "Regions",
                 "Edit",
                 "Region",
-                "Symbols",
-                "Unit System",
-                "Result Unit",
-                "Custom Units"
+                "Calculate",
+                "Check"
             ]
         );
-        assert_eq!(panel_titles("Functions"), ["Insert"]);
-        assert_eq!(panel_titles("Matrices/Tables"), ["Matrix", "Table"]);
-        assert_eq!(panel_titles("Plots"), ["Insert"]);
         assert_eq!(
-            panel_titles("Math Formatting"),
-            ["Result", "Font", "Region"]
+            panel_titles("Insert"),
+            ["Data", "Objects", "Programming", "Symbols", "Functions"]
         );
+        assert_eq!(panel_titles("Draw"), ["Shapes", "Order", "Align"]);
+        assert_eq!(panel_titles("Format"), ["Text", "Numbers", "Region"]);
         assert_eq!(
-            panel_titles("Calculation"),
-            ["Calculate", "Check", "Errors"]
+            panel_titles("Units"),
+            ["Unit system", "Result unit", "Custom units"]
         );
-        assert_eq!(
-            panel_titles("Document"),
-            ["Zoom", "Page", "Show", "Arrange", "Insert", "Window"]
+        assert_eq!(panel_titles("View"), ["Zoom", "Page", "Show", "Window"]);
+        assert_eq!(panel_titles("Help"), ["Help"]);
+        assert_eq!(panel_titles("Shape Format"), ["Shape", "Style", "Arrange"]);
+    }
+
+    /// A tab with one control is a sign the ribbon is badly divided: every ordinary
+    /// tab holds at least four commands in at least two groups, except Help.
+    #[test]
+    fn no_ordinary_tab_is_nearly_empty() {
+        let r = opencalc_ribbon();
+        for tab in r
+            .tabs
+            .iter()
+            .filter(|t| t.context.is_none() && t.title != "Help")
+        {
+            let count = items_of(vec![tab]).len();
+            assert!(count >= 4, "{} has only {count} commands", tab.title);
+            assert!(tab.panels.len() >= 2, "{} has one group", tab.title);
+        }
+    }
+
+    /// Every tab, drawn for real, must fit the narrowest window the program allows.
+    #[test]
+    fn every_tab_fits_the_smallest_window() {
+        use crate::ribbon::{CommandSource, ControlHost, RibbonState};
+        use eframe::egui;
+        struct All;
+        impl CommandSource for All {
+            fn is_enabled(&self, _: CommandId) -> bool {
+                true
+            }
+            fn shortcut_text(&self, _: CommandId) -> Option<String> {
+                None
+            }
+        }
+        struct Blank;
+        impl ControlHost for Blank {
+            fn control(
+                &mut self,
+                _: &mut egui::Ui,
+                _: &crate::theme::Theme,
+                _: crate::ribbon::Control,
+            ) {
+            }
+        }
+        let ribbon = opencalc_ribbon();
+        let theme = crate::theme::Theme::paper();
+        let ctx = egui::Context::default();
+        let all = [Context::Shape];
+        for tab in 0..ribbon.tabs.len() {
+            let mut width = 0.0;
+            let mut state = RibbonState {
+                active_tab: tab,
+                ..Default::default()
+            };
+            // Two frames: the first lays text out, the second has settled.
+            for _ in 0..2 {
+                let input = egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(3000.0, 400.0),
+                    )),
+                    ..Default::default()
+                };
+                let _ = ctx.run(input, |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        width = ribbon
+                            .show(ui, &theme, &mut state, &All, &all, &mut Blank)
+                            .width;
+                    });
+                });
+            }
+            // The ribbon sits inside 6 px margins on each side.
+            let room = crate::MIN_WIDTH - 12.0;
+            assert!(
+                width <= room,
+                "the {} tab needs {width:.0} px; the smallest window leaves {room:.0}",
+                ribbon.tabs[tab].title
+            );
+        }
+    }
+
+    /// The widgets of a column of controls start at one x, whatever their labels.
+    #[test]
+    fn the_controls_of_a_column_line_up() {
+        use crate::ribbon::{Control, ControlHost, RibbonState, ShapeControl as S};
+        use eframe::egui;
+        struct All;
+        impl crate::ribbon::CommandSource for All {
+            fn is_enabled(&self, _: CommandId) -> bool {
+                true
+            }
+            fn shortcut_text(&self, _: CommandId) -> Option<String> {
+                None
+            }
+        }
+        #[derive(Default)]
+        struct Record(Vec<(Control, f32)>);
+        impl ControlHost for Record {
+            fn control(&mut self, ui: &mut egui::Ui, _: &crate::theme::Theme, c: Control) {
+                self.0.push((c, ui.cursor().min.x));
+                ui.allocate_space(egui::vec2(40.0, 10.0));
+            }
+        }
+        let ribbon = opencalc_ribbon();
+        let tab = ribbon
+            .tabs
+            .iter()
+            .position(|t| t.context == Some(Context::Shape))
+            .unwrap();
+        let theme = crate::theme::Theme::paper();
+        let ctx = egui::Context::default();
+        let mut host = Record::default();
+        let mut state = RibbonState {
+            active_tab: tab,
+            ..Default::default()
+        };
+        for _ in 0..2 {
+            host.0.clear();
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1200.0, 300.0),
+                )),
+                ..Default::default()
+            };
+            let _ = ctx.run(input, |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    ribbon.show(ui, &theme, &mut state, &All, &[Context::Shape], &mut host);
+                });
+            });
+        }
+        let x = |c: S| {
+            host.0
+                .iter()
+                .find(|(k, _)| *k == Control::Shape(c))
+                .unwrap()
+                .1
+        };
+        assert_eq!(x(S::Fill), x(S::Outline), "Fill and Outline");
+        assert_eq!(x(S::Width), x(S::Line), "Width and Line");
+        assert_eq!(x(S::Kind), x(S::Corners), "Shape and Corners");
+        assert!(
+            x(S::Width) - x(S::Fill) >= 116.0,
+            "a gap is left between the columns: {} apart",
+            x(S::Width) - x(S::Fill)
         );
     }
 
@@ -347,7 +579,7 @@ mod tests {
     fn command_ids_are_unique() {
         let r = opencalc_ribbon();
         let mut seen = HashSet::new();
-        for i in all_items(&r) {
+        for i in ordinary_items(&r) {
             assert!(
                 seen.insert(i.command),
                 "duplicate command id {:?}",
@@ -375,6 +607,8 @@ mod tests {
             CommandId::TabHome,            // the Home tab
             CommandId::HelpAboutClose,     // the About window
             CommandId::AppOptionsClose,    // the Options window
+            CommandId::AppOptionsDefaults, // the Options window
+            CommandId::FileClearRecent,    // the Options window
             CommandId::DocPageSetupClose,  // the Page setup window
             CommandId::ThemeNeutral,       // the Options window
             CommandId::ThemeSlate,         // the Options window

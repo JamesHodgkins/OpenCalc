@@ -41,6 +41,8 @@ pub enum Repair {
     RunsFixed(RegionId),
     /// A table had a ragged shape or too many cells; it was trimmed to fit.
     TableFixed(RegionId),
+    /// A shape had a number out of range or a colour that is not in the palette.
+    ShapeFixed(RegionId),
 }
 
 impl fmt::Display for Repair {
@@ -56,6 +58,7 @@ impl fmt::Display for Repair {
             Repair::StylesFixed(id) => write!(f, "plot {} had unusable series styles", id.0),
             Repair::RunsFixed(id) => write!(f, "text region {} had styling that did not fit", id.0),
             Repair::TableFixed(id) => write!(f, "table {} had an unusable shape", id.0),
+            Repair::ShapeFixed(id) => write!(f, "shape {} had a setting out of range", id.0),
         }
     }
 }
@@ -94,6 +97,7 @@ fn check_text(r: &Region) -> Result<(), LoadError> {
             .flatten()
             .chain(t.columns.iter().flat_map(|c| [&c.header, &c.unit]))
             .try_for_each(|s| too_long("a table cell", s)),
+        RegionKind::Shape(_) => Ok(()),
         RegionKind::Picture(p) => {
             too_long("a picture name", &p.name)?;
             too_long("a picture description", &p.alt)?;
@@ -239,6 +243,12 @@ pub fn check(ws: &mut Worksheet) -> Result<Vec<Repair>, LoadError> {
             if fitted != r.runs {
                 r.runs = fitted;
                 repairs.push(Repair::RunsFixed(id));
+            }
+        }
+        if let RegionKind::Shape(s) = &mut r.kind {
+            if !s.is_valid() {
+                **s = std::mem::take(&mut **s).repaired();
+                repairs.push(Repair::ShapeFixed(id));
             }
         }
         if let RegionKind::Table(t) = &mut r.kind {

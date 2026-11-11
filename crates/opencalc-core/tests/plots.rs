@@ -15,7 +15,11 @@ fn sheet(lines: &[&str], plot: PlotSpec) -> (Worksheet, RegionId) {
         add(&mut w, RegionKind::math(line));
     }
     let id = add(&mut w, RegionKind::plot());
-    w.apply(Edit::SetPlot { id, spec: plot }).unwrap();
+    w.apply(Edit::SetPlot {
+        id,
+        spec: Box::new(plot),
+    })
+    .unwrap();
     (w, id)
 }
 
@@ -154,7 +158,14 @@ fn plots_are_edited_by_undoable_edits_that_merge_while_typing() {
     let before = w.eval_revision();
     for typed in ["x", "x ^", "x ^ 2"] {
         let spec = PlotSpec::default().with_x("x").with_series(0, typed);
-        h.apply(&mut w, Edit::SetPlot { id, spec }).unwrap();
+        h.apply(
+            &mut w,
+            Edit::SetPlot {
+                id,
+                spec: Box::new(spec),
+            },
+        )
+        .unwrap();
     }
     assert!(
         w.eval_revision() > before,
@@ -180,7 +191,7 @@ fn only_plots_take_plot_edits() {
     let err = w
         .apply(Edit::SetPlot {
             id: m,
-            spec: PlotSpec::default(),
+            spec: Box::default(),
         })
         .unwrap_err();
     assert!(err.to_string().contains("not the right kind"), "{err}");
@@ -400,7 +411,7 @@ fn options_and_styles_change_by_undoable_edits_and_restore_exactly() {
             &mut w,
             Edit::SetPlot {
                 id,
-                spec: styled.clone(),
+                spec: Box::new(styled.clone()),
             },
         )
         .unwrap();
@@ -679,7 +690,11 @@ fn polar_off(w: &Worksheet, id: RegionId) -> bool {
         panic!()
     };
     let xy = p.clone().with_options(PlotOptions::default());
-    w.apply(Edit::SetPlot { id, spec: xy }).unwrap();
+    w.apply(Edit::SetPlot {
+        id,
+        spec: Box::new(xy),
+    })
+    .unwrap();
     plot_of(&run(&w), id).unwrap().polar
 }
 

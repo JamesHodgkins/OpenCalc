@@ -4,7 +4,7 @@
 //! action. It never touches egui or the worker: anything that needs them comes
 //! back as an [`Effect`] for `App` to carry out.
 
-use opencalc_core::document::RegionKind;
+use opencalc_core::document::{RegionKind, ShapeKind};
 use opencalc_core::edit::Edit;
 use opencalc_core::registry::UnitSystem;
 
@@ -13,7 +13,6 @@ use super::state::AppState;
 use crate::canvas::CanvasCmd;
 use crate::commands::CommandId;
 use crate::sheet::OpenSheet;
-use crate::theme::{PaletteKey, Theme};
 use opencalc_core::document::PageSetup;
 use std::path::PathBuf;
 
@@ -26,6 +25,9 @@ pub enum Effect {
     CalculateNow,
     /// Re-apply the theme to egui.
     ApplyTheme,
+    /// Carry out the settings egui and the auto-save timer hold: the interface
+    /// size and the recovery interval.
+    ApplySettings,
     Quit,
     /// Size the dock panels from the current window width.
     ResetDockWidths,
@@ -94,6 +96,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
     if let Some(fx) = super::checking::dispatch_check(state, command) {
         return Some(fx);
     }
+    if let Some(fx) = super::options::dispatch_options(state, command) {
+        return Some(fx);
+    }
     if let Some(fx) = super::inserting::dispatch_insert(state, command) {
         return Some(fx);
     }
@@ -105,7 +110,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         FileNew => {
             state.untitled += 1;
             let title = format!("Untitled {}", state.untitled);
-            add_sheet(state, OpenSheet::new(&title));
+            let sheet = state.blank_sheet(&title);
+            add_sheet(state, sheet);
             fx.push(Effect::Recalculate);
         }
         FileNewFromTemplate => fx.push(Effect::NewFromTemplate),
@@ -144,6 +150,9 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         InsertPlot => insert(state, &mut fx, RegionKind::plot()),
         InsertTable => insert(state, &mut fx, RegionKind::table()),
         InsertPicture => insert(state, &mut fx, RegionKind::picture()),
+        InsertRectangle => arm_pen(state, ShapeKind::Rectangle),
+        InsertRoundedRectangle => arm_pen(state, ShapeKind::RoundedRectangle),
+        InsertEllipse => arm_pen(state, ShapeKind::Ellipse),
         RegionDelete => with_eval_check(state, &mut fx, |s| {
             s.delete_selection();
         }),
@@ -197,19 +206,10 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             state.layout_gen += 1;
             fx.push(Effect::ResetDockWidths);
         }
-        ThemeNeutral => set_palette(state, &mut fx, PaletteKey::Neutral),
-        ThemeSlate => set_palette(state, &mut fx, PaletteKey::Slate),
         // The ribbon opens the Result unit list itself; its face runs nothing.
         UnitsShowInMenu => {}
         UnitsDefine | UnitsManage => state.units_open = true,
         UnitsClose => state.units_open = false,
-        AppOptions => {
-            state.options_open = true;
-            fx.push(Effect::RefreshFileType);
-        }
-        FileTypeRegister => fx.push(Effect::SetFileType(true)),
-        FileTypeRemove => fx.push(Effect::SetFileType(false)),
-        AppOptionsClose => state.options_open = false,
         DocPageSetup => state.page_setup_open = true,
         DocPageSetupClose => {
             state.page_setup_open = false;
@@ -251,6 +251,10 @@ pub fn apply_canvas(state: &mut AppState, sheet: usize, cmds: Vec<CanvasCmd>) ->
                 state.sheets[sheet].edit(edit);
             }
             CanvasCmd::Seal => state.sheets[sheet].seal(),
+            CanvasCmd::DrawShape { kind, pos, size } => {
+                state.sheets[sheet].insert_drawn(RegionKind::shape(kind), pos, size);
+                state.ribbon_focus = Some(crate::ribbon::Context::Shape);
+            }
             CanvasCmd::TypeAhead(text) => {
                 let s = &mut state.sheets[sheet];
                 let id = s.insert(RegionKind::math(""));
@@ -266,7 +270,8 @@ pub fn apply_canvas(state: &mut AppState, sheet: usize, cmds: Vec<CanvasCmd>) ->
     }
 }
 
-pub(super) fn add_sheet(state: &mut AppState, sheet: OpenSheet) {
+pub(super) fn add_sheet(state: &mut AppState, mut sheet: OpenSheet) {
+    sheet.set_grid(state.settings.grid);
     state.sheets.push(sheet);
     state.active = Some(state.sheets.len() - 1);
     state.output = Default::default();
@@ -295,14 +300,6 @@ fn with_eval_check(state: &mut AppState, fx: &mut Vec<Effect>, f: impl FnOnce(&m
 }
 
 /// Switch the colour theme (persisted by the app on exit).
-fn set_palette(state: &mut AppState, fx: &mut Vec<Effect>, key: PaletteKey) {
-    if state.palette != key {
-        state.palette = key;
-        state.theme = Theme::palette(key);
-        fx.push(Effect::ApplyTheme);
-    }
-}
-
 /// Show results in another unit system. Display only, so no recalculation; it
 /// is an edit so it can be undone.
 fn set_unit_system(state: &mut AppState, system: UnitSystem) {
@@ -333,7 +330,11 @@ fn set_page(state: &mut AppState, own_step: bool, change: impl FnOnce(&mut PageS
 fn separate_regions(state: &mut AppState) {
     let Some(i) = state.active else { return };
     let sheet = &mut state.sheets[i];
-    match crate::canvas::separate::separate(sheet.doc.regions(), &sheet.canvas.sizes) {
+    match crate::canvas::separate::separate(
+        sheet.doc.regions(),
+        &sheet.canvas.sizes,
+        sheet.canvas.grid.step(),
+    ) {
         None => state.message(
             "Separate regions",
             format!(
@@ -376,6 +377,16 @@ fn insert(state: &mut AppState, fx: &mut Vec<Effect>, kind: RegionKind) {
     });
 }
 
+/// Pick up the drawing tool: the next drag on the canvas draws this shape.
+fn arm_pen(state: &mut AppState, kind: ShapeKind) {
+    if let Some(i) = state.active {
+        let canvas = &mut state.sheets[i].canvas;
+        canvas.pen = Some(kind);
+        canvas.editing = None;
+        canvas.field = None;
+    }
+}
+
 /// Set the zoom of the active worksheet (clamped by the view), about the centre.
 fn zoom_to(state: &mut AppState, zoom: f32) {
     let (centre, origin) = (state.viewport.center(), state.viewport.min);
@@ -394,7 +405,7 @@ fn zoom_by(state: &mut AppState, factor: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::PaletteKey;
+    use crate::theme::{PaletteKey, Theme};
     use opencalc_core::document::Point;
     use opencalc_core::edit::Edit;
 
@@ -610,6 +621,9 @@ mod tests {
             CommandId::InsertArea,
             CommandId::InsertTable,
             CommandId::InsertPicture,
+            CommandId::InsertRectangle,
+            CommandId::InsertRoundedRectangle,
+            CommandId::InsertEllipse,
         ] {
             assert!(
                 run(&mut s, c).is_empty(),

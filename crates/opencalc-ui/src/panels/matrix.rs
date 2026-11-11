@@ -25,7 +25,8 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
-        .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+        .pivot(Align2::CENTER_CENTER)
+        .default_pos(super::default_pos(ctx, Align2::CENTER_CENTER, [0.0, 0.0]))
         .show(ctx, |ui| {
             let (r, c) = (rows, cols);
             stepper(ui, "Rows", &mut rows, |n| n * c <= MAX_CELLS);

@@ -60,7 +60,8 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
         .collapsible(false)
         .resizable(true)
         .default_width(480.0)
-        .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+        .pivot(Align2::CENTER_CENTER)
+        .default_pos(super::default_pos(ctx, Align2::CENTER_CENTER, [0.0, 0.0]))
         .show(ctx, |ui| {
             egui::ScrollArea::vertical()
                 .max_height(420.0)

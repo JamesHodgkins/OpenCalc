@@ -11,21 +11,24 @@ pub mod adapt;
 pub mod align;
 mod editor;
 mod errors;
+mod grid;
 pub mod hit;
 mod overlay;
 pub(crate) mod page;
 pub(crate) mod paint;
 pub mod picture;
 pub mod plot;
+pub mod resize;
 mod result;
 pub(crate) mod separate;
+mod shape;
 mod table;
 pub mod text_style;
 pub(crate) mod unit_slot;
 pub mod view;
 
 use eframe::egui::{self, FontId, PointerButton, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
-use opencalc_core::document::{PageSetup, Region, RegionId};
+use opencalc_core::document::{PageSetup, Point, Region, RegionId, ShapeKind, Size};
 use opencalc_core::edit::Edit;
 use opencalc_core::eval::Output;
 use opencalc_core::registry::UnitSystem;
@@ -33,8 +36,8 @@ use opencalc_core::registry::UnitSystem;
 use crate::theme::{type_size, Theme};
 use adapt::{point, rect_of, Sizes};
 use hit::{click_selection, drag_positions, hit_test, in_marquee};
+use view::snap;
 pub use view::CanvasView;
-use view::{snap, GRID};
 
 /// Read-only inputs the canvas needs besides the document.
 pub struct Env<'a> {
@@ -71,6 +74,12 @@ pub enum CanvasCmd {
     /// Typing on the blank page: make a math region at the insertion point holding
     /// this text, and open it for editing.
     TypeAhead(String),
+    /// A shape drawn with the drawing tool: make it with this box and select it.
+    DrawShape {
+        kind: ShapeKind,
+        pos: Point,
+        size: Size,
+    },
 }
 
 enum Drag {
@@ -78,6 +87,15 @@ enum Drag {
         origins: Vec<(RegionId, Pos2)>,
         total: Vec2,
     },
+    /// A handle of the selected region being pulled; `orig` is its box when the
+    /// drag began (document space), so the result does not accumulate error.
+    Resize {
+        id: RegionId,
+        handle: resize::Handle,
+        orig: Rect,
+    },
+    /// A shape being drawn with the drawing tool.
+    Draw { start: Pos2, current: Pos2 },
     Marquee {
         start: Pos2,
         current: Pos2,
@@ -106,8 +124,13 @@ pub struct CanvasUi {
     pub field: Option<editor::Field>,
     /// The unit being typed into the slot after a result.
     pub unit_edit: Option<unit_slot::UnitEdit>,
+    /// The drawing tool: the next drag draws a shape of this kind (Escape or a
+    /// finished shape puts it away).
+    pub pen: Option<ShapeKind>,
     /// Where the next inserted region goes (document space).
     pub insert_at: Pos2,
+    /// The snap grid (from the settings; `OpenSheet::set_grid` changes it).
+    pub grid: crate::settings::GridSpacing,
     /// The last click was on blank page, so typing starts a math region there.
     pub armed: bool,
     /// Content sizes measured by the last paint.
@@ -130,7 +153,9 @@ impl Default for CanvasUi {
             enter_at_start: false,
             field: None,
             unit_edit: None,
+            pen: None,
             insert_at: Pos2::new(40.0, 40.0),
+            grid: Default::default(),
             // The initial insertion point is ready for type-to-create, just like
             // the point after moving the crosshair or clicking the blank page.
             armed: true,
@@ -199,11 +224,11 @@ pub fn show(
     for screen in page::paint(&painter, rect, view, origin, &env.page, pages, env) {
         if env.show_grid {
             let on_page = painter.with_clip_rect(screen.intersect(rect));
-            paint::grid(&on_page, screen, view, origin, env.paper);
+            grid::grid(&on_page, screen, view, origin, env.paper, st.grid);
         }
     }
 
-    for r in regions {
+    for r in hit::back_to_front(regions) {
         let screen = view.rect_to_screen(rect_of(r, &st.sizes), origin);
         if !screen.intersects(rect.expand(100.0)) {
             continue;
@@ -226,6 +251,14 @@ pub fn show(
                 .rect_to_screen(rect_of(r, &st.sizes), origin)
                 .expand(2.0);
             painter.rect_stroke(screen, 2.0, outline, StrokeKind::Outside);
+            if st.selection.len() == 1 && resizable(r) {
+                let inner = view.rect_to_screen(rect_of(r, &st.sizes), origin);
+                for h in resize::Handle::ALL {
+                    let square = Rect::from_center_size(h.point(inner), Vec2::splat(HANDLE_SIZE));
+                    painter.rect_filled(square, 1.0, theme.base);
+                    painter.rect_stroke(square, 1.0, outline, StrokeKind::Inside);
+                }
+            }
         }
     }
 
@@ -271,6 +304,23 @@ pub fn show(
 
     abandon::remove_if_empty(st, regions, &mut cmds);
     overlay::marquee(&painter, view, origin, st, theme);
+    if let (Some(kind), Some(Drag::Draw { start, current })) = (st.pen, &st.drag) {
+        let mods = ui.input(|i| i.modifiers);
+        let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+        let (pos, size) = shape::drawn_box(
+            kind,
+            *start,
+            *current,
+            grid,
+            mods.shift,
+            mods.ctrl || mods.command,
+        );
+        let band = view.rect_to_screen(
+            Rect::from_min_size(Pos2::new(pos.x, pos.y), Vec2::new(size.w, size.h)),
+            origin,
+        );
+        shape::preview(&painter, kind, band, theme.accent);
+    }
     painter.text(
         rect.min + Vec2::new(10.0, 8.0),
         egui::Align2::LEFT_TOP,
@@ -303,6 +353,87 @@ fn navigate(ui: &Ui, resp: &egui::Response, origin: Pos2, view: &mut CanvasView)
     }
 }
 
+/// Pixels from a handle's centre that still count as on it.
+const HANDLE_REACH: f32 = 7.0;
+/// Handle square, in pixels.
+const HANDLE_SIZE: f32 = 8.0;
+
+/// Whether the region has a size of its own to pull (typeset regions are sized by
+/// their content) and is free to change.
+fn resizable(r: &Region) -> bool {
+    !r.locked && !r.kind.is_auto_sized()
+}
+
+/// The one selected region that shows resize handles, if there is one.
+fn handled<'a>(regions: &'a [Region], st: &CanvasUi) -> Option<&'a Region> {
+    let [id] = st.selection.as_slice() else {
+        return None;
+    };
+    regions.iter().find(|r| r.id == *id && resizable(r))
+}
+
+/// The drawing tool: drag out a box for a shape. A click without a drag makes the
+/// shape at its usual size with its corner at the click. Escape puts the tool away.
+fn draw_with_pen(
+    ui: &Ui,
+    resp: &egui::Response,
+    scene: &Scene,
+    kind: ShapeKind,
+    st: &mut CanvasUi,
+    cmds: &mut Vec<CanvasCmd>,
+) {
+    let Scene {
+        env, view, origin, ..
+    } = *scene;
+    let mods = ui.input(|i| i.modifiers);
+    let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+    let (square, centre) = (mods.shift, mods.ctrl || mods.command);
+    let to_doc = |p: Pos2| view.screen_to_doc(p, origin);
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
+    }
+    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        st.pen = None;
+        st.drag = None;
+        return;
+    }
+    if resp.drag_started_by(PointerButton::Primary) {
+        cmds.push(CanvasCmd::Seal);
+        if let Some(press) = ui.input(|i| i.pointer.press_origin()) {
+            let start = to_doc(press);
+            st.drag = Some(Drag::Draw {
+                start,
+                current: start,
+            });
+        }
+    }
+    if resp.dragged_by(PointerButton::Primary) {
+        if let (Some(Drag::Draw { current, .. }), Some(p)) =
+            (&mut st.drag, resp.interact_pointer_pos())
+        {
+            *current = to_doc(p);
+        }
+    }
+    let finished = if resp.drag_stopped_by(PointerButton::Primary) {
+        match st.drag.take() {
+            Some(Drag::Draw { start, current }) => Some((start, current)),
+            _ => None,
+        }
+    } else if resp.clicked() {
+        resp.interact_pointer_pos().map(|p| (to_doc(p), to_doc(p)))
+    } else {
+        None
+    };
+    if let Some((start, end)) = finished {
+        let (pos, size) = shape::drawn_box(kind, start, end, grid, square, centre);
+        cmds.push(CanvasCmd::Seal);
+        cmds.push(CanvasCmd::DrawShape { kind, pos, size });
+        cmds.push(CanvasCmd::Seal);
+        st.pen = None;
+        st.drag = None;
+    }
+}
+
 fn pointer(
     ui: &Ui,
     resp: &egui::Response,
@@ -320,11 +451,36 @@ fn pointer(
     let extend = mods.shift || mods.command;
     let to_doc = |p: Pos2| view.screen_to_doc(p, origin);
 
+    if let Some(kind) = st.pen {
+        draw_with_pen(ui, resp, scene, kind, st, cmds);
+        return;
+    }
+    let handle_under = |p: Pos2, st: &CanvasUi| {
+        let r = handled(regions, st)?;
+        let screen = view.rect_to_screen(rect_of(r, &st.sizes), origin);
+        Some((
+            r.id,
+            resize::handle_at(screen, p, HANDLE_REACH)?,
+            rect_of(r, &st.sizes),
+        ))
+    };
+    if st.drag.is_none() && resp.hovered() {
+        if let Some((_, h, _)) = ui
+            .input(|i| i.pointer.hover_pos())
+            .and_then(|p| handle_under(p, st))
+        {
+            ui.ctx().set_cursor_icon(h.cursor());
+        }
+    }
     if resp.drag_started_by(PointerButton::Primary) {
         cmds.push(CanvasCmd::Seal);
         if let Some(press) = ui.input(|i| i.pointer.press_origin()) {
             let doc = to_doc(press);
+            let grabbed = handle_under(press, st);
             match hit_test(regions, &st.sizes, doc) {
+                _ if grabbed.is_some() => {
+                    st.drag = grabbed.map(|(id, handle, orig)| Drag::Resize { id, handle, orig });
+                }
                 Some(id) => {
                     if !st.selection.contains(&id) {
                         st.selection = click_selection(&st.selection, Some(id), extend);
@@ -361,7 +517,7 @@ fn pointer(
         match &mut st.drag {
             Some(Drag::Move { origins, total }) => {
                 *total += delta;
-                let grid = (env.snap && !mods.alt).then_some(GRID);
+                let grid = (env.snap && !mods.alt).then_some(st.grid.step());
                 let moves = drag_positions(origins, *total, grid)
                     .into_iter()
                     .map(|(id, p)| (id, point(p)))
@@ -373,7 +529,25 @@ fn pointer(
                     *current = to_doc(p);
                 }
             }
-            None => {}
+            Some(Drag::Resize { id, handle, orig }) => {
+                if let Some(p) = pos {
+                    let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+                    let b = resize::resized(
+                        *orig,
+                        *handle,
+                        to_doc(p),
+                        grid,
+                        mods.shift,
+                        mods.ctrl || mods.command,
+                    );
+                    cmds.push(CanvasCmd::Edit(Edit::SetRegionBox {
+                        id: *id,
+                        pos: point(b.min),
+                        size: Size::new(b.width(), b.height()),
+                    }));
+                }
+            }
+            Some(Drag::Draw { .. }) | None => {}
         }
     }
     if resp.drag_stopped_by(PointerButton::Primary) {
@@ -428,7 +602,7 @@ fn pointer(
         }
         st.armed = hit.is_none();
         if hit.is_none() {
-            st.insert_at = snap(doc, GRID);
+            st.insert_at = snap(doc, st.grid.step());
         }
     }
 }

@@ -62,7 +62,7 @@ Decision key: **Align** = change to match Mathcad. **Keep** = a deliberate diffe
 | 2 | Names browser | **Align**: remove. Replace with a **Functions window**: optional, searchable, from the Functions tab, built from the `FUNCTIONS` table (signature and summary), click to insert | |
 | 3 | Plot editing in a side pane | **Align** (with the editor): a plot has editable placeholders for its x and y expressions on the plot, and a title; no side pane | Needs editor step E4 |
 | 4 | Home page tab; sample opens at startup | **Home tab stays (owner decision).** Start with a blank *Untitled* worksheet open beside it; the example moves to File > Example | |
-| 5 | Ribbon tabs from OpenDraft | **Align**: Math, Functions, Matrices/Tables, Plots, Math Formatting, Calculation, Document (Input/Output when import and export exist). Content is mapped in section 5 | Panel contents are **[inferred]**; review before building |
+| 5 | Ribbon tabs from OpenDraft | **Superseded (2026-11-11):** the owner had the ribbon redone by task (Home, Insert, Draw, Format, Units, View, Help, with contextual tabs). See `RIBBON_MAP.md`. The names are our own, not PTC's | |
 | 6 | Definitions show their value | **Align**: `x := 5` shows only the definition; `x =` shows `x = 5` | **[inferred]** from how Mathcad worksheets read. Large visible change; see decision B |
 | 7 | Four decimals, trailing zeros | **Align**: three decimals, trailing zeros not shown (`10 kN`, `0.333`) | **[inferred]**; the Math Formatting tab changes it |
 | 8 | Click blank space and just start typing to make a math region; a quote mark starts a text region | **Align** | **[inferred]**; belongs with the editor (E4) |

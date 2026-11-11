@@ -46,7 +46,11 @@ pub struct Theme {
     pub pressed: Color32,
     // Accent (red, to tell OpenCalc from OpenDraft).
     pub accent: Color32,
+    // Hover and press on accent fills (SPEC 4.6). Nothing is accent-filled since
+    // the app button became the File menu, so only the contrast test reads them.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub accent_hover: Color32,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub accent_pressed: Color32,
     pub accent_text: Color32,
     // Status. `error` is for text and icons only, never fills.

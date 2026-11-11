@@ -1,100 +1,90 @@
-# Ribbon map: today's commands to Mathcad-style tabs (U2)
+# Ribbon map
 
-Status: **built (U2)**. Owner decisions: the start-page Home tab stays (recent files, release news later; there is no ribbon Home tab); Units sit on the Math tab; the theme moved to an Options window opened from the application menu. Also removed with the old tabs: the placeholder font-size slot.
+Status: **built (redesigned 2026-11-11)**. This replaces the first ribbon map (Mathcad-style
+tabs: Math, Functions, Matrices/Tables, Plots, Math Formatting, Calculation, Document). That layout
+left tabs with one button, a Math tab with nine unrelated groups, and a Document tab that mixed page,
+view and drawing commands. The owner asked for it to be redone from scratch.
 
-Tab names come from PTC's public guides (Math, Input/Output, Matrices/Tables, Plots,
-Math Formatting, Calculation, Document, and a Functions tab). Which commands sit
-on each tab was only partly confirmed (Math covers operators, symbols and units;
-Matrices/Tables covers vectors and matrices; Plots covers 2D and 3D graphs;
-Input/Output covers reading data). Everything else below is **inferred**; it is a
-reasonable grouping, not a copy. See `UI_ALIGNMENT.md` and `CLEAN_ROOM.md`.
+The tab names and groups below are **our own, organised by task**; they are not a copy of any
+other product's ribbon (see `CLEAN_ROOM.md`). The ribbon is data in `ribbon/defs.rs`.
 
-## 1. Proposed tabs
+## Rules
 
-| Tab | Panels | Contents |
+1. **One task per tab.** A tab answers "what am I doing": editing, inserting, drawing,
+   formatting, working with units, or changing the view.
+2. **Every command sits in exactly one ordinary tab.** (A test checks it.) A *contextual* tab may repeat
+   commands that its selection needs close at hand.
+3. **No near-empty tab.** Every ordinary tab but Help holds at least four commands in at least two
+   groups (a test checks it). A lone button belongs in a bigger tab.
+4. **Large buttons for the main action of a group**, small stacked rows for the rest.
+5. **Everything fits the narrowest window** (900 px). A test draws each tab and measures it.
+6. File commands, Undo and Redo, Options and the recent list are not ribbon items: they live in the
+   File menu and the quick access toolbar.
+
+## Ordinary tabs
+
+| Tab | Group | Contents |
 |---|---|---|
-| **Math** | Regions | Math region (large), Text region (large) |
-| | Programming | Solve block (large), Program (large) |
-| | Clipboard | Paste (split), Cut, Copy |
+| **Home** | Clipboard | Paste (large), Cut, Copy |
+| | Regions | Math region (large), Text region (large) |
 | | Edit | Find, Replace |
 | | Region | Delete, Lock, Tag |
-| | Symbols | Greek letters (flyout) |
-| | Units | Unit system (SI, USCS, CGS split), Result unit (a drop-down of the units of the selected result's kind, Automatic first; the face reads the unit shown now), Define unit, Manage units |
-| **Functions** | Insert | Insert function (opens the Functions window) |
-| **Matrices/Tables** | Matrix | Matrix and vector, Range *(new, need the editor, dimmed until E4)* |
-| | Table | Table region *(dimmed, as today)* |
-| **Plots** | Insert | X-Y plot (large) |
-| **Math Formatting** | Result | More decimals, Fewer decimals, Scientific, Engineering *(dimmed, as today)* |
-| | Font | Bold, Italic *(dimmed, as today)* |
-| | Region | Border (toggle: a line round each selected region) |
-| **Calculation** | Calculate | Calculate worksheet (large), Automatic calculation (toggle, moved from the status bar and View) |
-| | Check | Run checks *(dimmed until `opencalc check`)* |
-| | Errors | Next, Previous *(dimmed until errors are navigable)* |
-| **Document** | Zoom | In, Out, Fit, 100% |
-| | Page | Page setup: size, orientation, margins *(new; P2)* |
-| | Show | Grid, Snap |
-| | Arrange | Align horizontally, Align vertically, Separate regions *(dimmed, as today)* |
-| | Insert | Area, Picture *(dimmed, as today)* |
-| | Window | Properties pane (optional), Reset layout, Switch palette |
-| **Help** | Help | Shortcuts, User guide, About |
-| *Input/Output* | (hidden) | CSV import and export arrive in Milestone 3 |
+| | Calculate | Calculate worksheet (large), Automatic calculation (toggle) |
+| | Check | Run checks (large), Next problem, Previous problem |
+| **Insert** | Data | Matrix, Range, Table (large) |
+| | Objects | Plot, Picture, Area (large) |
+| | Programming | Solve block, Program (large) |
+| | Symbols | Greek letters (large, opens a flyout of letters) |
+| | Functions | Insert function (large, opens the Functions window) |
+| **Draw** | Shapes | Rectangle, Rounded rectangle, Ellipse (large; pick one, then drag on the page) |
+| | Order | Bring to front, Bring forward, Send backward, Send to back |
+| | Align | Align horizontally, Align vertically, Separate regions |
+| **Format** | Text | Bold, Italic, Underline |
+| | Numbers | More decimals, Fewer decimals, Scientific, Engineering |
+| | Region | Border (toggle) |
+| **Units** | Unit system | SI, USCS, CGS (split button) |
+| | Result unit | A drop-down of the units of the selected result's kind, Automatic first |
+| | Custom units | Define unit, Manage units |
+| **View** | Zoom | In, Out, Fit, 100% |
+| | Page | Page setup (large), Page View, Draft View |
+| | Show | Grid, Snap, Labels |
+| | Window | Reset layout (large) |
+| **Help** | Help | Shortcuts, User guide *(dimmed)*, About |
 
-## 2. Where every existing command goes
+## Contextual tabs
 
-| Command | Now | Proposed |
+A contextual tab belongs to the selected thing. It is shown, tinted along its top edge, only while
+that thing is selected, and comes forward once when it is drawn. Selecting it again does not jump to it.
+
+| Tab | Shown while | Groups |
 |---|---|---|
-| New, Open, Save, Close, Quit | app button, Quick Access Toolbar | unchanged |
-| Undo, Redo | Home tab and Quick Access Toolbar | Quick Access Toolbar only (already there) |
-| Paste, Cut, Copy | Home | Math > Clipboard |
-| Find, Replace | Home | Math > Edit |
-| Delete, Lock, Tag | Home | Math > Region |
-| Math region, Text region | Insert | Math > Regions |
-| Solve block, Program | Insert | Math > Programming |
-| Greek letters | Insert | Math > Symbols |
-| Area, Picture | Insert | Document > Insert |
-| Plot | Insert | Plots > Insert |
-| Table | Insert | Matrices/Tables > Table |
-| Bold, Italic | Format | Math Formatting > Font |
-| Decimals more, fewer, Scientific, Engineering | Format | Math Formatting > Result |
-| Align, Separate | Format | Document > Arrange |
-| SI, USCS, CGS, display units, Define, Manage | Units | Math > Units |
-| Calculate all | Calculate | Calculation > Calculate |
-| Live recalculation | status bar and View | Calculation > Calculate (toggle) |
-| Changed only | Calculate | **removed**: automatic calculation makes it meaningless |
-| Run checks | Calculate | Calculation > Check |
-| Warnings list, next, previous | Calculate | Calculation > Errors (next, previous); the list is **removed** because errors show on the regions |
-| Zoom in, out, fit, 100% | View | Document > Zoom |
-| Grid, Snap | View | Document > Show |
-| Guides | View | **removed** (never built; the margin box covers it) |
-| Functions window | View | Functions > Insert (and Document > Window) |
-| Properties pane, Reset layout, Switch palette | View | Document > Window |
-| Shortcuts, User guide, About | Help | unchanged |
+| **Shape Format** | one shape is selected | Shape (kind, corner radius), Style (fill, outline, width, line style), Arrange (draw order, Lock, Delete) |
 
-## 3. Tabs that go away
+Value controls (a colour, a number, a choice) are drawn by the app through `ControlHost`, because a
+ribbon item otherwise only runs a command. Fill and outline use a colour picker: Automatic, none, the
+palette with its shades, standard colours, and exact RGBA with hex.
 
-Home (ribbon), Insert, Format, Units, Calculate, View. Their contents are spread as
-above. The document **Home tab** (the start page beside the worksheet tabs) is not a
-ribbon tab and stays.
+Planned, each replacing a floating window the same way: **Picture**, **Table** and **Plot**.
 
-## 4. What this costs
+## Where the old commands went
 
-- It is a rearrangement and renaming of data in `ribbon/defs.rs`; command behaviour
-  does not change, so existing tests of commands still hold.
-- New commands (Page setup, Matrix, Range) are added dimmed and implemented later
-  (P2 and the editor), so the ribbon never shows a control that looks live and is not.
-- Tests: every command still appears exactly once; every ribbon item names a real
-  command; the tab list and panel titles are as above; nothing implemented is
-  unreachable from the ribbon.
-- Status bar (U4): built; page, calculation indicator and a zoom slider.
+| Old place | New place |
+|---|---|
+| Math > Regions, Clipboard, Edit, Region | Home |
+| Math > Programming, Symbols | Insert |
+| Math > Units, Result Unit, Custom Units | Units |
+| Functions > Insert | Insert > Functions |
+| Matrices/Tables | Insert > Data |
+| Plots > Insert | Insert > Objects |
+| Math Formatting | Format |
+| Calculation | Home > Calculate and Check |
+| Document > Zoom, Page, Show, Window | View |
+| Document > Arrange, Shapes | Draw |
+| Document > Insert (Area, Picture) | Insert > Objects |
 
-## 5. Decisions needed
+## Still to do
 
-1. **Which "Home tab" did you mean to keep?** The start page beside the worksheet
-   tabs (this note assumes so), or the ribbon's Home tab (Clipboard, Edit, Region)?
-   Mathcad has no ribbon Home tab, so the default here distributes its contents to
-   Math. If you want a Home ribbon tab, it would hold Clipboard, Edit and Region and
-   the Math tab would keep Regions, Symbols and Units.
-2. **Units on the Math tab** (as PTC's guide lists "operators, symbols and units"
-   there), or a tab of its own as now?
-3. **Switch palette** under Document > Window, or somewhere else (for example the
-   application button)?
+- An Alt+click that picks what lies under a filled shape, and a right-click menu with the draw-order
+  commands.
+- Picture, Table and Plot contextual tabs (their floating windows go away as they arrive).
+- Lines and arrows in Draw > Shapes.

@@ -1,4 +1,4 @@
-//! Painting the grid and each region type. Everything here draws in screen
+//! Painting each region type. Everything here draws in screen
 //! space from a region's top-left; the caller does the document-to-screen
 //! transform and decides what is visible.
 
@@ -10,7 +10,6 @@ use opencalc_core::expr::Expr;
 use super::adapt::{kind_icon, vec};
 use super::errors;
 use super::result::{self, Beside};
-use super::view::{CanvasView, GRID};
 use super::Env;
 use crate::format::format_value_with;
 use crate::layout::{Layout, Op, Typesetter};
@@ -24,43 +23,6 @@ const TEXT_SIZE: f32 = 13.0;
 pub(super) const PAD: f32 = 6.0;
 /// Gap between an expression and its result, in document units.
 const RESULT_GAP: f32 = 6.0;
-
-/// Minor lines at the snap grid (an eighth of an inch), a stronger line every
-/// eighth (an inch). When zoomed out
-/// far enough that lines would crowd, the spacing steps up by five.
-pub fn grid(painter: &Painter, rect: Rect, view: &CanvasView, origin: Pos2, theme: &Theme) {
-    let mut step = GRID * view.zoom;
-    let mut major_every = 8;
-    while step < 8.0 {
-        step *= 5.0;
-        major_every *= 5;
-    }
-    let base = origin + view.offset;
-    let minor = Stroke::new(1.0_f32, theme.raised);
-    // A little fainter than the border colour: halfway to the minor lines.
-    let major = Stroke::new(1.0_f32, theme.raised.lerp_to_gamma(theme.border, 0.5));
-
-    let first = ((rect.min.x - base.x) / step).floor() as i64;
-    let last = ((rect.max.x - base.x) / step).ceil() as i64;
-    for k in first..=last {
-        let stroke = if k.rem_euclid(major_every) == 0 {
-            major
-        } else {
-            minor
-        };
-        painter.vline(base.x + k as f32 * step, rect.y_range(), stroke);
-    }
-    let first = ((rect.min.y - base.y) / step).floor() as i64;
-    let last = ((rect.max.y - base.y) / step).ceil() as i64;
-    for k in first..=last {
-        let stroke = if k.rem_euclid(major_every) == 0 {
-            major
-        } else {
-            minor
-        };
-        painter.hline(rect.x_range(), base.y + k as f32 * step, stroke);
-    }
-}
 
 /// Where and how to draw one region.
 #[derive(Clone, Copy)]
@@ -163,6 +125,7 @@ fn content(
         }
         RegionKind::Table(spec) => super::table::paint(ui, painter, env, r, spec, place),
         RegionKind::Picture(spec) => super::picture::paint(ui, painter, env, r, spec, place),
+        RegionKind::Shape(spec) => super::shape::paint(painter, env, r, spec, place),
     }
 }
 

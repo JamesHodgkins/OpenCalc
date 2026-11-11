@@ -160,7 +160,7 @@ pub fn render_pages(
             let whole = Rect::from_min_size(pos2(0.0, 0.0), vec2(w, h));
             page::paint_paper(&painter, whole, 1.0, &setup, true);
             page::header_footer(&painter, whole, 1.0, &setup, &env, k, count);
-            for r in doc.regions() {
+            for r in crate::canvas::hit::back_to_front(doc.regions()) {
                 if !rect_of(r, &sizes).intersects(page_rect) {
                     continue;
                 }

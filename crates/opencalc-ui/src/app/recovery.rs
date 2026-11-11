@@ -79,23 +79,26 @@ impl App {
             return;
         }
         let now = ctx.input(|i| i.time);
-        if now - self.last_autosave >= self.autosave_every {
+        let writing = self.state.settings.recovery_every().is_some();
+        if writing && now - self.last_autosave >= self.autosave_every {
             self.last_autosave = now;
             for i in 0..self.state.sheets.len() {
                 self.write_recovery(i);
             }
         }
-        // A recovery file is needed only while its worksheet is modified.
+        // A recovery file is needed only while its worksheet is modified, and
+        // only while recovery files are on: turned off, an old one would offer to
+        // restore changes that are out of date.
         let state = &self.state;
         let wanted = |key: u32| state.sheets.iter().any(|s| s.key == key && s.dirty());
         self.recovery_files.retain(|key, file| {
-            let keep = wanted(*key);
+            let keep = writing && wanted(*key);
             if !keep {
                 let _ = std::fs::remove_file(&*file);
             }
             keep
         });
-        if self.state.sheets.iter().any(|s| s.dirty()) {
+        if writing && self.state.sheets.iter().any(|s| s.dirty()) {
             ctx.request_repaint_after(Duration::from_secs_f64(self.autosave_every));
         }
     }

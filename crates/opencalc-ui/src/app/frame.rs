@@ -39,12 +39,22 @@ impl App {
                 panels::title::show(ui, &cx, &mut cmds);
             });
 
+        // Edits that panels and the ribbon's controls ask for (they only read the document).
+        let mut panel_edits: Vec<canvas::CanvasCmd> = Vec::new();
+        let contexts = panels::shape_controls::contexts(&self.state);
+        if let Some(c) = self.state.ribbon_focus.take() {
+            self.ribbon_state.focus = Some(c);
+        }
+
         egui::TopBottomPanel::top("ribbon-tabs")
             .exact_height(metrics::TAB_STRIP)
             .frame(bar(theme.base, 8, 0))
             .show_separator_line(false)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| self.ribbon.tab_strip(ui, &theme, &mut self.ribbon_state));
+                ui.horizontal(|ui| {
+                    self.ribbon
+                        .tab_strip(ui, &theme, &mut self.ribbon_state, &contexts)
+                });
             });
 
         egui::TopBottomPanel::top("ribbon")
@@ -52,9 +62,18 @@ impl App {
             .frame(bar(theme.raised, 6, 4))
             .show_separator_line(false)
             .show(ctx, |ui| {
-                let out = self
-                    .ribbon
-                    .show(ui, &theme, &mut self.ribbon_state, &registry);
+                let mut host = panels::shape_controls::ShapeControls {
+                    state: &self.state,
+                    out: &mut panel_edits,
+                };
+                let out = self.ribbon.show(
+                    ui,
+                    &theme,
+                    &mut self.ribbon_state,
+                    &registry,
+                    &contexts,
+                    &mut host,
+                );
                 cmds.extend(out.clicked);
             });
 
@@ -76,8 +95,6 @@ impl App {
             .show(ctx, |ui| panels::status::show(ui, &self.state, &mut cmds));
 
         let dock = Frame::new().fill(theme.surface).inner_margin(8);
-        // Edits that panels and the plot window ask for (they only read the document).
-        let mut panel_edits: Vec<canvas::CanvasCmd> = Vec::new();
         if self.state.show_functions {
             egui::SidePanel::left(egui::Id::new(("functions", self.state.layout_gen)))
                 .default_width(width * 0.20)
@@ -124,7 +141,12 @@ impl App {
 
         panels::about::show(ctx, &self.state, &mut cmds);
         panels::shortcuts::show(ctx, &self.state, &mut cmds);
-        panels::options::show(ctx, &self.state, &mut cmds);
+        let mut settings = None;
+        panels::options::show(ctx, &self.state, &mut cmds, &mut settings);
+        if let Some(next) = settings {
+            let effects = super::options::set_settings(&mut self.state, next);
+            self.run_effects(ctx, effects);
+        }
         panels::dialogs::show(ctx, &self.state, &mut cmds);
 
         // Seen by the canvas next frame: egui reports IME output only while a text
