@@ -6,7 +6,7 @@ left tabs with one button, a Math tab with nine unrelated groups, and a Document
 view and drawing commands. The owner asked for it to be redone from scratch.
 
 The tab names and groups below are **our own, organised by task**; they are not a copy of any
-other product's ribbon (see `CLEAN_ROOM.md`). The ribbon is data in `ribbon/defs.rs`.
+other product's ribbon. The ribbon is data in `ribbon/defs.rs`.
 
 ## Rules
 

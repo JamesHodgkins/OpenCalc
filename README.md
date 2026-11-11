@@ -16,7 +16,6 @@ docs/
   SPEC.md          technical specification
   ARCHITECTURE.md  code structure, rules, refactor plan
   TECH_DEBT.md     register of known shortcuts
-  CLEAN_ROOM.md    provenance log for every feature's source
 tests/corpus/     worksheets with known answers (see its README)
 ```
 
@@ -37,10 +36,6 @@ cargo packager --release -f wix      # the Windows installer (.msi), after packa
 Windows and Linux are supported; macOS is not yet. On Windows the program carries its own icon and the worksheet icon; the installer (`installer/windows/main.wxs`, built with cargo-packager like OpenDraft's) installs for the current user without an administrator prompt, adds a Start menu shortcut and makes double-clicking an `.ocx` file open it. Without the installer, Options has a button that does the file part. OpenCalc is a single window: starting it again, or double-clicking another worksheet, opens that worksheet as a tab in the running window. On Linux, `cargo packager --release -f deb,appimage` builds the packages (`installer/linux/`). `scripts/make_icons.py` and `scripts/installer_images.py` rebuild the icons and installer pictures from the logo. Third-party licence notices are made by `scripts/third_party.sh` (cargo-about) and shipped with every package.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the checks on Windows and Linux; `release.yml` builds and publishes the packages when a version tag is pushed.
-
-## Clean-room policy
-
-OpenCalc is written from public behaviour and original design. Commercial and freeware products are used for reference only. See `docs/SPEC.md` section 9.1 and `docs/CLEAN_ROOM.md`.
 
 ## Licence
 

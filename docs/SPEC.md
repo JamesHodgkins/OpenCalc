@@ -655,7 +655,7 @@ pub struct RibbonOutput { pub clicked: Option<&'static str>, pub slots: Vec<(&'s
 - Entities and worksheet regions are referred to by stable ID, never by list position.
 - Commit checks, run before every merge: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`. A failing check blocks the commit. `scripts/check.ps1` runs all three plus the file-size rule.
 - Every user action is a named command. Menus, ribbon items, shortcuts and tools all call the registry.
-- Update `docs/SPEC.md` and `docs/CLEAN_ROOM.md` in the same change as a feature.
+- Update `docs/SPEC.md` in the same change as a feature.
 
 ### 4.11 Licence and code sharing with OpenDraft
 
@@ -664,7 +664,7 @@ pub struct RibbonOutput { pub clicked: Option<&'static str>, pub slots: Vec<(&'s
 **Code sharing (decided 2026-11-06): option 1, re-implement.** `opencalc-ui` is written from this section; OpenDraft is read for reference only and no `od-ui` code is copied. The options considered were:
 
 1. **Re-implement.** Write `opencalc-ui` from this section, reading OpenDraft for reference only. Slower, but the result is OpenCalc's own code, and the design rules above are specific enough to build from.
-2. **Copy the `od-ui` modules.** Faster. Each copied file keeps its header and a note of where it came from, and the change is recorded in `docs/CLEAN_ROOM.md`.
+2. **Copy the `od-ui` modules.** Faster. Each copied file keeps its header and a note of where it came from.
 3. **Extract a shared crate.** Move `od-ui` into a separate crate both apps depend on. Cleanest long term, but it changes OpenDraft's repository layout, so it is a bigger decision.
 
 Revisit option 3 (a shared crate) only if the two UI crates start to drift in ways that cost time.
@@ -850,13 +850,4 @@ Solve blocks and optimisation; custom operators and programming blocks; plugin A
 ## 9. Legal and Naming
 - The name "Mathcad" is a PTC trademark. The product is named **OpenCalc**.
 - Design the file format, UI and documentation from scratch. Use Mathcad documentation only to understand behaviour, and never copy text or screenshots.
-- Keep a short clean-room note in the repository recording which sources informed each feature.
 - **Licence:** GPL-3.0-or-later (see `LICENSE`). Every crate declares it through the workspace.
-
-### 9.1 Clean-room rules (binding on all contributors)
-1. **Reference only.** Commercial and freeware products (Mathcad, SMath Studio) may be used to learn expected behaviour, workflows and UX conventions, and to check results.
-2. **No copying.** Do not copy code, documentation text, screenshots, icons, sample worksheets, file formats or internal data structures from any product.
-3. **No reverse engineering.** Do not decompile, disassemble, inspect binaries, or analyse proprietary file internals.
-4. **Test oracle is black-box only.** Results may be compared by entering the same inputs and recording outputs. Tests use original or textbook examples, never proprietary or company calculations.
-5. **Compatible code only.** Code may be taken from GPL-3.0-or-later sources (such as OpenDraft) or MIT-licensed sources (such as Calcpad), provided it keeps its licence notice and attribution and the change is recorded in `CLEAN_ROOM.md`. Code from any product with an incompatible or proprietary licence is never copied.
-6. **Record provenance.** Each feature's design note lists the sources consulted, so the origin of every behaviour can be shown.

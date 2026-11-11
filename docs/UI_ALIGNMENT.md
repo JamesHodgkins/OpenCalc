@@ -10,7 +10,7 @@ a CAD user expects and a Mathcad user does not. The owner's goal is a Mathcad-st
 worksheet, so the window and the everyday behaviour should follow Mathcad. This note
 lists what Mathcad has, what OpenCalc has, and what to change.
 
-**Sources and confidence.** Public PTC help only (see `CLEAN_ROOM.md`). Items marked
+**Sources and confidence.** Public PTC help only. Items marked
 **[verified]** are stated in PTC's published help or guides. Items marked
 **[inferred]** are from general knowledge of how Mathcad behaves and need a check
 by someone who has the product in front of them. Nothing here is copied from the
