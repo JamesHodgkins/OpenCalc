@@ -1,6 +1,6 @@
 //! The unit of a result, changed where it is shown.
 //!
-//! As in Mathcad and SMath, the unit after `=` is a slot: click it and type the
+//! As in SMath, the unit after `=` is a slot: click it and type the
 //! unit the result should read in (`N/mm^2`), Enter to accept. It is display only.
 //! A slot that is hovered or selected shows a faint outline so it can be found.
 //!

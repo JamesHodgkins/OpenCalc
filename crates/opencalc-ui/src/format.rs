@@ -251,7 +251,7 @@ pub fn axis_unit(system: UnitSystem, dim: Dimension, peak: f64) -> (String, f64)
 }
 
 /// A number to three decimal places with trailing zeros dropped (`10`, `0.333`,
-/// `-1.5`), as Mathcad shows results by default. Numbers too large or too small to
+/// `-1.5`). This is the default display. Numbers too large or too small to
 /// read plainly use scientific notation (`1.5e-7`, `2.5e12`).
 #[cfg(test)]
 pub fn number_text(x: f64) -> String {

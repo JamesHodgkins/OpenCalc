@@ -26,7 +26,7 @@ pub enum BinaryOp {
     Mul,
     Div,
     Pow,
-    /// Comparisons give 1 (true) or 0 (false), dimensionless, as in Mathcad.
+    /// Comparisons give 1 (true) or 0 (false), dimensionless.
     Eq,
     Ne,
     Lt,
@@ -43,7 +43,7 @@ pub enum AssignKind {
     Evaluate,
 }
 
-/// The name of the variable that sets where indexing starts, as in Mathcad.
+/// The name of the variable that sets where indexing starts.
 pub const ORIGIN: &str = "ORIGIN";
 
 /// A parse error with the part of the source it points at, as a half-open range

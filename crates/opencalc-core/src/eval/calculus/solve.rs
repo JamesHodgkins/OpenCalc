@@ -10,7 +10,7 @@
 //! * `find` and `minerr` run Levenberg-Marquardt on the equations and on the
 //!   violations of the inequalities. `find` then checks every constraint and
 //!   gives an error rather than a point that fails one; `minerr` returns the best
-//!   point reached, as Mathcad documents for `minerr`.
+//!   point reached (the `minerr` behaviour).
 //! * `minimize` and `maximize` run BFGS; constraints are handled by an augmented
 //!   Lagrangian, then checked the same way as for `find`.
 

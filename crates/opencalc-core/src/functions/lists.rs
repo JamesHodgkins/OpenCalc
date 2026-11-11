@@ -2,9 +2,9 @@
 //! `sort`, `reverse`, `cumsum`, `cvar`, `corr` (roadmap Phase 1.2), and the
 //! element-by-element application of a one-number function to a matrix.
 //!
-//! Like `stdev`, `var` and `cvar` divide by n (the population form, as Mathcad
-//! does); `var_sample` divides by n - 1. All of them need real numbers and, where
-//! several values are combined, one shared dimension.
+//! Like `stdev`, `var` and `cvar` divide by n (the population form);
+//! `var_sample` divides by n - 1. All of them need real numbers and, where several
+//! values are combined, one shared dimension.
 
 use super::stats::{gather, gather_real};
 use super::Arity::{AtLeast, Exactly};

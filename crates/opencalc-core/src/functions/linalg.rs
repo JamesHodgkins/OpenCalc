@@ -1,6 +1,6 @@
 //! Matrix constructors and operations: `identity`, `tr`, `rank`, `cross`,
 //! `augment`, `stack` (roadmap Phase 1.2). The inverse and integer powers are
-//! the `^` operator (`M ^ -1`, `M ^ 3`), as in Mathcad.
+//! the `^` operator (`M ^ -1`, `M ^ 3`).
 
 use super::Arity::Exactly;
 use super::{count, FunctionDef, Result};

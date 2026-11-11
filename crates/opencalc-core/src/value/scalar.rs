@@ -95,7 +95,7 @@ impl Scalar {
     }
 
     /// Compare two scalars. Both must have the same dimension. Equality is exact
-    /// (as in Mathcad without `TOL`); ordering needs real numbers.
+    /// (without `TOL`); ordering needs real numbers.
     pub fn compare(self, o: Scalar, how: Comparison) -> Result<bool, ValueError> {
         self.same_dim(&o)?;
         match how {

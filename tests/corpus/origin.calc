@@ -1,4 +1,4 @@
-# source: original; ORIGIN sets where indexing starts, as in Mathcad
+# source: original; ORIGIN sets where indexing starts
 ORIGIN := 1
 v := [10, 20, 30]
 first := v[1]

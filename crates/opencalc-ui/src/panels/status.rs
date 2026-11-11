@@ -1,4 +1,4 @@
-//! Status bar, after Mathcad's: the page, the calculation indicator, and at the
+//! Status bar: the page, the calculation indicator, and at the
 //! right the zoom slider. Grid, snap, units and automatic calculation live on the
 //! ribbon; errors show on the regions themselves.
 

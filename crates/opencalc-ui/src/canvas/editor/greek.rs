@@ -1,6 +1,6 @@
 //! Ctrl+G: turn the letter before the caret (or each letter selected) into its
 //! Greek counterpart, and a Greek letter back into the Latin one. The pairs follow
-//! the Mathcad habit: `p` is pi, `q` is theta, `f` is phi, `c` is chi.
+//! a common habit in math editors: `p` is pi, `q` is theta, `f` is phi, `c` is chi.
 
 use super::Field;
 

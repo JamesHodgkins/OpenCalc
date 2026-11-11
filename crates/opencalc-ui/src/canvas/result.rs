@@ -1,6 +1,6 @@
 //! What a math region shows beside what was typed.
 //!
-//! As in Mathcad and SMath, a *definition* (`x := 5`) shows only the definition, and
+//! As in SMath, a *definition* (`x := 5`) shows only the definition, and
 //! a bare expression shows nothing: a result appears only on an evaluation region
 //! (`x =`, or `2 + 3 =`). Errors are always shown, wherever they happen, so a failing
 //! definition is not silent.
