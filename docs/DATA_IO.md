@@ -14,12 +14,12 @@ Labels: **[PTC]** documented by PTC, **[decision]** a choice for this repository
 - 22 production files mention these two variants (paint, hit-testing, find, edit,
   validation, clipboard, labels, export). Each already has an intentional arm for
   "no content"; they all need revisiting when a variant gains data.
-- The `.ocx` container is a ZIP with `manifest.json` and `worksheet.json`; extra
+- The `.ocalc` container is a ZIP with `manifest.json` and `worksheet.json`; extra
   entries are ignored, at most 8 entries are accepted (`FILE_FORMAT.md` section 1), and
   the project's notes already expect `assets/` for pictures and data snapshots.
 - Matrices can now have a unit per element (TD-28 resolved), so a table whose
   columns have different units evaluates to one matrix.
-- Dependencies in the build: `png` (a direct dependency of `opencalc-ui`, used by
+- Dependencies in the build: `png` (a direct dependency of `opencalc-app`, used by
   PNG export) and `zip`. **Not** in the build: a CSV parser, a JPEG decoder, an Excel
   reader or writer.
 

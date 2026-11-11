@@ -131,8 +131,8 @@ commands! {
     AppOptionsClose: "app.options_close", "Close Options", icons::CLOSE;
     AppOptionsDefaults: "app.options_defaults", "Restore defaults", icons::REFRESH;
     FileClearRecent: "file.clear_recent", "Clear recent list", icons::DELETE;
-    FileTypeRegister: "app.file_type_register", "Open .ocx files with OpenCalc", icons::FILE_NEW;
-    FileTypeRemove: "app.file_type_remove", "Stop opening .ocx files with OpenCalc", icons::CLOSE;
+    FileTypeRegister: "app.file_type_register", "Open .ocalc files with OpenCalc", icons::FILE_NEW;
+    FileTypeRemove: "app.file_type_remove", "Stop opening .ocalc files with OpenCalc", icons::CLOSE;
     ThemeNeutral: "theme.neutral", "Neutral", icons::THEME;
     ThemeSlate: "theme.slate", "Slate", icons::THEME;
     TabHome: "tab.home", "Home", icons::HOME;

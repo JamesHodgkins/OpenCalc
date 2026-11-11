@@ -5,7 +5,7 @@
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=../../assets/icons/opencalc.ico");
-    println!("cargo:rerun-if-changed=../../assets/icons/ocx.ico");
+    println!("cargo:rerun-if-changed=../../assets/icons/ocalc.ico");
     #[cfg(windows)]
     embed_icons();
 }
@@ -15,7 +15,7 @@ fn embed_icons() {
     let mut resources = winresource::WindowsResource::new();
     // Resource 1 is the program's own icon; 2 is what a worksheet file shows.
     resources.set_icon("../../assets/icons/opencalc.ico");
-    resources.set_icon_with_id("../../assets/icons/ocx.ico", "2");
+    resources.set_icon_with_id("../../assets/icons/ocalc.ico", "2");
     resources.set("FileDescription", "OpenCalc");
     resources.set("ProductName", "OpenCalc");
     if let Err(error) = resources.compile() {

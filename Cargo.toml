@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "crates/opencalc-core",
-    "crates/opencalc-ui",
+    "crates/opencalc-app",
     "crates/opencalc-cli",
 ]
 

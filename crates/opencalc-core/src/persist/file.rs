@@ -105,12 +105,12 @@ mod tests {
     #[test]
     fn writing_creates_then_replaces_and_leaves_no_temporary_file() {
         let dir = scratch("replace");
-        let path = dir.join("a.ocx");
+        let path = dir.join("a.ocalc");
         write_atomic(&path, b"first").unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"first");
         write_atomic(&path, b"second, longer").unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"second, longer");
-        assert_eq!(entries(&dir), ["a.ocx"]);
+        assert_eq!(entries(&dir), ["a.ocalc"]);
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -118,7 +118,7 @@ mod tests {
     fn a_failed_write_leaves_the_target_alone_and_no_temporary_file() {
         let dir = scratch("fail");
         // The folder does not exist: nothing can be created.
-        assert!(write_atomic(&dir.join("missing").join("a.ocx"), b"x").is_err());
+        assert!(write_atomic(&dir.join("missing").join("a.ocalc"), b"x").is_err());
         // The target is a folder: the final step fails after the data was written.
         let target = dir.join("target");
         fs::create_dir(&target).unwrap();

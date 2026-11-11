@@ -13,7 +13,7 @@ use super::Harness;
 fn files_from_another_copy_open_as_tabs_and_a_bad_path_is_reported_not_fatal() {
     let dir = std::env::temp_dir().join(format!("opencalc-incoming-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("from_elsewhere.ocx");
+    let path = dir.join("from_elsewhere.ocalc");
     std::fs::write(&path, save_bytes(&Worksheet::new("Sent over")).unwrap()).unwrap();
 
     let mut h = Harness::new();
@@ -39,7 +39,7 @@ fn files_from_another_copy_open_as_tabs_and_a_bad_path_is_reported_not_fatal() {
     assert_eq!(h.app.state.sheets.len(), before + 1);
 
     // A file that is not there says so and leaves the others alone.
-    send.send(vec![dir.join("missing.ocx")]).unwrap();
+    send.send(vec![dir.join("missing.ocalc")]).unwrap();
     h.frame();
     assert_eq!(h.app.state.sheets.len(), before + 1);
     assert!(h.app.state.dialog.is_some(), "the missing file is reported");

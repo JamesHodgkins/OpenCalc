@@ -84,7 +84,7 @@ fn right_enters_the_pane_of_choices_under_new() {
 #[test]
 fn a_number_opens_that_recent_worksheet() {
     let mut h = Harness::new();
-    let gone = std::env::temp_dir().join("opencalc-app-menu-no-such-file.ocx");
+    let gone = std::env::temp_dir().join("opencalc-app-menu-no-such-file.ocalc");
     h.app.state.recent = vec![gone.clone()];
     h.frame();
     h.key(Key::F, Modifiers::ALT);

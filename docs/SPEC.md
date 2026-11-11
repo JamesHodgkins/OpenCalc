@@ -396,7 +396,7 @@ pub struct Evaluator {
 
 **OpenCalc's accent is red**, so the two apps are easy to tell apart. Everything else in the look is shared.
 
-**Reuse approach:** pending a code-sharing decision (section 4.11). Until then, OpenCalc re-implements the same design tokens and component behaviour in its own `opencalc-ui` crate. No code is copied.
+**Reuse approach:** pending a code-sharing decision (section 4.11). Until then, OpenCalc re-implements the same design tokens and component behaviour in its own `opencalc-app` crate. No code is copied.
 
 ### 4.1 Window structure (top to bottom)
 
@@ -410,7 +410,7 @@ pub struct Evaluator {
 
 **The File menu** (`panels/app_menu.rs`) drops from the app button. The left column lists New worksheet, Open, Save, Save As, Export and Close worksheet, each with its icon and shortcut, then Options, About and Quit at its foot under a divider. The right pane shows the recent worksheets (numbered 1 to 9 and 0, with the folder under the name, and "Open" on any already open), or, while New, Save As or Export is chosen, that command's choices, each with a line saying what it does. The left row whose pane shows takes the pane's `raised` tone and joins it, with a short accent bar. Resting the pointer on a row for 0.15 s opens its pane; a click on a row runs it (Export, which runs nothing itself, opens its pane). Keys: Up and Down move, Right enters the pane, Left leaves it, Enter or Space runs, a digit opens that recent worksheet, Escape closes. Running any command closes the menu.
 
-**The Options window** (`panels/options.rs`, settings in `settings.rs`) opens from Options in the File menu. A list of sections on the left (General, Worksheet, New worksheets, Files), the chosen section's settings on the right, each a row of name, control and one line saying what it does. Changes apply at once and are kept between sessions; there is no OK or Cancel, only Restore defaults and Close. General: theme, interface size (80% to 150%; worksheet zoom is separate), a link to the keyboard shortcuts. Worksheet: grid spacing (1/16, 1/8 or 1/4 in, 2 or 5 mm; the stronger line falls on each inch or centimetre), show grid, snap to grid. New worksheets: the unit system, paper, orientation, margin and background pattern a worksheet made with New starts with; an open worksheet keeps its own. Files: how often recovery files are written (15 s to 5 min, or off), clearing the recent list, and the `.ocx` file type where the system allows it. Settings belong to the computer, never to a worksheet, so nothing in them changes what a worksheet calculates or how it looks elsewhere. They are stored as `key=value` lines; a value that does not parse is ignored.
+**The Options window** (`panels/options.rs`, settings in `settings.rs`) opens from Options in the File menu. A list of sections on the left (General, Worksheet, New worksheets, Files), the chosen section's settings on the right, each a row of name, control and one line saying what it does. Changes apply at once and are kept between sessions; there is no OK or Cancel, only Restore defaults and Close. General: theme, interface size (80% to 150%; worksheet zoom is separate), a link to the keyboard shortcuts. Worksheet: grid spacing (1/16, 1/8 or 1/4 in, 2 or 5 mm; the stronger line falls on each inch or centimetre), show grid, snap to grid. New worksheets: the unit system, paper, orientation, margin and background pattern a worksheet made with New starts with; an open worksheet keeps its own. Files: how often recovery files are written (15 s to 5 min, or off), clearing the recent list, and the `.ocalc` file type where the system allows it. Settings belong to the computer, never to a worksheet, so nothing in them changes what a worksheet calculates or how it looks elsewhere. They are stored as `key=value` lines; a value that does not parse is ignored.
 
 ### 4.1a Floating and overlay rules
 - Popups and menus use the `panel_raised` tone, a 2 px margin and 22 px rows. Lists over 12 rows scroll.
@@ -649,7 +649,7 @@ pub struct RibbonOutput { pub clicked: Option<&'static str>, pub slots: Vec<(&'s
 
 ### 4.10 Engineering conventions (adopted from OpenDraft's CLAUDE.md)
 
-- Crates depend downward: `opencalc-core` (no UI) <- `opencalc-ui` and `opencalc-cli`. Geometry, maths and document logic must be testable with no window.
+- Crates depend downward: `opencalc-core` (no UI) <- `opencalc-app` and `opencalc-cli`. Geometry, maths and document logic must be testable with no window.
 - No `unwrap`, `todo!`, `dbg!` or prints in production code (the CLI binary's output layer is exempt: printing is its job). `unsafe` is forbidden. Tests may unwrap.
 - Keep files under about 400 production lines. Split by responsibility (for example, `ribbon/buttons.rs`, `ribbon/rows.rs`).
 - Entities and worksheet regions are referred to by stable ID, never by list position.
@@ -661,9 +661,9 @@ pub struct RibbonOutput { pub clicked: Option<&'static str>, pub slots: Vec<(&'s
 
 **Licence (decided):** OpenCalc is GPL-3.0-or-later, the same as OpenDraft. The `LICENSE` file is the GPL v3 text.
 
-**Code sharing (decided 2026-11-06): option 1, re-implement.** `opencalc-ui` is written from this section; OpenDraft is read for reference only and no `od-ui` code is copied. The options considered were:
+**Code sharing (decided 2026-11-06): option 1, re-implement.** `opencalc-app` is written from this section; OpenDraft is read for reference only and no `od-ui` code is copied. The options considered were:
 
-1. **Re-implement.** Write `opencalc-ui` from this section, reading OpenDraft for reference only. Slower, but the result is OpenCalc's own code, and the design rules above are specific enough to build from.
+1. **Re-implement.** Write `opencalc-app` from this section, reading OpenDraft for reference only. Slower, but the result is OpenCalc's own code, and the design rules above are specific enough to build from.
 2. **Copy the `od-ui` modules.** Faster. Each copied file keeps its header and a note of where it came from.
 3. **Extract a shared crate.** Move `od-ui` into a separate crate both apps depend on. Cleanest long term, but it changes OpenDraft's repository layout, so it is a bigger decision.
 
@@ -769,9 +769,9 @@ If either takes much longer than expected, revise the design before building on 
 **Exit criterion:** both prototypes run in one window, and an edit to an input updates a dependent result via the worker.
 
 ### Milestone 1: Skeleton and UI Layout
-- [x] Cargo workspace: `opencalc-core` (model, parser, evaluator, units), `opencalc-ui` (egui app), `opencalc-cli` (headless).
+- [x] Cargo workspace: `opencalc-core` (model, parser, evaluator, units), `opencalc-app` (egui app), `opencalc-cli` (headless).
 - [x] eframe app shell matching section 4.1: title row with app button and Quick Access Toolbar, tab strip, ribbon body, document tabs, canvas, dock panels, status bar.
-- [x] `opencalc-ui` theme module (section 4.6): four tones, Neutral and Blue slate palettes, Inter and Lucide bundled.
+- [x] `opencalc-app` theme module (section 4.6): four tones, Neutral and Blue slate palettes, Inter and Lucide bundled.
 - [x] Ribbon widget (section 4.8) drawn from one data definition; all seven tabs populated.
 - [x] `CanvasView` with pan, zoom, grid, and coordinate transforms.
 - [x] Region model and z-ordered painting; placeholder for each region type.

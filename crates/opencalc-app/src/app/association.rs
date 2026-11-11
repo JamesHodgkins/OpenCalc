@@ -1,4 +1,4 @@
-//! Making `.ocx` files open in OpenCalc when they are double-clicked, and show the
+//! Making `.ocalc` files open in OpenCalc when they are double-clicked, and show the
 //! worksheet icon.
 //!
 //! On Windows this is a few keys under the current user's `Software\Classes` (so no
@@ -20,7 +20,7 @@ pub const USER_CLASSES: &str = r"HKCU\Software\Classes";
 /// Whether this system's file type can be set from here, and whether it is.
 pub trait FileType {
     fn supported(&self) -> bool;
-    /// `.ocx` files open in this copy of the program.
+    /// `.ocalc` files open in this copy of the program.
     fn registered(&self) -> bool;
     /// Register (`true`) or remove the registration.
     fn set(&mut self, on: bool) -> Result<(), String>;
@@ -117,7 +117,7 @@ impl FileType for NativeFileType {
             let _ = Command::new("ie4uinit").arg("-show").status();
             return Ok(());
         }
-        // Leave `.ocx` alone if another program has taken it since.
+        // Leave `.ocalc` alone if another program has taken it since.
         let dot = format!(".{EXTENSION}");
         if self.default_of(&dot).as_deref() == Some(PROG_ID) {
             Self::reg(&["delete", &self.key(&dot), "/f"])?;
@@ -162,7 +162,7 @@ mod tests {
     fn the_keys_name_the_type_its_icon_and_how_to_open_a_file() {
         let e = entries(Path::new(r"C:\Apps\OpenCalc\opencalc.exe"));
         let value = |key: &str| e.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str());
-        assert_eq!(value(".ocx"), Some("OpenCalc.Worksheet"));
+        assert_eq!(value(".ocalc"), Some("OpenCalc.Worksheet"));
         assert_eq!(
             value(r"OpenCalc.Worksheet\DefaultIcon"),
             Some(r#""C:\Apps\OpenCalc\opencalc.exe",-2"#)
@@ -192,9 +192,10 @@ mod tests {
             "a path with a space survives"
         );
         // Another program's claim on the extension is not removed.
-        NativeFileType::reg(&["add", &native.key(".ocx"), "/ve", "/d", "Other.App", "/f"]).unwrap();
+        NativeFileType::reg(&["add", &native.key(".ocalc"), "/ve", "/d", "Other.App", "/f"])
+            .unwrap();
         native.set(false).unwrap();
-        assert_eq!(native.default_of(".ocx").as_deref(), Some("Other.App"));
+        assert_eq!(native.default_of(".ocalc").as_deref(), Some("Other.App"));
         assert!(native.default_of("OpenCalc.Worksheet").is_none());
         assert!(!native.registered());
         let scratch = root.rsplit_once(r"\Classes").unwrap().0.to_owned();

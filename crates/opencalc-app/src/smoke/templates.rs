@@ -36,7 +36,7 @@ fn a_template_is_saved_with_its_kind_and_the_worksheet_is_untouched() {
     let file = t.dir.join("beam");
     t.answer_template_save(Some(file));
     t.run(CommandId::FileSaveAsTemplate);
-    let bytes = std::fs::read(t.dir.join("beam.ocxt")).unwrap();
+    let bytes = std::fs::read(t.dir.join("beam.ocalct")).unwrap();
     let loaded = persist::load_bytes(&bytes).unwrap();
     assert!(loaded.is_template);
     assert_eq!(loaded.worksheet.regions().len(), 1);
@@ -50,10 +50,10 @@ fn a_template_is_saved_with_its_kind_and_the_worksheet_is_untouched() {
 #[test]
 fn a_new_worksheet_from_a_template_is_an_untitled_copy() {
     let mut t = rig("tpl_new");
-    t.answer_template_save(Some(t.dir.join("beam.ocxt")));
+    t.answer_template_save(Some(t.dir.join("beam.ocalct")));
     t.run(CommandId::FileSaveAsTemplate);
     t.run(CommandId::DialogOk);
-    t.answer_template_open(Some(t.dir.join("beam.ocxt")));
+    t.answer_template_open(Some(t.dir.join("beam.ocalct")));
     t.run(CommandId::FileNewFromTemplate);
     assert_eq!(t.state().sheets.len(), 2);
     let i = t.state().active.unwrap();
@@ -70,7 +70,7 @@ fn a_new_worksheet_from_a_template_is_an_untitled_copy() {
 #[test]
 fn an_ordinary_worksheet_can_also_be_used_as_a_template() {
     let mut t = rig("tpl_plain");
-    let file = t.dir.join("sheet.ocx");
+    let file = t.dir.join("sheet.ocalc");
     std::fs::write(
         &file,
         persist::save_bytes(&t.state().sheets[0].doc).unwrap(),
@@ -84,7 +84,7 @@ fn an_ordinary_worksheet_can_also_be_used_as_a_template() {
 #[test]
 fn a_bad_template_says_why_and_opens_nothing() {
     let mut t = rig("tpl_bad");
-    let file = t.dir.join("junk.ocxt");
+    let file = t.dir.join("junk.ocalct");
     std::fs::write(&file, b"not a zip").unwrap();
     t.answer_template_open(Some(file));
     t.run(CommandId::FileNewFromTemplate);
@@ -102,19 +102,19 @@ fn a_bad_template_says_why_and_opens_nothing() {
 #[test]
 fn a_template_opened_for_editing_is_saved_back_as_a_template() {
     let mut t = rig("tpl_edit");
-    t.answer_template_save(Some(t.dir.join("beam.ocxt")));
+    t.answer_template_save(Some(t.dir.join("beam.ocalct")));
     t.run(CommandId::FileSaveAsTemplate);
     t.run(CommandId::DialogOk);
-    t.h.app.open_path(&t.dir.join("beam.ocxt"));
+    t.h.app.open_path(&t.dir.join("beam.ocalct"));
     t.h.frame();
     let i = t.state().active.unwrap();
     assert_eq!(
         t.state().sheets[i].path.as_deref(),
-        Some(t.dir.join("beam.ocxt").as_path())
+        Some(t.dir.join("beam.ocalct").as_path())
     );
     t.type_into_active("G := 2");
     t.run(CommandId::FileSave);
-    let back = persist::load_bytes(&std::fs::read(t.dir.join("beam.ocxt")).unwrap()).unwrap();
+    let back = persist::load_bytes(&std::fs::read(t.dir.join("beam.ocalct")).unwrap()).unwrap();
     assert!(back.is_template, "still a template after Save");
     assert_eq!(back.worksheet.regions().len(), 2);
 }

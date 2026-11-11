@@ -13,4 +13,4 @@ Keywords=calculation;engineering;units;worksheet;
 # The window's app id, so the desktop gives it this icon and groups it.
 StartupWMClass=opencalc
 # What the program opens.
-MimeType=application/vnd.opencalc.worksheet;
+MimeType=application/x-opencalc-worksheet;

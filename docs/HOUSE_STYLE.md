@@ -146,8 +146,8 @@ Use restrained, short transitions for hover, press, menu opening, and panel chan
 
 This reusable spec is derived from the current OpenCalc UI implementation and its project specification. For concrete token and behavior references, see:
 
-- `crates/opencalc-ui/src/theme.rs` — palettes, metrics, type sizes, widget states, focus ring.
-- `crates/opencalc-ui/src/fonts.rs` — bundled Inter/Lucide font setup.
-- `crates/opencalc-ui/src/panels/title.rs` — application row and quick access actions.
-- `crates/opencalc-ui/src/panels/status.rs` — status row behavior.
+- `crates/opencalc-app/src/theme.rs` — palettes, metrics, type sizes, widget states, focus ring.
+- `crates/opencalc-app/src/fonts.rs` — bundled Inter/Lucide font setup.
+- `crates/opencalc-app/src/panels/title.rs` — application row and quick access actions.
+- `crates/opencalc-app/src/panels/status.rs` — status row behavior.
 - `docs/SPEC.md`, sections 4.1, 4.6, 4.8, and 4.9 — shell, theme, tool groups, and accessibility details.

@@ -185,12 +185,12 @@ pub(super) fn files(ui: &mut Ui, state: &AppState, next: &mut Settings, out: &mu
     if supported {
         let (help, command) = if registered {
             (
-                "Double-clicking an .ocx file opens it in OpenCalc.",
+                "Double-clicking an .ocalc file opens it in OpenCalc.",
                 CommandId::FileTypeRemove,
             )
         } else {
             (
-                "Make double-clicking an .ocx file open it here, with its icon.",
+                "Make double-clicking an .ocalc file open it here, with its icon.",
                 CommandId::FileTypeRegister,
             )
         };

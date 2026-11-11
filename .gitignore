@@ -3,7 +3,7 @@ target/
 private/
 
 # Local recovery and autosave files
-*.ocx.recovery
+*.ocalc.recovery
 *.oc.recovery
 *.tmp
 

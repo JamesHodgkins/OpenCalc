@@ -51,7 +51,7 @@ pub struct App {
     pub queue: Vec<CommandId>,
     /// How the app asks for file paths.
     files: Box<dyn Files>,
-    /// Whether `.ocx` files open in this program (a setting of the system).
+    /// Whether `.ocalc` files open in this program (a setting of the system).
     pub(crate) file_type: Box<dyn association::FileType>,
     /// Files that other copies of the program were asked to open.
     incoming: Option<std::sync::mpsc::Receiver<Vec<PathBuf>>>,
@@ -146,12 +146,12 @@ impl App {
         }
     }
 
-    /// Read from the system whether `.ocx` files open here, for the Options window.
+    /// Read from the system whether `.ocalc` files open here, for the Options window.
     pub(crate) fn refresh_file_type(&mut self) {
         self.state.file_type = (self.file_type.supported(), self.file_type.registered());
     }
 
-    /// Make `.ocx` files open in this program (or stop doing so), and say if it fails.
+    /// Make `.ocalc` files open in this program (or stop doing so), and say if it fails.
     fn set_file_type(&mut self, on: bool) {
         if let Err(reason) = self.file_type.set(on) {
             self.state.message(

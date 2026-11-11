@@ -752,7 +752,7 @@ fn conversions_place_regions_where_the_document_says() {
 /// does outside `ctx.run`, so it is a lower bound on a real frame.
 ///
 /// Ignored by default because timing means nothing in a debug build. Run:
-///   cargo test --release -p opencalc-ui perf -- --ignored --nocapture
+///   cargo test --release -p opencalc-app perf -- --ignored --nocapture
 #[test]
 #[ignore = "performance: run in release with --ignored --nocapture"]
 fn perf_frame_time_with_200_visible_regions() {

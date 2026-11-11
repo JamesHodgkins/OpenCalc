@@ -223,34 +223,34 @@ fn write_fixtures() {
     let dir = fixture("v2");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
-        dir.join("empty.ocx"),
+        dir.join("empty.ocalc"),
         save_bytes(&Worksheet::new("Empty")).unwrap(),
     )
     .unwrap();
-    std::fs::write(dir.join("sample.ocx"), save_bytes(&sample_v2()).unwrap()).unwrap();
+    std::fs::write(dir.join("sample.ocalc"), save_bytes(&sample_v2()).unwrap()).unwrap();
 }
 
 #[test]
 fn files_written_by_format_1_still_open() {
-    let empty = load_bytes(&std::fs::read(fixture("v1/empty.ocx")).unwrap()).unwrap();
+    let empty = load_bytes(&std::fs::read(fixture("v1/empty.ocalc")).unwrap()).unwrap();
     assert_eq!(empty.worksheet, Worksheet::new("Empty"));
-    let sheet = load_bytes(&std::fs::read(fixture("v1/sample.ocx")).unwrap()).unwrap();
+    let sheet = load_bytes(&std::fs::read(fixture("v1/sample.ocalc")).unwrap()).unwrap();
     assert!(sheet.repairs.is_empty());
     assert_eq!(sheet.worksheet, sample());
 }
 
 #[test]
 fn files_written_by_format_2_still_open() {
-    let empty = load_bytes(&std::fs::read(fixture("v2/empty.ocx")).unwrap()).unwrap();
+    let empty = load_bytes(&std::fs::read(fixture("v2/empty.ocalc")).unwrap()).unwrap();
     assert_eq!(empty.worksheet, Worksheet::new("Empty"));
-    let sheet = load_bytes(&std::fs::read(fixture("v2/sample.ocx")).unwrap()).unwrap();
+    let sheet = load_bytes(&std::fs::read(fixture("v2/sample.ocalc")).unwrap()).unwrap();
     assert!(sheet.repairs.is_empty());
     assert_eq!(sheet.worksheet, sample_v2());
 }
 
 #[test]
 fn a_format_1_file_is_upgraded_to_2_when_saved_and_keeps_its_plots() {
-    let old = load_bytes(&std::fs::read(fixture("v1/sample.ocx")).unwrap()).unwrap();
+    let old = load_bytes(&std::fs::read(fixture("v1/sample.ocalc")).unwrap()).unwrap();
     let saved = save_bytes(&old.worksheet).unwrap();
     let manifest = zip::ZipArchive::new(std::io::Cursor::new(saved.clone()))
         .unwrap()

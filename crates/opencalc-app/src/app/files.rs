@@ -43,7 +43,7 @@ pub trait Files {
 pub struct NativeFiles;
 
 fn filter(dialog: rfd::FileDialog) -> rfd::FileDialog {
-    dialog.add_filter("OpenCalc worksheet", &[EXTENSION])
+    dialog.add_filter("OpenCalc worksheet", &[EXTENSION, persist::OLD_EXTENSION])
 }
 
 impl Files for NativeFiles {
@@ -57,7 +57,12 @@ impl Files for NativeFiles {
         rfd::FileDialog::new()
             .add_filter(
                 "OpenCalc template or worksheet",
-                &[persist::TEMPLATE_EXTENSION, EXTENSION],
+                &[
+                    persist::TEMPLATE_EXTENSION,
+                    EXTENSION,
+                    persist::OLD_TEMPLATE_EXTENSION,
+                    persist::OLD_EXTENSION,
+                ],
             )
             .set_title("New from template")
             .pick_file()
@@ -217,9 +222,7 @@ impl App {
         if let Some(title) = &rename {
             let _ = copy.apply(Edit::SetTitle(title.clone()));
         }
-        let template = path
-            .extension()
-            .is_some_and(|e| e == persist::TEMPLATE_EXTENSION);
+        let template = path.extension().is_some_and(persist::is_template_extension);
         let saved = if template {
             persist::save_template_bytes(&copy)
         } else {

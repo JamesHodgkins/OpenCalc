@@ -91,7 +91,7 @@ pub(super) fn setup(name: &str, state: AppState) -> Rig {
     let script = Rc::new(RefCell::new(Script::default()));
     let ctx = egui::Context::default();
     let app = App::with_files(ctx.clone(), state, Box::new(Fake(script.clone())));
-    let dir = std::env::temp_dir().join(format!("opencalc-ui-{}-{name}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("opencalc-app-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     Rig {
@@ -196,7 +196,7 @@ fn save_asks_for_a_name_writes_the_file_and_clears_the_mark() {
     let target = t.dir.join("beam"); // no extension typed
     t.answer_save(Some(target));
     t.run(CommandId::FileSave);
-    let file = t.dir.join("beam.ocx");
+    let file = t.dir.join("beam.ocalc");
     assert!(file.exists(), "the extension is added");
     let sheet = &t.state().sheets[0];
     assert!(!sheet.dirty());
@@ -207,7 +207,7 @@ fn save_asks_for_a_name_writes_the_file_and_clears_the_mark() {
         "a first save names the worksheet after the file"
     );
     assert_eq!(t.state().recent.first(), Some(&file));
-    assert_eq!(t.script.borrow().suggested, ["Untitled.ocx"]);
+    assert_eq!(t.script.borrow().suggested, ["Untitled.ocalc"]);
     // Saving again does not ask.
     t.type_into_active("b := 2 m");
     assert!(t.state().sheets[0].dirty());
@@ -221,7 +221,7 @@ fn save_asks_for_a_name_writes_the_file_and_clears_the_mark() {
 fn ctrl_s_saves_through_the_keyboard() {
     let mut t = setup("ctrl_s", blank());
     t.type_into_active("a := 1");
-    let target = t.dir.join("k.ocx");
+    let target = t.dir.join("k.ocalc");
     t.answer_save(Some(target.clone()));
     t.h.key(Key::S, Modifiers::COMMAND);
     t.h.frame();
@@ -234,7 +234,7 @@ fn what_was_saved_opens_again_the_same() {
     let mut t = setup("roundtrip", blank());
     t.type_into_active("a := 1 m");
     t.type_into_active("b := a + 2 m");
-    let target = t.dir.join("r.ocx");
+    let target = t.dir.join("r.ocalc");
     t.answer_save(Some(target.clone()));
     t.run(CommandId::FileSave);
     let saved = t.state().sheets[0].doc.clone();
@@ -258,7 +258,7 @@ fn what_was_saved_opens_again_the_same() {
 fn opening_an_open_file_switches_to_it_and_a_blank_sheet_is_replaced() {
     let mut t = setup("same", blank());
     t.type_into_active("a := 1");
-    let target = t.dir.join("s.ocx");
+    let target = t.dir.join("s.ocalc");
     t.answer_save(Some(target.clone()));
     t.run(CommandId::FileSave);
     t.run(CommandId::FileNew);
@@ -270,7 +270,7 @@ fn opening_an_open_file_switches_to_it_and_a_blank_sheet_is_replaced() {
 
     // A blank untouched worksheet makes way for the file.
     let mut u = setup("replace", blank());
-    let copy = u.dir.join("s.ocx");
+    let copy = u.dir.join("s.ocalc");
     std::fs::copy(&target, &copy).unwrap();
     u.answer_open(Some(copy));
     u.run(CommandId::FileOpen);
@@ -282,16 +282,19 @@ fn opening_an_open_file_switches_to_it_and_a_blank_sheet_is_replaced() {
 fn save_as_writes_a_second_file_and_leaves_the_first_alone() {
     let mut t = setup("saveas", blank());
     t.type_into_active("a := 1");
-    t.answer_save(Some(t.dir.join("one.ocx")));
+    t.answer_save(Some(t.dir.join("one.ocalc")));
     t.run(CommandId::FileSave);
-    let first = std::fs::read(t.dir.join("one.ocx")).unwrap();
+    let first = std::fs::read(t.dir.join("one.ocalc")).unwrap();
     t.type_into_active("b := 2");
-    t.answer_save(Some(t.dir.join("two.ocx")));
+    t.answer_save(Some(t.dir.join("two.ocalc")));
     t.run(CommandId::FileSaveAs);
-    assert_eq!(std::fs::read(t.dir.join("one.ocx")).unwrap(), first);
-    assert!(t.dir.join("two.ocx").exists());
+    assert_eq!(std::fs::read(t.dir.join("one.ocalc")).unwrap(), first);
+    assert!(t.dir.join("two.ocalc").exists());
     let sheet = &t.state().sheets[0];
-    assert_eq!(sheet.path.as_deref(), Some(t.dir.join("two.ocx").as_path()));
+    assert_eq!(
+        sheet.path.as_deref(),
+        Some(t.dir.join("two.ocalc").as_path())
+    );
     assert_eq!(sheet.title(), "two");
     assert!(!sheet.dirty());
 }
@@ -311,14 +314,14 @@ fn a_cancelled_save_changes_nothing() {
 fn a_failed_save_says_so_and_keeps_the_worksheet_modified() {
     let mut t = setup("fail", blank());
     t.type_into_active("a := 1");
-    t.answer_save(Some(t.dir.join("no_such_folder").join("x.ocx")));
+    t.answer_save(Some(t.dir.join("no_such_folder").join("x.ocalc")));
     t.run(CommandId::FileSave);
     let sheet = &t.state().sheets[0];
     assert!(sheet.dirty() && sheet.path.is_none());
     assert_eq!(sheet.title(), "Untitled", "a failed save does not rename");
     let message = t.message().expect("an error message");
     assert!(
-        message.contains("x.ocx") && message.contains("still marked as modified"),
+        message.contains("x.ocalc") && message.contains("still marked as modified"),
         "{message}"
     );
     t.run(CommandId::DialogOk);
@@ -337,9 +340,9 @@ fn closing_a_modified_worksheet_asks_and_each_answer_does_what_it_says() {
     assert!(t.state().sheets[0].dirty());
     // Save writes, then closes.
     t.run(CommandId::FileClose);
-    t.answer_save(Some(t.dir.join("c.ocx")));
+    t.answer_save(Some(t.dir.join("c.ocalc")));
     t.run(CommandId::DialogSave);
-    assert!(t.dir.join("c.ocx").exists());
+    assert!(t.dir.join("c.ocalc").exists());
     assert!(t.state().sheets.is_empty());
     // Don't save closes without writing.
     t.run(CommandId::FileNew);
@@ -382,9 +385,9 @@ fn quitting_asks_about_each_modified_worksheet_and_cancel_stops_it() {
     assert!(!t.h.app.allow_close && t.state().sheets.len() == 3);
 
     t.run(CommandId::AppQuit);
-    t.answer_save(Some(t.dir.join("q.ocx")));
+    t.answer_save(Some(t.dir.join("q.ocalc")));
     t.run(CommandId::DialogSave);
-    assert!(t.dir.join("q.ocx").exists());
+    assert!(t.dir.join("q.ocalc").exists());
     assert_eq!(
         t.unsaved_dialog(),
         Some((1, Then::Quit)),
@@ -405,20 +408,20 @@ fn quitting_with_nothing_modified_just_quits() {
 #[test]
 fn opening_something_that_is_not_a_worksheet_explains_and_changes_nothing() {
     let mut t = setup("bad", blank());
-    let junk = t.dir.join("junk.ocx");
+    let junk = t.dir.join("junk.ocalc");
     std::fs::write(&junk, b"this is not a zip").unwrap();
     t.answer_open(Some(junk));
     t.run(CommandId::FileOpen);
     let message = t.message().expect("a message");
     assert!(
-        message.contains("junk.ocx") && message.contains("not an OpenCalc worksheet"),
+        message.contains("junk.ocalc") && message.contains("not an OpenCalc worksheet"),
         "{message}"
     );
     assert_eq!(t.state().sheets.len(), 1);
     assert!(t.state().recent.is_empty());
 
     t.run(CommandId::DialogOk);
-    t.answer_open(Some(t.dir.join("missing.ocx")));
+    t.answer_open(Some(t.dir.join("missing.ocalc")));
     t.run(CommandId::FileOpen);
     assert!(t.message().unwrap().contains("not found"));
 }
@@ -429,7 +432,7 @@ fn the_recent_list_is_newest_first_without_repeats_and_opens_by_index() {
     for n in 1..=3 {
         t.run(CommandId::FileNew);
         t.type_into_active("x := 1");
-        t.answer_save(Some(t.dir.join(format!("f{n}.ocx"))));
+        t.answer_save(Some(t.dir.join(format!("f{n}.ocalc"))));
         t.run(CommandId::FileSave);
     }
     let names: Vec<String> = t
@@ -438,7 +441,7 @@ fn the_recent_list_is_newest_first_without_repeats_and_opens_by_index() {
         .iter()
         .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
         .collect();
-    assert_eq!(names, ["f3.ocx", "f2.ocx", "f1.ocx"]);
+    assert_eq!(names, ["f3.ocalc", "f2.ocalc", "f1.ocalc"]);
 
     // Close everything, then open the oldest from the list.
     while !t.state().sheets.is_empty() {
@@ -498,7 +501,7 @@ fn closing_the_window_with_unsaved_changes_asks_instead_of_closing() {
 fn a_file_dropped_on_the_window_opens() {
     let mut t = setup("drop", blank());
     t.type_into_active("a := 1");
-    let target = t.dir.join("d.ocx");
+    let target = t.dir.join("d.ocalc");
     t.answer_save(Some(target.clone()));
     t.run(CommandId::FileSave);
     t.run(CommandId::FileClose);
@@ -592,20 +595,20 @@ fn a_modified_worksheet_is_written_to_a_recovery_file_and_the_real_file_is_untou
     let mut t = setup("auto1", blank());
     t.autosave();
     t.type_into_active("a := 1");
-    let target = t.dir.join("w.ocx");
+    let target = t.dir.join("w.ocalc");
     t.answer_save(Some(target.clone()));
     t.run(CommandId::FileSave);
     let saved = std::fs::read(&target).unwrap();
     t.tick();
     assert_eq!(
         Rig::files_in(&t.dir),
-        ["w.ocx"],
+        ["w.ocalc"],
         "clean: nothing to recover"
     );
 
     t.type_into_active("b := 2");
     t.tick();
-    let recovery = t.dir.join("w.ocx.recovery");
+    let recovery = t.dir.join("w.ocalc.recovery");
     assert!(recovery.exists());
     assert_eq!(
         std::fs::read(&target).unwrap(),
@@ -640,7 +643,7 @@ fn an_unsaved_worksheet_recovers_to_the_app_folder_and_closing_it_deletes_the_fi
     t.tick();
     let files = Rig::files_in(&dir);
     assert_eq!(files.len(), 1, "{files:?}");
-    assert!(files[0].starts_with("untitled-") && files[0].ends_with(".ocx.recovery"));
+    assert!(files[0].starts_with("untitled-") && files[0].ends_with(".ocalc.recovery"));
     t.run(CommandId::FileClose);
     t.run(CommandId::DialogDiscard);
     t.h.frame();
@@ -667,13 +670,13 @@ fn after_a_crash_the_next_start_offers_to_restore_and_restoring_leaves_it_unsave
     let mut t = setup("crash1", blank());
     t.autosave();
     t.type_into_active("a := 1");
-    let target = t.dir.join("w.ocx");
+    let target = t.dir.join("w.ocalc");
     t.answer_save(Some(target.clone()));
     t.run(CommandId::FileSave);
     let saved = std::fs::read(&target).unwrap();
     t.type_into_active("b := 2");
     t.tick();
-    let recovery = t.dir.join("w.ocx.recovery");
+    let recovery = t.dir.join("w.ocalc.recovery");
     assert!(recovery.exists());
     make_newer(&recovery, &target);
 
@@ -743,7 +746,7 @@ fn an_unsaved_worksheet_restored_from_the_app_folder_keeps_using_the_same_file()
     next.tick();
     assert_eq!(Rig::files_in(&dir).len(), 1);
     // Saving it somewhere removes the recovery file.
-    let kept = next.dir.join("kept.ocx");
+    let kept = next.dir.join("kept.ocalc");
     next.answer_save(Some(kept));
     next.run(CommandId::FileSave);
     next.h.frame();
@@ -754,10 +757,10 @@ fn an_unsaved_worksheet_restored_from_the_app_folder_keeps_using_the_same_file()
 fn opening_a_file_with_a_newer_recovery_file_asks_and_an_older_one_is_ignored() {
     let mut t = setup("offer", blank());
     t.type_into_active("a := 1");
-    let target = t.dir.join("o.ocx");
+    let target = t.dir.join("o.ocalc");
     t.answer_save(Some(target.clone()));
     t.run(CommandId::FileSave);
-    let recovery = t.dir.join("o.ocx.recovery");
+    let recovery = t.dir.join("o.ocalc.recovery");
     let ago = |secs| std::time::SystemTime::now() - std::time::Duration::from_secs(secs);
     let set_age = |path: &Path, secs| {
         std::fs::File::options()
@@ -795,7 +798,7 @@ fn a_damaged_recovery_file_says_so_and_is_kept() {
     let mut t = setup("badrec", blank());
     let dir = t.autosave();
     std::fs::create_dir_all(&dir).unwrap();
-    let junk = dir.join("untitled-1-1.ocx.recovery");
+    let junk = dir.join("untitled-1-1.ocalc.recovery");
     std::fs::write(&junk, b"junk").unwrap();
     t.h.app.scan_recovery();
     t.h.frame();

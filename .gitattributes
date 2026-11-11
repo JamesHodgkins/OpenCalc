@@ -4,7 +4,7 @@
 *.png binary
 *.ron binary
 # Fixtures are binary; never convert line endings.
-*.ocx binary
+*.ocalc binary
 *.bmp binary
 *.ico binary
 *.sh text eol=lf

@@ -1,5 +1,5 @@
 [package]
-name = "opencalc-ui"
+name = "opencalc-app"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -25,7 +25,7 @@ winresource = "0.1"
 proptest.workspace = true
 
 # The Windows installer (`cargo packager --release -f wix` after
-# `cargo build --release -p opencalc-ui -p opencalc-cli`; see installer/windows/main.wxs).
+# `cargo build --release -p opencalc-app -p opencalc-cli`; see installer/windows/main.wxs).
 # The version is this package's, so the installer cannot disagree with the
 # program; an MSI takes numeric versions only, so prerelease tags get none.
 [package.metadata.packager]
@@ -36,7 +36,7 @@ publisher = "OpenCalc project"
 authors = ["OpenCalc project <contact@openengineering.uk>"]
 description = "OpenCalc, an engineering worksheet"
 # The longer text `apt show` displays.
-long-description = """OpenCalc is a free, open-source engineering worksheet: write calculations as maths on a free-form page, with units, live recalculation, plots, find and replace, and export to PDF and PNG. It keeps its own .ocx format. This package also installs opencalc-cli, which checks worksheets from a command line."""
+long-description = """OpenCalc is a free, open-source engineering worksheet: write calculations as maths on a free-form page, with units, live recalculation, plots, find and replace, and export to PDF and PNG. It keeps its own .ocalc format. This package also installs opencalc-cli, which checks worksheets from a command line."""
 homepage = "https://github.com/JamesHodgkins/OpenCalc"
 license-file = "../../LICENSE"
 out-dir = "../../dist/packager"
@@ -63,10 +63,10 @@ dialog-image-path = "../../installer/windows/dialog.bmp"
 
 # Linux: `cargo packager --release -f deb,appimage` (see installer/linux). The file
 # type is what the desktop entry's MimeType lists; the .deb also installs the
-# shared-mime-info file that says *.ocx is that type.
+# shared-mime-info file that says *.ocalc is that type.
 [[package.metadata.packager.file-associations]]
-extensions = ["ocx"]
-mime-type = "application/vnd.opencalc.worksheet"
+extensions = ["ocalc"]
+mime-type = "application/x-opencalc-worksheet"
 description = "OpenCalc worksheet"
 name = "OpenCalc.Worksheet"
 

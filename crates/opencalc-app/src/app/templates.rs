@@ -1,6 +1,6 @@
 //! Templates: starting a new worksheet from a saved one, and saving the active
 //! worksheet to start others from. A template is a worksheet file with the
-//! extension `.ocxt` and `"kind": "template"` in its manifest, so there is one
+//! extension `.ocalct` and `"kind": "template"` in its manifest, so there is one
 //! format to keep working.
 
 use std::path::Path;

@@ -116,7 +116,7 @@ fn restore_defaults_puts_back_every_setting_and_the_theme() {
 #[test]
 fn clear_recent_list_empties_the_file_menu_list() {
     let mut h = Harness::new();
-    h.app.state.recent = vec!["a.ocx".into(), "b.ocx".into()];
+    h.app.state.recent = vec!["a.ocalc".into(), "b.ocalc".into()];
     h.command(CommandId::FileClearRecent);
     assert!(h.app.state.recent.is_empty());
 }

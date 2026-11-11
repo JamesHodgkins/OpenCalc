@@ -31,9 +31,9 @@ pub enum Effect {
     Quit,
     /// Size the dock panels from the current window width.
     ResetDockWidths,
-    /// Read the system's `.ocx` file type again (the Options window shows it).
+    /// Read the system's `.ocalc` file type again (the Options window shows it).
     RefreshFileType,
-    /// Register this program for `.ocx` files, or remove that.
+    /// Register this program for `.ocalc` files, or remove that.
     SetFileType(bool),
     /// Ask which file to open, then open it.
     ChooseOpen,

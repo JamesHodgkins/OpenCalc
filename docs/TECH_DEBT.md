@@ -26,7 +26,7 @@ context is in `ARCHITECTURE.md`.
 
 | ID | Debt | Impact | Pay by | Size |
 |---|---|---|---|---|
-| TD-12 | **Resolved.** `.ocx` file format with `FORMAT_VERSION`, migration chain, atomic writes and crash recovery (see `PERSISTENCE.md`). | | | |
+| TD-12 | **Resolved.** `.ocalc` file format with `FORMAT_VERSION`, migration chain, atomic writes and crash recovery (see `PERSISTENCE.md`). | | | |
 | TD-13 | **Resolved.** `opencalc check` loads, evaluates and reports worksheets (`crates/opencalc-cli`). | | | |
 | TD-11 | **Mostly done.** Result format (decimals, scientific, engineering) and display units exist (`document/result_format.rs`, Math Formatting tab). A result's unit is also a slot: click it and type any unit (`N/mm^2`). Still missing: custom (worksheet-defined) units in the slot, and a unit typed in the expression itself. | Minor. | When asked | S |
 | TD-21 | **Partly done.** CI builds and tests on Linux, and deb/AppImage packaging is configured. Not yet run by hand on a Linux desktop; macOS is not supported. | Possible Linux-only UI problems (fonts, file association, single-instance hand-off). | Before a Linux release | S |
@@ -45,7 +45,7 @@ context is in `ARCHITECTURE.md`.
 ### Language and engine decisions to revisit
 
 Choices made quickly that are easy to change now and costly once worksheets exist.
-Worksheets are saved today (`.ocx`), so the milestone this register once named for
+Worksheets are saved today (`.ocalc`), so the milestone this register once named for
 them ("before Milestone 3 saves real files") has passed: changing any of these changes
 saved results. Each row is one decision, split out of the old TD-29 to TD-32 so that
 one can be paid without the others.

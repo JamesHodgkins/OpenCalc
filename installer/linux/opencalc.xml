@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tells the desktop what an .ocx file is, so a file manager shows it as an OpenCalc worksheet and
+<!-- Tells the desktop what an .ocalc file is, so a file manager shows it as an OpenCalc worksheet and
      opens it with OpenCalc. Installed to /usr/share/mime/packages by the .deb. -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
-  <mime-type type="application/vnd.opencalc.worksheet">
+  <mime-type type="application/x-opencalc-worksheet">
     <comment>OpenCalc worksheet</comment>
-    <glob pattern="*.ocx"/>
+    <glob pattern="*.ocalc"/>
   </mime-type>
 </mime-info>

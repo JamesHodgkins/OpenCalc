@@ -160,7 +160,10 @@ mod tests {
     fn a_second_copy_hands_its_files_to_the_first_and_is_told_to_exit() {
         let dir = scratch("handover");
         let receiver = first(start(Some(&dir), &[], || {}));
-        let files = [PathBuf::from("C:\\work\\a.ocx"), PathBuf::from("b b.ocx")];
+        let files = [
+            PathBuf::from("C:\\work\\a.ocalc"),
+            PathBuf::from("b b.ocalc"),
+        ];
         assert!(matches!(start(Some(&dir), &files, || {}), Start::Forwarded));
         let got = receiver.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(got, files);
@@ -198,7 +201,9 @@ mod tests {
         let info = std::fs::read_to_string(file_in(&dir)).unwrap();
         let port: u16 = info.lines().next().unwrap().parse().unwrap();
         let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
-        stream.write_all(b"not-the-secret\nC:\\evil.ocx\n").unwrap();
+        stream
+            .write_all(b"not-the-secret\nC:\\evil.ocalc\n")
+            .unwrap();
         drop(stream);
         assert!(receiver.recv_timeout(Duration::from_millis(500)).is_err());
         for junk in ["", "x\ny\n", "99999999\ntoken\n", "\n\n"] {

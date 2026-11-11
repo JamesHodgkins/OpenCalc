@@ -69,7 +69,7 @@ pub struct AppState {
     pub draft: bool,
     /// The Options window (settings such as the theme).
     pub options_open: bool,
-    /// Whether `.ocx` can be registered here, and whether it is (read when Options opens).
+    /// Whether `.ocalc` can be registered here, and whether it is (read when Options opens).
     pub file_type: (bool, bool),
     /// The Units window (custom units).
     pub units_open: bool,
