@@ -153,6 +153,7 @@ Impact: editing feels structural but is not. Pay by: if structural operations ar
 | ID | Debt | Impact | Pay by | Size |
 |---|---|---|---|---|
 | TD-36 | The function-length limit is 150 lines (`scripts/check.ps1`, no exceptions). About 18 production functions are over 100 lines, many of them flat tables or matches (`dispatch`, `is_implemented`, `Expr` printing, `layout_node`). | A tighter limit would need those split; at 150 a function can still grow large before the gate objects. | Tighten to 100 once the flat tables are resolved | M |
+| TD-37 | Copying ignores a failed write to the system clipboard (`NativeClipboard::set`, `app/clipboard.rs`). Paste recognises this app's own copy by comparing the system clipboard's text, so after a failed write it sees whatever was there before and pastes that as a text region instead of the copied regions. | A copy can silently turn into the wrong paste when the clipboard is busy or unavailable. | When it is reported | S |
 
 ## Paid in the 2026-11-06 review
 

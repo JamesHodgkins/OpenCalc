@@ -251,7 +251,9 @@ impl Worksheet {
                 Ok(inverse) => inverses.push(inverse),
                 Err(error) => {
                     for inverse in inverses.iter().rev() {
-                        let _ = self.apply_inner(inverse);
+                        // An inverse always applies: it sets back what the edit changed.
+                        let undone = self.apply_inner(inverse);
+                        debug_assert!(undone.is_ok(), "an inverse edit failed: {undone:?}");
                     }
                     return Err(error);
                 }
