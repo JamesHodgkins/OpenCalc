@@ -122,6 +122,37 @@ struct Cx<'a> {
     meter: &'a Meter<'a>,
 }
 
+impl<'a> Cx<'a> {
+    /// The context for a whole region or plot: nothing local, no calls deep.
+    fn top(
+        env: &'a Env,
+        fns: &'a Fns<'a>,
+        units: &'a UnitRegistry,
+        meter: &'a Meter<'a>,
+    ) -> Cx<'a> {
+        Cx {
+            env,
+            fns,
+            units,
+            locals: RefCell::default(),
+            depth: 0,
+            meter,
+        }
+    }
+
+    /// The same names, units and budget with `locals` in scope, `depth` calls deep.
+    fn scoped(&self, locals: Vec<(String, Value)>, depth: usize) -> Cx<'a> {
+        Cx {
+            env: self.env,
+            fns: self.fns,
+            units: self.units,
+            locals: RefCell::new(locals),
+            depth,
+            meter: self.meter,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Warning {
     /// A name defined by more than one region. The last in layout order wins.
@@ -211,14 +242,7 @@ pub fn evaluate_cancellable(
             } else {
                 // Each region has its own budget of repeated evaluations.
                 let meter = Meter::new(cancel);
-                let cx = Cx {
-                    env: &env,
-                    fns: &fns,
-                    units,
-                    locals: RefCell::default(),
-                    depth: 0,
-                    meter: &meter,
-                };
+                let cx = Cx::top(&env, &fns, units, &meter);
                 eval_region(expr, &cx)
             };
             let result = result.map_err(|l| {
@@ -247,14 +271,7 @@ pub fn evaluate_cancellable(
     // Plots define nothing, so they are evaluated last, against the final names.
     for (id, input) in plots {
         let meter = Meter::new(cancel);
-        let cx = Cx {
-            env: &env,
-            fns: &fns,
-            units,
-            locals: RefCell::default(),
-            depth: 0,
-            meter: &meter,
-        };
+        let cx = Cx::top(&env, &fns, units, &meter);
         out.plots.insert(*id, plot::evaluate_plot(input, &cx));
     }
     out

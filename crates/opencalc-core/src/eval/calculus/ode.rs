@@ -17,7 +17,6 @@ use crate::expr::Expr;
 use crate::numeric::{self, Complex64};
 use crate::units::{Dimension, UnitError};
 use crate::value::{Matrix, Scalar, Value, MAX_ELEMENTS};
-use std::cell::RefCell;
 
 mod rk45;
 
@@ -86,14 +85,7 @@ pub(super) fn odesolve(args: &[Expr], cx: &Cx) -> Evaluated {
     let base = locals.len();
     locals.push((time.clone(), Value::dimensionless(0.0)));
     locals.push((state.clone(), Value::dimensionless(0.0)));
-    let mut inner = Cx {
-        env: cx.env,
-        fns: cx.fns,
-        units: cx.units,
-        locals: RefCell::new(locals),
-        depth: cx.depth,
-        meter: cx.meter,
-    };
+    let mut inner = cx.scoped(locals, cx.depth);
     let body = &args[0];
     let mut rhs = |t: f64, y: &[f64]| -> Result<Vec<f64>, Located> {
         inner.meter.charge().map_err(Located::here)?;

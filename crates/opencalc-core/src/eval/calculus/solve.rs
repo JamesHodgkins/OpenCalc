@@ -21,7 +21,6 @@ use crate::expr::{solver_parts, BinaryOp, Expr};
 use crate::numeric;
 use crate::units::{Dimension, UnitError};
 use crate::value::{Matrix, Scalar, Value};
-use std::cell::RefCell;
 
 mod bfgs;
 mod lm;
@@ -199,14 +198,7 @@ pub(super) fn evaluate(name: &str, args: &[Expr], cx: &Cx) -> Evaluated {
             .map(|n| ((*n).to_owned(), Value::dimensionless(0.0))),
     );
     let mut problem = Problem {
-        inner: Cx {
-            env: cx.env,
-            fns: cx.fns,
-            units: cx.units,
-            locals: RefCell::new(locals),
-            depth: cx.depth,
-            meter: cx.meter,
-        },
+        inner: cx.scoped(locals, cx.depth),
         base,
         dims: dims.clone(),
         objective: parts.objective,

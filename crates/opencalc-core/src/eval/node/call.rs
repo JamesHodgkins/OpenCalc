@@ -4,7 +4,6 @@ use super::{child, eval, Evaluated, Located};
 use crate::eval::{Cx, EvalError, UserFn, MAX_CALL_DEPTH};
 use crate::expr::Expr;
 use crate::value::Value;
-use std::cell::RefCell;
 
 /// A `given` block is the solver call it lowers to. The call's arguments are the
 /// closing line's, then the constraints; the block's children are the other way
@@ -72,14 +71,7 @@ pub(super) fn call_user(name: &str, f: &UserFn, args: &[Expr], cx: &Cx) -> Evalu
     if args.len() < f.params.len() {
         add_defaults(name, f, args.len(), &mut locals, cx)?;
     }
-    let inner = Cx {
-        env: cx.env,
-        fns: cx.fns,
-        units: cx.units,
-        locals: RefCell::new(locals),
-        depth: cx.depth + 1,
-        meter: cx.meter,
-    };
+    let inner = cx.scoped(locals, cx.depth + 1);
     // An error in the body is reported at the call, with the function's name.
     eval(f.body, &inner).map_err(|l| {
         Located::here(EvalError::InFunction {
@@ -101,14 +93,7 @@ fn add_defaults(
     locals: &mut Vec<(String, Value)>,
     cx: &Cx,
 ) -> Result<(), Located> {
-    let outer = Cx {
-        env: cx.env,
-        fns: cx.fns,
-        units: cx.units,
-        locals: RefCell::default(),
-        depth: cx.depth + 1,
-        meter: cx.meter,
-    };
+    let outer = cx.scoped(Vec::new(), cx.depth + 1);
     let first = f.params.len() - f.defaults.len();
     for (param, default) in f.params[given..].iter().zip(&f.defaults[given - first..]) {
         let value = eval(default, &outer).map_err(|l| {

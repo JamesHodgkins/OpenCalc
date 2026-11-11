@@ -59,12 +59,12 @@ No function-length limit exists. Split the first four; the last four are large m
   - [x] `opencalc-core/src/functions.rs:282` (now an error)
   - [x] `opencalc-core/src/parser/forms.rs:22` (`try_from` into an array)
   - [x] `opencalc-core/src/parser/program.rs:436` (now `parser/statement.rs`, matched directly)
-- [ ] Share one constructor for the `RefCell` locals context, now repeated in:
-  - [ ] `eval/node.rs`
-  - [ ] `eval/calculus.rs`
-  - [ ] `eval/calculus/ode.rs`
-  - [ ] `eval/calculus/solve.rs`
-  - [ ] `eval.rs`
+- [x] Share one constructor for the `RefCell` locals context (`Cx::top` and `Cx::scoped`), replacing:
+  - [x] `eval/node.rs` (now `eval/node/call.rs`)
+  - [x] `eval/calculus.rs`
+  - [x] `eval/calculus/ode.rs`
+  - [x] `eval/calculus/solve.rs`
+  - [x] `eval.rs`
 - [ ] Review the 40 `let _ =` in production code; confirm none hide a save, load or recovery error
 - [ ] Consider splitting `opencalc-ui/src/smoke.rs` (1,743 lines) into topic files like the existing `smoke/` ones
 - [ ] Spot-check per-frame paint code for hot-path `.clone()` calls (373 in the workspace overall)
