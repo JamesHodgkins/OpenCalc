@@ -13,7 +13,7 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 - [x] Re-normalise the working copy to LF (no CRLF files remain)
 - [x] `cargo fmt --all`
 - [x] `cargo fmt --all --check` passes
-- [ ] `powershell -File scripts/check.ps1` passes end to end (fmt, clippy, tests and perf pass; the file-size step fails, see 1b)
+- [x] `powershell -File scripts/check.ps1` passes end to end
 - [x] Commit the uncommitted work (checkpoint commit on branch `audit-fixes`)
 
 ### 1b. File-size gate fails (found while running item 1)
@@ -22,7 +22,7 @@ Audit basis: clippy clean, no TODO/FIXME, one `#[allow]`, about 60k lines in 229
 - [x] `opencalc-core/src/csv.rs` (410)
 - [x] `opencalc-core/src/parser.rs` (424)
 - [x] `opencalc-core/src/edit/mod.rs` (507)
-- [ ] `opencalc-core/src/eval/node.rs` (500)
+- [x] `opencalc-core/src/eval/node.rs` (500)
 - [x] `opencalc-core/src/parser/program.rs` (470)
 - [x] `opencalc-ui/src/layout.rs` (521)
 - [x] `opencalc-ui/src/app/dispatch.rs` (404)
