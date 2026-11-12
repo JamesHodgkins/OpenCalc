@@ -10,6 +10,9 @@ description = "OpenCalc desktop application (egui / eframe)."
 name = "opencalc"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 eframe.workspace = true
 rfd.workspace = true

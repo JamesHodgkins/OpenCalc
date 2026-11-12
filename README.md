@@ -10,7 +10,7 @@ Free-form calculation notes with units, live recalculation and document export.
 ```
 crates/
   opencalc-core/   document model, parser, evaluator, units (no UI code)
-  opencalc-app/     desktop application (eframe / egui)  -> binary: opencalc
+  opencalc-app/    desktop application (eframe / egui)  -> binary: opencalc
   opencalc-cli/    headless tool (check, later calc and export)
 docs/
   SPEC.md          technical specification

@@ -10,6 +10,9 @@ description = "OpenCalc headless command-line tool (check, calc, export)."
 name = "opencalc-cli"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 clap.workspace = true
 opencalc-core.workspace = true
