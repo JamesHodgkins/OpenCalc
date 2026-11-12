@@ -1,8 +1,8 @@
 # Persistence design (Milestone 3A): save, open, check
 
-Status: **implemented** (decisions in section 8 settled: ZIP, `.ocx`, native dialogs via `rfd`, revision-based dirty).
+Status: **implemented** (decisions in section 8 settled: ZIP, `.ocalc`, native dialogs via `rfd`, revision-based dirty).
 
-**Progress:** all steps S1 to S6 done (S6: `docs/FILE_FORMAT.md`, checked by `tests/file_format_doc.rs`) (S5: `opencalc-ui/src/app/recovery.rs`) (S4: `opencalc-cli check`, `opencalc-core/src/check.rs`) (S3: Save, Save As, Open, recent files, dirty dot, close and quit prompts, window-close guard, drag and drop, `opencalc FILE`; tests in `opencalc-ui/src/smoke/files.rs`). S1 done (`opencalc-core/src/persist*`, `tests/persist.rs`, fixtures in
+**Progress:** all steps S1 to S6 done (S6: `docs/FILE_FORMAT.md`, checked by `tests/file_format_doc.rs`) (S5: `opencalc-app/src/app/recovery.rs`) (S4: `opencalc-cli check`, `opencalc-core/src/check.rs`) (S3: Save, Save As, Open, recent files, dirty dot, close and quit prompts, window-close guard, drag and drop, `opencalc FILE`; tests in `opencalc-app/src/smoke/files.rs`). S1 done (`opencalc-core/src/persist*`, `tests/persist.rs`, fixtures in
 `tests/fixtures/v1/`). Measured on the reference machine: save of 500 regions 0.9 ms,
 load 2.1 ms (budget 20 ms each, in the benchmark gate).
 
@@ -33,7 +33,7 @@ load 2.1 ms (budget 20 ms each, in the benchmark gate).
 
 ## 3. The file
 
-Extension `.ocx` (see decision 2). A ZIP (deflate) holding:
+Extension `.ocalc` (see decision 2). A ZIP (deflate) holding:
 
 ```
 manifest.json    {"format_version":1,"app":"opencalc 0.0.1"}
@@ -96,7 +96,7 @@ cannot (bad unit, duplicate IDs) refuses the file with the reason.
 | Action | Behaviour |
 |---|---|
 | Save (Ctrl+S) | Untitled: asks for a path (Save As). Otherwise writes to the same path. The dirty mark clears only after the write succeeds. |
-| Save As (Ctrl+Shift+S) | Native dialog, `.ocx` filter; adds the extension; asks before replacing. |
+| Save As (Ctrl+Shift+S) | Native dialog, `.ocalc` filter; adds the extension; asks before replacing. |
 | Open (Ctrl+O) | Native dialog; a file already open just switches to its tab; the sheet opens fitted, clean history. A failure shows a message with the path and the reason. |
 | Dirty mark | A dot before the tab title and in the window title. |
 | Close tab / Quit with unsaved changes | In-app dialog: Save, Don't save, Cancel (naming the worksheet). Quit asks once per modified sheet. Cancel keeps everything. |
@@ -126,7 +126,7 @@ the app data folder for an untitled sheet, using the same atomic write. The main
 changes only on an explicit save. At startup, a recovery file newer than its
 worksheet (or one with no worksheet) prompts Restore or Discard; a clean save and a
 clean close delete it. `*.oc.recovery` is already ignored by git; the pattern will be
-updated to `*.ocx.recovery`.
+updated to `*.ocalc.recovery`.
 
 ## 8. Decisions needed
 
@@ -135,7 +135,11 @@ updated to `*.ocx.recovery`.
    the first asset arrives, as a version bump). *Recommendation: ZIP now.* The
    migration chain exists either way, and pictures and CSV import are both in this
    milestone, so a later switch would cost a migration for little saving.
-2. **Extension.** `.ocx` (chosen; matches `.odx` in OpenDraft). Rejected: `.ocalc`, `.opencalc`, `.oc`.
+2. **Extension.** `.ocalc`, templates `.ocalct` (changed 2026-11-11 from `.ocx`/`.ocxt`).
+   The family rule is "o" plus the product word (`.odraft`, `.ocalc`, `.opath`), so a
+   new app never has to avoid another's two-letter prefix, and `.ocx` is also the
+   Windows extension for ActiveX controls, which some mail filters block. Files saved
+   as `.ocx`/`.ocxt` by 0.0.1 still open. Rejected: `.opencalc` (long), `.oc`.
 3. **File dialogs.** `rfd` for native dialogs (recommended), or an in-app file
    browser (more work, looks the same on every platform, no new dependency).
 4. **Dirty tracking.** Revision-based (recommended, simple, errs towards "modified"),

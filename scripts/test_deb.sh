@@ -23,11 +23,11 @@ ls /usr/share/icons/hicolor/*/apps/opencalc.png
 desktop-file-validate /usr/share/applications/opencalc.desktop
 cat /usr/share/applications/opencalc.desktop
 
-# The desktop knows what an .ocx file is: the package's file lands in the type
+# The desktop knows what an .ocalc file is: the package's file lands in the type
 # database that file managers read (the package manager runs this on install; it
 # is run again here so the check does not depend on that).
 update-mime-database /usr/share/mime
-grep -F 'application/vnd.opencalc.worksheet:*.ocx' /usr/share/mime/globs2
+grep -F 'application/x-opencalc-worksheet:*.ocalc' /usr/share/mime/globs2
 
 # Every library the program is linked against must be found (the ones it opens at
 # run time are covered by starting it below).

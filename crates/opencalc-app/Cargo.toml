@@ -1,0 +1,110 @@
+[package]
+name = "opencalc-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "OpenCalc desktop application (egui / eframe)."
+
+[[bin]]
+name = "opencalc"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+eframe.workspace = true
+rfd.workspace = true
+opencalc-core.workspace = true
+png = "0.18"
+flate2 = "1"
+arboard = { version = "3", default-features = false }
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[dev-dependencies]
+proptest.workspace = true
+
+# The Windows installer (`cargo packager --release -f wix` after
+# `cargo build --release -p opencalc-app -p opencalc-cli`; see installer/windows/main.wxs).
+# The version is this package's, so the installer cannot disagree with the
+# program; an MSI takes numeric versions only, so prerelease tags get none.
+[package.metadata.packager]
+product-name = "OpenCalc"
+identifier = "uk.openengineering.opencalc"
+publisher = "OpenCalc project"
+# The .deb's Maintainer field.
+authors = ["OpenCalc project <contact@openengineering.uk>"]
+description = "OpenCalc, an engineering worksheet"
+# The longer text `apt show` displays.
+long-description = """OpenCalc is a free, open-source engineering worksheet: write calculations as maths on a free-form page, with units, live recalculation, plots, find and replace, and export to PDF and PNG. It keeps its own .ocalc format. This package also installs opencalc-cli, which checks worksheets from a command line."""
+homepage = "https://github.com/JamesHodgkins/OpenCalc"
+license-file = "../../LICENSE"
+out-dir = "../../dist/packager"
+binaries-dir = "../../target/release"
+icons = [
+    "../../assets/icons/opencalc.ico",
+    "../../assets/app-icons/16x16.png",
+    "../../assets/app-icons/32x32.png",
+    "../../assets/app-icons/48x48.png",
+    "../../assets/app-icons/64x64.png",
+    "../../assets/app-icons/128x128.png",
+    "../../assets/app-icons/256x256.png",
+]
+formats = ["wix"]
+binaries = [
+    { path = "opencalc", main = true },
+    { path = "opencalc-cli" },
+]
+
+[package.metadata.packager.wix]
+template = "../../installer/windows/main.wxs"
+banner-path = "../../installer/windows/banner.bmp"
+dialog-image-path = "../../installer/windows/dialog.bmp"
+
+# Linux: `cargo packager --release -f deb,appimage` (see installer/linux). The file
+# type is what the desktop entry's MimeType lists; the .deb also installs the
+# shared-mime-info file that says *.ocalc is that type.
+[[package.metadata.packager.file-associations]]
+extensions = ["ocalc"]
+mime-type = "application/x-opencalc-worksheet"
+description = "OpenCalc worksheet"
+name = "OpenCalc.Worksheet"
+
+# The AppImage must bring the libraries winit opens at run time that a plain desktop
+# might lack (found on the build machine under /usr/lib*, so CI installs them first).
+# The core window system and the graphics libraries stay the system's.
+[package.metadata.packager.appimage]
+libs = [
+    "libxkbcommon.so.0",
+    "libxkbcommon-x11.so.0",
+    "libXcursor.so.1",
+    "libXi.so.6",
+    "libX11-xcb.so.1",
+]
+
+[package.metadata.packager.deb]
+package-name = "opencalc"
+# Built on Ubuntu 22.04 (glibc 2.35). The window toolkit opens these at run time
+# (winit: libX11, libXcursor, libX11-xcb, libXi, libxkbcommon and its X11 part, and
+# the Wayland libraries; the graphics: libGL and libEGL), so a package manager that
+# reads only the program's linked libraries would miss them: they are listed here.
+depends = [
+    "libc6 (>= 2.35)",
+    "libgl1",
+    "libegl1",
+    "libx11-6",
+    "libx11-xcb1",
+    "libxcb1",
+    "libxcursor1",
+    "libxi6",
+    "libxkbcommon0",
+    "libxkbcommon-x11-0",
+    "libwayland-client0",
+    "libwayland-cursor0",
+    "libwayland-egl1",
+]
+desktop-template = "../../installer/linux/opencalc.desktop"
+files = { "../../installer/linux/opencalc.xml" = "usr/share/mime/packages/opencalc.xml" }

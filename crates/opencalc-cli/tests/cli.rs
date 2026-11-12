@@ -63,7 +63,7 @@ fn text(bytes: &[u8]) -> String {
 #[test]
 fn a_clean_worksheet_exits_0_and_says_how_much_it_checked() {
     let d = Dir::new("clean");
-    let f = d.sheet("ok.ocx", &["a := 1 m", "b := a * 2"]);
+    let f = d.sheet("ok.ocalc", &["a := 1 m", "b := a * 2"]);
     let out = run(&[&f], &[]);
     assert_eq!(out.status.code(), Some(0));
     assert!(text(&out.stdout).contains("2 regions, 0 error(s), 0 warning(s)"));
@@ -77,13 +77,13 @@ fn a_clean_worksheet_exits_0_and_says_how_much_it_checked() {
 #[test]
 fn an_error_exits_1_and_points_at_the_region_and_the_failing_part() {
     let d = Dir::new("error");
-    let f = d.sheet("bad.ocx", &["ok := 1", "q := 1 m + 2 s"]);
+    let f = d.sheet("bad.ocalc", &["ok := 1", "q := 1 m + 2 s"]);
     let out = run(&[&f], &["--quiet"]);
     assert_eq!(out.status.code(), Some(1));
     let s = text(&out.stdout);
     let lines: Vec<&str> = s.lines().collect();
     assert!(
-        lines[0].contains("bad.ocx: region 2 (10, 60): error:"),
+        lines[0].contains("bad.ocalc: region 2 (10, 60): error:"),
         "{s}"
     );
     assert_eq!(lines[1], "    q := 1 m + 2 s");
@@ -94,7 +94,7 @@ fn an_error_exits_1_and_points_at_the_region_and_the_failing_part() {
 #[test]
 fn a_warning_alone_still_exits_1() {
     let d = Dir::new("warn");
-    let f = d.sheet("w.ocx", &["a := 1", "a := 2"]);
+    let f = d.sheet("w.ocalc", &["a := 1", "a := 2"]);
     let out = run(&[&f], &[]);
     assert_eq!(out.status.code(), Some(1));
     let s = text(&out.stdout);
@@ -105,15 +105,15 @@ fn a_warning_alone_still_exits_1() {
 #[test]
 fn files_that_cannot_be_opened_exit_2_and_say_why_on_stderr() {
     let d = Dir::new("corrupt");
-    std::fs::write(d.path("junk.ocx"), b"not a worksheet").unwrap();
-    let out = run(&[&d.path("junk.ocx")], &[]);
+    std::fs::write(d.path("junk.ocalc"), b"not a worksheet").unwrap();
+    let out = run(&[&d.path("junk.ocalc")], &[]);
     assert_eq!(out.status.code(), Some(2));
     assert!(
-        text(&out.stderr).contains("junk.ocx: error: cannot open"),
+        text(&out.stderr).contains("junk.ocalc: error: cannot open"),
         "{}",
         text(&out.stderr)
     );
-    let out = run(&[&d.path("missing.ocx")], &[]);
+    let out = run(&[&d.path("missing.ocalc")], &[]);
     assert_eq!(out.status.code(), Some(2));
     assert!(
         text(&out.stderr).contains("not found"),
@@ -125,16 +125,16 @@ fn files_that_cannot_be_opened_exit_2_and_say_why_on_stderr() {
 #[test]
 fn with_several_files_each_is_reported_and_the_worst_result_wins() {
     let d = Dir::new("many");
-    let good = d.sheet("good.ocx", &["a := 1"]);
-    let bad = d.sheet("bad.ocx", &["a := b"]);
+    let good = d.sheet("good.ocalc", &["a := 1"]);
+    let bad = d.sheet("bad.ocalc", &["a := b"]);
     let out = run(&[&good, &bad], &[]);
     assert_eq!(out.status.code(), Some(1));
     let s = text(&out.stdout);
     assert!(
-        s.contains("good.ocx: 1 regions, 0 error(s)") && s.contains("bad.ocx: region 1"),
+        s.contains("good.ocalc: 1 regions, 0 error(s)") && s.contains("bad.ocalc: region 1"),
         "{s}"
     );
-    let out = run(&[&good, &bad, &d.path("missing.ocx")], &[]);
+    let out = run(&[&good, &bad, &d.path("missing.ocalc")], &[]);
     assert_eq!(out.status.code(), Some(2));
 }
 
@@ -148,8 +148,8 @@ fn repairs_made_while_loading_are_reported_as_warnings() {
     z.write_all(br#"{"format_version":1}"#).unwrap();
     z.start_file("worksheet.json", o).unwrap();
     z.write_all(json.as_bytes()).unwrap();
-    std::fs::write(d.path("r.ocx"), z.finish().unwrap().into_inner()).unwrap();
-    let out = run(&[&d.path("r.ocx")], &[]);
+    std::fs::write(d.path("r.ocalc"), z.finish().unwrap().into_inner()).unwrap();
+    let out = run(&[&d.path("r.ocalc")], &[]);
     assert_eq!(out.status.code(), Some(1));
     assert!(
         text(&out.stdout).contains("repaired on load"),

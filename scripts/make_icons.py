@@ -2,7 +2,7 @@
 
     python scripts/make_icons.py
 
-Writes assets/icons/opencalc.ico (the application) and assets/icons/ocx.ico (a
+Writes assets/icons/opencalc.ico (the application) and assets/icons/ocalc.ico (a
 worksheet file), each with the usual sizes from 16 to 256 pixels, and the
 application icon as separate PNGs in assets/app-icons/ for the Linux packages. Needs Pillow. The
 results are committed, so this only has to be run when the logo changes.
@@ -82,5 +82,5 @@ def app_icon_pngs(frames):
 
 if __name__ == "__main__":
     app_icon_pngs(save("opencalc", application()))
-    save("ocx", worksheet())
+    save("ocalc", worksheet())
     print("wrote", OUT)

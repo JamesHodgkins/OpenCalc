@@ -21,7 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "installer" / "windows"
 BADGE = ROOT / "assets" / "logos" / "badge_icon_dark_256.png"
-FONTS = ROOT / "crates" / "opencalc-ui" / "assets" / "fonts"
+FONTS = ROOT / "crates" / "opencalc-app" / "assets" / "fonts"
 RED = (198, 40, 40)
 GREY = (150, 154, 160)
 

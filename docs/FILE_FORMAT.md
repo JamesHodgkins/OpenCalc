@@ -1,4 +1,4 @@
-# The OpenCalc file format (`.ocx`), version 3
+# The OpenCalc file format (`.ocalc`), version 3
 
 This describes what is in a worksheet file, so other tools can read or write one.
 The code that does it is `opencalc-core/src/persist*`. The examples below are
@@ -6,7 +6,7 @@ loaded by a test (`tests/file_format_doc.rs`), so they cannot drift from the cod
 
 ## 1. The container
 
-A `.ocx` file is an ordinary ZIP archive (deflate) with these entries:
+A `.ocalc` file is an ordinary ZIP archive (deflate) with these entries:
 
 | Entry | Content |
 |---|---|
@@ -32,7 +32,7 @@ suit version control. A reader must not rely on that.
   A reader that only understands versions up to N must refuse a file with a larger
   number rather than guess at it.
 - `app` names the program that wrote the file. Informational.
-- `kind` is `"template"` for a template (extension `.ocxt`) and absent for a worksheet.
+- `kind` is `"template"` for a template (extension `.ocalct`) and absent for a worksheet.
   A template is otherwise an ordinary worksheet file. File > New from template makes
   an untitled copy; opening the template itself edits it and saves it back as a template.
 
@@ -305,7 +305,7 @@ loaded by the tests for as long as the program exists.
 
 ## 9. Recovery files
 
-While a worksheet has unsaved changes, OpenCalc writes them to `<name>.ocx.recovery`
+While a worksheet has unsaved changes, OpenCalc writes them to `<name>.ocalc.recovery`
 beside the file (or in its own folder for a worksheet that was never saved). A
 recovery file has exactly the format above. It is deleted when the worksheet is
 saved or closed; if one is found at the next start, the program offers to restore it.

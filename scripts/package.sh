@@ -6,7 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-version=$(cargo pkgid -p opencalc-ui | sed 's/.*[#@]//')
+version=$(cargo pkgid -p opencalc-app | sed 's/.*[#@]//')
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) os=windows; ext=.exe ;;
   Linux) os=linux; ext= ;;
@@ -14,7 +14,7 @@ case "$(uname -s)" in
 esac
 name="OpenCalc-${version}-${os}"
 
-cargo build --release -p opencalc-ui -p opencalc-cli
+cargo build --release -p opencalc-app -p opencalc-cli
 
 rm -rf "dist/${name}"
 mkdir -p "dist/${name}"

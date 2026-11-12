@@ -6,6 +6,9 @@ license.workspace = true
 publish.workspace = true
 description = "OpenCalc document model, parser, evaluator and units. No UI code."
 
+[lints]
+workspace = true
+
 [dependencies]
 serde.workspace = true
 thiserror.workspace = true

@@ -2444,6 +2444,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
+name = "opencalc-app"
+version = "0.0.1"
+dependencies = [
+ "arboard",
+ "eframe",
+ "flate2",
+ "opencalc-core",
+ "png",
+ "proptest",
+ "rfd",
+ "winresource",
+]
+
+[[package]]
 name = "opencalc-cli"
 version = "0.0.1"
 dependencies = [
@@ -2462,20 +2476,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "zip",
-]
-
-[[package]]
-name = "opencalc-ui"
-version = "0.0.1"
-dependencies = [
- "arboard",
- "eframe",
- "flate2",
- "opencalc-core",
- "png",
- "proptest",
- "rfd",
- "winresource",
 ]
 
 [[package]]

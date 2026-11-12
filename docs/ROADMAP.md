@@ -91,7 +91,7 @@ the decisions in `DATA_IO.md` section 7.
 - [x] CSV reader and writer module (own parser, bounded, tested; no UI yet).
 - [x] Table region (editable grid, evaluates to a matrix): `TableSpec`, `Edit::SetTable`, painting, a table window for editing; CSV import and export buttons in the table window (commands `table.import_csv`, `table.export_csv`).
 - [ ] ~~CSV/text read and write functions~~ proposed to be replaced by import and export commands (`DATA_IO.md` section 2); awaiting decision.
-- [x] Picture region: PNG only, embedded in the `.ocx` (base64 in the worksheet JSON), Picture window to choose, remove and describe. JPEG is not supported (no decoder dependency yet).
+- [x] Picture region: PNG only, embedded in the `.ocalc` (base64 in the worksheet JSON), Picture window to choose, remove and describe. JPEG is not supported (no decoder dependency yet).
 - [x] CSV import and export (in the table window; the Input/Output ribbon tab entry is still to add).
 - [ ] Excel (`.xlsx`) read and write; evaluate a crate against the dependency policy first.
 - [ ] Image data to matrix and back.
@@ -106,7 +106,7 @@ Design for the items still open: `DOCUMENT_FEATURES.md` (decisions A to E).
 - [x] Rich text in text regions: bold, italic, underline and 8 colours on marked characters or the whole text (`runs` on the region, `Edit::SetRuns`); real Inter Italic and Bold Italic bundled (TD-24 resolved). Out: font families and sizes, lists, links.
 - [x] Region borders: `Region.border`, `Edit::SetBorder`, Math Formatting > Region > Border toggle; drawn on the page and in exports.
 - [ ] Content protection: password-protected regions and hidden content (needs a security design before code).
-- [x] Templates (`.ocxt`, the worksheet format with `kind: template`): New from template, Save as template. No built-in templates yet; no file association for `.ocxt` yet.
+- [x] Templates (`.ocalct`, the worksheet format with `kind: template`): New from template, Save as template. No built-in templates yet; no file association for `.ocalct` yet.
 
 ## Phase 6: Programming (L)
 

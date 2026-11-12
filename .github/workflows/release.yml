@@ -30,7 +30,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          version=$(cargo pkgid -p opencalc-ui | sed 's/.*[#@]//')
+          version=$(cargo pkgid -p opencalc-app | sed 's/.*[#@]//')
           echo "version=$version" >> "$GITHUB_OUTPUT"
           case "$version" in
             *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;

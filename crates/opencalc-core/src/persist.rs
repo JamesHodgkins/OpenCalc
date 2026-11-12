@@ -1,6 +1,6 @@
 //! Saving and loading worksheets as bytes. See `docs/PERSISTENCE.md`.
 //!
-//! This module turns a [`Worksheet`] into the bytes of an `.ocx` file and back. It
+//! This module turns a [`Worksheet`] into the bytes of an `.ocalc` file and back. It
 //! does no file or window work (rule R1): the app and the CLI own paths and
 //! dialogs, and both load through [`load_bytes`], so `check` verifies exactly what
 //! the app would open.
@@ -26,10 +26,21 @@ pub use migrate::{run as run_migrations, Step};
 pub use validate::{Repair, MAX_COORD, MAX_CUSTOM_UNITS, MAX_EXTENT, MAX_REGIONS, MAX_TEXT_CHARS};
 
 /// The file extension, without the dot.
-pub const EXTENSION: &str = "ocx";
+pub const EXTENSION: &str = "ocalc";
 
 /// The extension of a template: a worksheet kept to start new ones from.
-pub const TEMPLATE_EXTENSION: &str = "ocxt";
+pub const TEMPLATE_EXTENSION: &str = "ocalct";
+
+/// The extensions OpenCalc 0.0.1 saved with. Such files still open (the
+/// contents are the same format); saving always uses [`EXTENSION`] or
+/// [`TEMPLATE_EXTENSION`].
+pub const OLD_EXTENSION: &str = "ocx";
+pub const OLD_TEMPLATE_EXTENSION: &str = "ocxt";
+
+/// Whether a file extension (without the dot) is a template's, old or new.
+pub fn is_template_extension(ext: &std::ffi::OsStr) -> bool {
+    ext == TEMPLATE_EXTENSION || ext == OLD_TEMPLATE_EXTENSION
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {

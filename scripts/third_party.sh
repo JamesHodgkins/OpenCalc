@@ -22,7 +22,7 @@ append() {
 }
 
 
-append "Inter (the interface font), crates/opencalc-ui/assets/fonts" crates/opencalc-ui/assets/fonts/LICENSE-inter-OFL.txt
-append "Lucide (the icon font), crates/opencalc-ui/assets/fonts" crates/opencalc-ui/assets/fonts/LICENSE-lucide.txt
+append "Inter (the interface font), crates/opencalc-app/assets/fonts" crates/opencalc-app/assets/fonts/LICENSE-inter-OFL.txt
+append "Lucide (the icon font), crates/opencalc-app/assets/fonts" crates/opencalc-app/assets/fonts/LICENSE-lucide.txt
 
 echo "$out"

@@ -15,7 +15,7 @@ them, with the rows they fixed marked *done*; section 2 shows the code as built.
 ```
    opencalc-cli ──┐
                   ├──▶  opencalc-core      std, serde, thiserror. No egui, no windowing.
-   opencalc-ui  ──┘
+   opencalc-app  ──┘
 ```
 
 | # | Rule | Why |
@@ -47,7 +47,7 @@ crates/opencalc-core/src/
   edit/              Edit enum, Worksheet::apply -> inverse; History (undo/redo, coalescing)
   file/              container, manifest, migrations                   (planned, M3)
 
-crates/opencalc-ui/src/
+crates/opencalc-app/src/
   main.rs            entry point and window size
   app/               mod.rs (App: worker, ribbon, effects), state.rs (AppState: data only),
                      dispatch.rs (command -> state change + Effects), frame.rs (panel layout,

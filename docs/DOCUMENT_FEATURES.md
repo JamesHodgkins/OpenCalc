@@ -10,7 +10,7 @@ templates, rich text, content protection and global definitions. Roadmap context
 | # | Item | Size | Needs a decision | Recommended |
 |---|---|---|---|---|
 | 1 | Page background styles | S | which styles; print or not | Build now |
-| 2 | Templates (`.ocxt`) | M | built-in templates or none | Build now |
+| 2 | Templates (`.ocalct`) | M | built-in templates or none | Build now |
 | 3 | Global definitions `≡` | none | whether to re-scope | **Close as satisfied by design**; accept `≡` as another spelling of `:=` |
 | 4 | Rich text | L | bundle an italic font; colours | Build after 1 and 2 |
 | 5 | Content protection | M to L | what threat it covers | Build only the honest, no-crypto part first |
@@ -49,18 +49,18 @@ sample. The container, migrations and validation already handle any worksheet, a
 recovery files exist for untitled sheets.
 
 **Proposal.**
-- A template is **the same file as a worksheet** with the extension `.ocxt` and
+- A template is **the same file as a worksheet** with the extension `.ocalct` and
   `"kind": "template"` in `manifest.json` (an unknown manifest field is ignored by older
   readers, per `FILE_FORMAT.md`). No second format to maintain.
 - **File > New from template...** opens a picker (or the user's template folder) and
   creates a new untitled worksheet from a copy of the template's contents. It never
   opens the template itself for editing, so it cannot be overwritten by Save.
-- **File > Save as template...** writes the active worksheet as `.ocxt`.
+- **File > Save as template...** writes the active worksheet as `.ocalct`.
 - Templates live wherever the user keeps them; the app also remembers a template
   folder (app data directory) shown first in the picker.
-- Opening a `.ocxt` by double-click asks "New worksheet from this template, or edit
+- Opening a `.ocalct` by double-click asks "New worksheet from this template, or edit
   the template?" (two buttons), so editing a template stays possible.
-- File association for `.ocxt` follows the `.ocx` one (Options > file type).
+- File association for `.ocalct` follows the `.ocalc` one (Options > file type).
 
 **Decision B:** ship a few built-in templates (blank, beam check skeleton, units
 conversion sheet), or none? Built-ins are about a day each to write well and test; none
@@ -156,7 +156,7 @@ B and later C, or only the existing lock? And is a new hashing dependency accept
 | Item | Core | UI | File format |
 |---|---|---|---|
 | Background | `PageSetup` fields, sanitising | page painter, Page setup window, export | `page.background`, `page.tint`, `page.print_background` |
-| Templates | `manifest.kind` | New from template, Save as template, open prompt | `.ocxt`, `manifest.kind` |
+| Templates | `manifest.kind` | New from template, Save as template, open prompt | `.ocalct`, `manifest.kind` |
 | `≡` alias | parser | none | none |
 | Rich text | `Run`, `Edit::SetText` extended, run maintenance | layouter, editor, fonts | optional `runs` on `Text` |
 | Protection | password hash, lock check | lock dialog, collapsed painting | optional `lock` data on a region |

@@ -11,7 +11,7 @@ Windows 11. Rust 1.99.0.
 ```
 cargo bench -p opencalc-core --bench recalc                  # core, 40 runs each
 cargo bench -p opencalc-core --bench recalc -- --check       # exit 1 if a budget is exceeded
-cargo test --release -p opencalc-ui perf -- --ignored --nocapture   # UI frame time
+cargo test --release -p opencalc-app perf -- --ignored --nocapture   # UI frame time
 ```
 
 `scripts/check.ps1` runs the core benchmark in quick mode with `--check` as a

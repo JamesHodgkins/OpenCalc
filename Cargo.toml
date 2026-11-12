@@ -2,9 +2,16 @@
 resolver = "2"
 members = [
     "crates/opencalc-core",
-    "crates/opencalc-ui",
+    "crates/opencalc-app",
     "crates/opencalc-cli",
 ]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
 
 [workspace.package]
 version = "0.0.1"
