@@ -283,6 +283,23 @@ impl eframe::App for App {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        restore_usable_size(ctx);
         self.frame(ctx);
+    }
+}
+
+/// A window size remembered from last time can be tiny (a minimised window is
+/// saved that way) and the system does not always enforce the minimum on restore:
+/// open at the usual size instead, once.
+fn restore_usable_size(ctx: &egui::Context) {
+    let Some(inner) = ctx.input(|i| i.viewport().inner_rect) else {
+        return;
+    };
+    let minimised = ctx.input(|i| i.viewport().minimized).unwrap_or(false);
+    if !minimised && (inner.width() < crate::MIN_WIDTH || inner.height() < 520.0) {
+        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+            crate::INITIAL_WIDTH,
+            780.0,
+        )));
     }
 }
