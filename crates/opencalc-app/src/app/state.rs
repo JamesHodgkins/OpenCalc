@@ -268,6 +268,35 @@ impl AppState {
         self.results_stale() && self.calc.worker_ok && self.calc.applied == self.calc.revision
     }
 
+    /// Whether the Tab key steps through the regions rather than through the
+    /// controls: a region is selected, nothing is being typed into, and no window,
+    /// menu or dialog is open to want Tab for itself. With nothing selected Tab
+    /// still reaches the ribbon, so the keyboard can get there (Escape lets go of
+    /// the selection).
+    pub fn tab_steps_regions(&self, typing: bool) -> bool {
+        let Some(sheet) = self.active_sheet() else {
+            return false;
+        };
+        let c = &sheet.canvas;
+        !typing
+            && !self.text_box_focus
+            && !c.selection.is_empty()
+            && c.editing.is_none()
+            && c.unit_edit.is_none()
+            && self.dialog.is_none()
+            && !(self.app_menu_open
+                || self.about_open
+                || self.page_setup_open
+                || self.options_open
+                || self.units_open
+                || self.labels_open
+                || self.shortcuts_open
+                || self.matrix_open
+                || self.check.open
+                || self.find.open
+                || self.label_for.is_some())
+    }
+
     /// Say something short on the status bar, where it fades after a few seconds.
     /// For things that went well; a problem still gets a dialog.
     pub fn notify(&mut self, text: impl Into<String>) {

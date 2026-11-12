@@ -251,3 +251,72 @@ fn the_cursor_closes_to_a_grab_while_a_region_is_dragged() {
     h.frame();
     assert_ne!(h.cursor, CursorIcon::Grabbing, "let go");
 }
+
+/// Region ids in reading order: top to bottom, then left to right.
+fn reading_order(h: &Harness) -> Vec<RegionId> {
+    let mut all: Vec<_> = h
+        .sheet()
+        .doc
+        .regions()
+        .iter()
+        .map(|r| (r.pos.y, r.pos.x, r.id))
+        .collect();
+    all.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+    all.into_iter().map(|(_, _, id)| id).collect()
+}
+
+#[test]
+fn tab_steps_the_selection_through_the_regions_in_reading_order_and_wraps() {
+    let (mut h, id) = selected();
+    let order = reading_order(&h);
+    let at = order
+        .iter()
+        .position(|o| *o == id)
+        .expect("selected region");
+    h.press_key(Key::Tab, Modifiers::NONE);
+    assert_eq!(
+        h.sheet().canvas.selection,
+        vec![order[(at + 1) % order.len()]]
+    );
+    h.press_key(Key::Tab, Modifiers::SHIFT);
+    assert_eq!(h.sheet().canvas.selection, vec![id], "Shift+Tab goes back");
+    // All the way round, and it comes back to where it began.
+    for _ in 0..order.len() {
+        h.press_key(Key::Tab, Modifiers::NONE);
+    }
+    assert_eq!(h.sheet().canvas.selection, vec![id]);
+    // Backwards off the first region wraps to the last.
+    h.app.state.sheets[0].canvas.selection = vec![order[0]];
+    h.press_key(Key::Tab, Modifiers::SHIFT);
+    assert_eq!(h.sheet().canvas.selection, vec![*order.last().unwrap()]);
+}
+
+#[test]
+fn tab_belongs_to_the_controls_when_nothing_is_selected_or_a_dialog_is_open() {
+    let mut h = Harness::new();
+    h.settle();
+    h.press_key(Key::Tab, Modifiers::NONE);
+    assert!(
+        h.sheet().canvas.selection.is_empty(),
+        "nothing selected: Tab is not ours"
+    );
+
+    let (mut h, id) = selected();
+    h.app.state.message("Test", "a dialog".into());
+    h.press_key(Key::Tab, Modifiers::NONE);
+    assert_eq!(
+        h.sheet().canvas.selection,
+        vec![id],
+        "a dialog has the keyboard"
+    );
+}
+
+#[test]
+fn tab_does_not_leave_a_region_that_is_being_edited() {
+    let (mut h, id) = selected();
+    h.press_key(Key::Enter, Modifiers::NONE);
+    assert_eq!(h.sheet().canvas.editing, Some(id));
+    h.press_key(Key::Tab, Modifiers::NONE);
+    assert_eq!(h.sheet().canvas.selection, vec![id]);
+    assert_eq!(h.sheet().canvas.editing, Some(id));
+}

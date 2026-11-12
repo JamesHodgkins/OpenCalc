@@ -228,6 +228,32 @@ impl App {
     }
 
     /// Consume the key bindings that apply right now and queue their commands.
+    /// Tab and Shift+Tab step the selection through the regions when the canvas
+    /// has the keyboard (see `AppState::tab_steps_regions`). Called on the raw input,
+    /// before egui sees the key: afterwards it would already be moving the focus.
+    pub fn claim_tab(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        use egui::{Event, Key};
+        if !self.state.tab_steps_regions(ctx.wants_keyboard_input()) {
+            return;
+        }
+        let tab = |e: &Event| matches!(e, Event::Key { key: Key::Tab, .. });
+        let step = raw.events.iter().find_map(|e| match e {
+            Event::Key {
+                key: Key::Tab,
+                pressed: true,
+                modifiers,
+                ..
+            } if !(modifiers.ctrl || modifiers.alt || modifiers.command) => Some(!modifiers.shift),
+            _ => None,
+        });
+        let Some(forward) = step else { return };
+        raw.events.retain(|e| !tab(e));
+        if let Some(i) = self.state.active {
+            let viewport = self.state.viewport.size();
+            self.state.sheets[i].cycle_selection(forward, viewport);
+        }
+    }
+
     fn queue_shortcuts(&mut self, ctx: &egui::Context) {
         let registry = self.registry();
         let typing = ctx.wants_keyboard_input();

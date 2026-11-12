@@ -131,7 +131,7 @@ impl Harness {
 
     fn frame_with(&mut self, events: Vec<Event>) {
         self.time += 0.05;
-        let input = RawInput {
+        let mut input = RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1280.0, 780.0))),
             time: Some(self.time),
             events,
@@ -139,6 +139,7 @@ impl Harness {
             ..Default::default()
         };
         let app = &mut self.app;
+        app.claim_tab(&self.ctx, &mut input);
         let out = self.ctx.run(input, |ctx| app.frame(ctx));
         self.cursor = out.platform_output.cursor_icon;
         for command in out.platform_output.commands {
