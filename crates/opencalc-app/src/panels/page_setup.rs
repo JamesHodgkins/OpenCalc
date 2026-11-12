@@ -8,6 +8,7 @@ use opencalc_core::document::{
 };
 use opencalc_core::edit::Edit;
 
+use super::controls::combo;
 use super::Commands;
 use crate::app::AppState;
 use crate::canvas::CanvasCmd;
@@ -29,47 +30,50 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, edits: &mut Vec
         .collapsible(false)
         .resizable(false)
         .show(ctx, |ui| {
-            let heading = |ui: &mut egui::Ui, text: &str| {
-                ui.label(
-                    RichText::new(text)
-                        .size(type_size::SMALL)
-                        .color(state.theme.text_weak),
-                );
-            };
-            heading(ui, "PAPER");
-            ui.horizontal(|ui| {
-                for paper in PaperSize::ALL {
-                    if ui
-                        .selectable_label(page.paper == paper, paper.label())
-                        .clicked()
-                    {
+            egui::Grid::new("page-setup-grid")
+                .num_columns(2)
+                .spacing([16.0, 8.0])
+                .show(ui, |ui| {
+                    ui.label("Paper size");
+                    let papers: Vec<(PaperSize, String)> = PaperSize::ALL
+                        .iter()
+                        .map(|p| (*p, p.label().to_owned()))
+                        .collect();
+                    let mut paper = page.paper;
+                    combo(ui, "page-paper", &mut paper, &papers);
+                    if paper != page.paper {
                         out.push(CommandId::PagePaper(paper));
                     }
-                }
-            });
-            heading(ui, "ORIENTATION");
-            ui.horizontal(|ui| {
-                for landscape in [false, true] {
-                    let command = CommandId::PageLandscape(landscape);
-                    if ui
-                        .selectable_label(page.landscape == landscape, command.label())
-                        .clicked()
-                    {
-                        out.push(command);
+                    ui.end_row();
+
+                    ui.label("Orientation");
+                    let sides: Vec<(bool, String)> = [false, true]
+                        .iter()
+                        .map(|l| (*l, CommandId::PageLandscape(*l).label().to_owned()))
+                        .collect();
+                    let mut landscape = page.landscape;
+                    combo(ui, "page-orientation", &mut landscape, &sides);
+                    if landscape != page.landscape {
+                        out.push(CommandId::PageLandscape(landscape));
                     }
-                }
-            });
-            heading(ui, "MARGIN (ALL SIDES)");
-            let mut mm = page.margin_mm.round();
-            let (lo, hi) = MARGIN_RANGE_MM;
-            let drag = egui::DragValue::new(&mut mm)
-                .range(lo..=hi)
-                .suffix(" mm")
-                .speed(0.25);
-            if ui.add(drag).changed() {
-                out.push(CommandId::PageMarginMm(mm.round() as u8));
-            }
-            background(ui, state, page, edits);
+                    ui.end_row();
+
+                    ui.label("Margins (all sides)");
+                    let mut mm = page.margin_mm.round();
+                    let (lo, hi) = MARGIN_RANGE_MM;
+                    let drag = egui::DragValue::new(&mut mm)
+                        .range(lo..=hi)
+                        .suffix(" mm")
+                        .speed(0.25);
+                    if ui.add(drag).changed() {
+                        out.push(CommandId::PageMarginMm(mm.round() as u8));
+                    }
+                    ui.end_row();
+
+                    background(ui, page, edits);
+                });
+            ui.add_space(4.0);
+            print_background(ui, page, edits);
             headers(ui, state, sheet.doc.headers(), edits);
         });
     if !open {
@@ -166,50 +170,51 @@ fn headers(ui: &mut egui::Ui, state: &AppState, all: &HeaderFooter, edits: &mut 
     }
 }
 
-/// The background section: a pattern, a paper colour, and whether exports keep them.
-fn background(ui: &mut egui::Ui, state: &AppState, page: PageSetup, edits: &mut Vec<CanvasCmd>) {
-    let heading = |ui: &mut egui::Ui, text: &str| {
-        ui.label(
-            RichText::new(text)
-                .size(type_size::SMALL)
-                .color(state.theme.text_weak),
-        );
-    };
+/// The background rows of the settings grid: a pattern and a paper colour.
+fn background(ui: &mut egui::Ui, page: PageSetup, edits: &mut Vec<CanvasCmd>) {
     let mut set = |next: PageSetup| {
         edits.push(CanvasCmd::Edit(Edit::SetPageSetup(next)));
         edits.push(CanvasCmd::Seal);
     };
-    ui.add_space(6.0);
-    heading(ui, "BACKGROUND PATTERN");
-    ui.horizontal(|ui| {
-        for b in Background::ALL {
-            if ui
-                .selectable_label(page.background == b, b.label())
-                .clicked()
-            {
-                set(PageSetup {
-                    background: b,
-                    ..page
-                });
-            }
-        }
-    });
-    heading(ui, "PAPER COLOUR");
-    ui.horizontal(|ui| {
-        for t in Tint::ALL {
-            if ui.selectable_label(page.tint == t, t.label()).clicked() {
-                set(PageSetup { tint: t, ..page });
-            }
-        }
-    });
+    ui.label("Background");
+    let patterns: Vec<(Background, String)> = Background::ALL
+        .iter()
+        .map(|b| (*b, b.label().to_owned()))
+        .collect();
+    let mut pattern = page.background;
+    combo(ui, "page-background", &mut pattern, &patterns);
+    if pattern != page.background {
+        set(PageSetup {
+            background: pattern,
+            ..page
+        });
+    }
+    ui.end_row();
+
+    ui.label("Paper colour");
+    let tints: Vec<(Tint, String)> = Tint::ALL
+        .iter()
+        .map(|t| (*t, t.label().to_owned()))
+        .collect();
+    let mut tint = page.tint;
+    combo(ui, "page-tint", &mut tint, &tints);
+    if tint != page.tint {
+        set(PageSetup { tint, ..page });
+    }
+    ui.end_row();
+}
+
+/// Whether exports keep the background.
+fn print_background(ui: &mut egui::Ui, page: PageSetup, edits: &mut Vec<CanvasCmd>) {
     let mut print = page.print_background;
     if ui
         .checkbox(&mut print, "Include the background when exporting")
         .changed()
     {
-        set(PageSetup {
+        edits.push(CanvasCmd::Edit(Edit::SetPageSetup(PageSetup {
             print_background: print,
             ..page
-        });
+        })));
+        edits.push(CanvasCmd::Seal);
     }
 }

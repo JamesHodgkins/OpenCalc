@@ -4,9 +4,10 @@ use eframe::egui::{self, RichText, Ui};
 use opencalc_core::document::{Background, PaperSize, MARGIN_RANGE_MM};
 use opencalc_core::registry::UnitSystem;
 
-use super::{choice, combo, row, THEMES};
+use super::{choice, row, THEMES};
 use crate::app::AppState;
 use crate::commands::CommandId;
+use crate::panels::controls::combo;
 use crate::panels::Commands;
 use crate::settings::{recovery_label, GridSpacing, Settings, RECOVERY, SCALES};
 use crate::theme::{type_size, Theme};
