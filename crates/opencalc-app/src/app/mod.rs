@@ -255,6 +255,13 @@ impl App {
 }
 
 impl eframe::App for App {
+    /// Behind the bars: a hairline of the window's own colour can show between two
+    /// of them (a fractional height, or a scaled display), so it is the base tone
+    /// rather than black.
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        self.state.theme.base.to_normalized_gamma_f32()
+    }
+
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string(
             crate::settings::STORAGE_KEY,
