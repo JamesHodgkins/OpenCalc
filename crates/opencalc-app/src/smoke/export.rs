@@ -349,3 +349,48 @@ fn the_text_of_the_worksheet_is_in_the_pdf_for_selecting_and_searching() {
     let pdf = pdf_bytes(&source, 0.5).unwrap();
     assert!(String::from_utf8_lossy(&pdf).contains(" Tj ET"));
 }
+
+#[test]
+fn exporting_results_that_are_out_of_date_asks_first() {
+    let mut t = rig("export_stale");
+    t.h.app.state.live_recalc = false;
+    t.type_into_active("b := 2");
+    assert!(t.state().results_stale() && t.state().stale_notice());
+    let target = t.dir.join("late.pdf");
+    t.answer_export(Some(target.clone()));
+    t.run(CommandId::FileExportPdf);
+    assert!(
+        matches!(t.state().dialog, Some(Dialog::StaleExport(_))),
+        "asked, and wrote nothing"
+    );
+    assert!(!target.exists());
+
+    t.run(CommandId::DialogCancel);
+    assert!(t.state().dialog.is_none() && !target.exists());
+
+    // Recalculating instead brings the numbers up to date; nothing is exported.
+    t.run(CommandId::FileExportPdf);
+    t.run(CommandId::DialogRecalculate);
+    for _ in 0..40 {
+        t.h.frame();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(!t.state().results_stale() && !target.exists());
+
+    // Exporting what is shown goes ahead.
+    t.type_into_active("c := 3");
+    t.answer_export(Some(target.clone()));
+    t.run(CommandId::FileExportPdf);
+    t.run(CommandId::DialogExportAnyway);
+    assert!(std::fs::read(&target).unwrap().starts_with(b"%PDF-1.4"));
+    assert!(message(&t).contains("Exported"));
+}
+
+#[test]
+fn up_to_date_results_export_without_asking() {
+    let mut t = rig("export_fresh");
+    assert!(!t.state().stale_notice());
+    t.answer_export(Some(t.dir.join("fresh.pdf")));
+    t.run(CommandId::FileExportPdf);
+    assert!(message(&t).contains("Exported"));
+}

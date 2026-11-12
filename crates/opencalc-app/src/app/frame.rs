@@ -114,6 +114,7 @@ impl App {
                 None => panels::home::show(ui, &self.state, &mut cmds),
             });
 
+        panels::stale::show(ctx, &self.state, &mut cmds);
         panels::plot_window::show(ctx, &self.state, &mut panel_edits);
         panels::picture_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         panels::text_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);

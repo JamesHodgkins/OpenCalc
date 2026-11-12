@@ -23,11 +23,30 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                     .size(type_size::BODY),
             );
         }
-        ui.label(
-            RichText::new(state.calc_label())
-                .color(theme.text_weak)
-                .size(type_size::BODY),
-        );
+        if state.stale_notice() {
+            // Numbers that no longer match the inputs: say so where it cannot be
+            // missed, and let a click put it right.
+            let text = RichText::new(format!(
+                "{}  Results out of date. Recalculate (Ctrl+F9)",
+                crate::icons::WARNING
+            ))
+            .color(theme.warning)
+            .strong()
+            .size(type_size::BODY);
+            if ui
+                .add(egui::Button::new(text).frame(false))
+                .on_hover_text("Calculate the worksheet now")
+                .clicked()
+            {
+                out.push(CommandId::CalcAll);
+            }
+        } else {
+            ui.label(
+                RichText::new(state.calc_label())
+                    .color(theme.text_weak)
+                    .size(type_size::BODY),
+            );
+        }
         if state.active_sheet().is_some_and(|s| s.canvas.pen.is_some()) {
             ui.label(
                 RichText::new(

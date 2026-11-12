@@ -41,8 +41,10 @@ pub enum Effect {
     NewFromTemplate,
     /// Ask where to write the active worksheet as a template.
     SaveAsTemplate,
-    /// Export the active worksheet.
+    /// Export the active worksheet (asks first if its results are out of date).
     Export(crate::export::Kind),
+    /// Export it without asking that.
+    ExportNow(crate::export::Kind),
     /// Fill the selected table from a CSV file, or write it to one.
     ImportCsv,
     /// Choose an image file for the selected picture.

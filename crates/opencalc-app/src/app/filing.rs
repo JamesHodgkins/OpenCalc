@@ -32,6 +32,8 @@ pub enum Dialog {
     },
     /// Changes that were not saved when the program last stopped.
     Recover(Recovery),
+    /// An export was asked for while the numbers on the page are out of date.
+    StaleExport(crate::export::Kind),
 }
 
 /// A recovery file found at startup.
@@ -189,6 +191,16 @@ pub fn dispatch_file(state: &mut AppState, command: CommandId) -> Option<Vec<Eff
         DialogDropRecovery => {
             if let Some(Dialog::Recover(r)) = state.dialog.take() {
                 fx.push(Effect::DeleteFile(r.file));
+            }
+        }
+        DialogExportAnyway => {
+            if let Some(Dialog::StaleExport(kind)) = state.dialog.take() {
+                fx.push(Effect::ExportNow(kind));
+            }
+        }
+        DialogRecalculate => {
+            if let Some(Dialog::StaleExport(_)) = state.dialog.take() {
+                fx.push(Effect::CalculateNow);
             }
         }
         DialogCancel | DialogOk => state.dialog = None,

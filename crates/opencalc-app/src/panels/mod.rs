@@ -22,6 +22,7 @@ pub mod plot_view;
 pub mod plot_window;
 pub mod shape_controls;
 pub mod shortcuts;
+pub mod stale;
 pub mod status;
 pub mod table_window;
 pub mod text_window;

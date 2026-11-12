@@ -19,6 +19,17 @@ impl App {
     /// Ask where to put it, draw the pages and write them. Reports the result, or
     /// what went wrong, in a message; the worksheet is never changed.
     pub(super) fn export_active(&mut self, kind: Kind) {
+        // A printout of numbers that no longer match the inputs is the worst
+        // surprise this program can give, so ask first.
+        if self.state.results_stale() {
+            self.state.dialog = Some(crate::app::filing::Dialog::StaleExport(kind));
+            return;
+        }
+        self.export_now(kind);
+    }
+
+    /// Export without checking that the results are up to date.
+    pub(super) fn export_now(&mut self, kind: Kind) {
         let Some(sheet) = self.state.active_sheet() else {
             return;
         };

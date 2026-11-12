@@ -235,6 +235,7 @@ impl App {
                 Effect::Cut => self.cut(),
                 Effect::Paste => self.paste(),
                 Effect::Export(kind) => self.export_active(kind),
+                Effect::ExportNow(kind) => self.export_now(kind),
                 Effect::ImportCsv => self.import_csv(),
                 Effect::ChoosePicture => self.choose_picture(),
                 Effect::ExportCsv => self.export_csv(),

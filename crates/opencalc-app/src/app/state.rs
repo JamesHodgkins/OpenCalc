@@ -259,6 +259,12 @@ impl AppState {
                 .is_some_and(|s| self.calc.shown_for == Some(s.key))
     }
 
+    /// Whether to tell the user that the numbers on the page are out of date: manual
+    /// mode, edited since the last calculation, and not already being calculated.
+    pub fn stale_notice(&self) -> bool {
+        self.results_stale() && self.calc.worker_ok && self.calc.applied == self.calc.revision
+    }
+
     /// The calculation indicator on the status bar.
     pub fn calc_label(&self) -> &'static str {
         if !self.calc.worker_ok {

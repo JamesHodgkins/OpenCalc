@@ -164,6 +164,23 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
                 },
             );
         }
+        Dialog::StaleExport(_) => layout(
+            ui,
+            state,
+            out,
+            Layout {
+                icon: icons::WARNING,
+                title: "The results are out of date",
+                body: "The worksheet was changed after it was last calculated, so the \
+                       numbers on the page do not match its inputs.",
+                note: Some("Recalculate, then export again, or export what is shown."),
+                buttons: &[
+                    CommandId::DialogRecalculate,
+                    CommandId::DialogExportAnyway,
+                    CommandId::DialogCancel,
+                ],
+            },
+        ),
         Dialog::Message { title, text } => layout(
             ui,
             state,
@@ -180,7 +197,9 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
     // Escape, or a click outside, answers "Cancel" / "OK".
     if response.should_close() {
         out.push(match dialog {
-            Dialog::Unsaved { .. } | Dialog::Recover(_) => CommandId::DialogCancel,
+            Dialog::Unsaved { .. } | Dialog::Recover(_) | Dialog::StaleExport(_) => {
+                CommandId::DialogCancel
+            }
             Dialog::Message { .. } => CommandId::DialogOk,
         });
     }
