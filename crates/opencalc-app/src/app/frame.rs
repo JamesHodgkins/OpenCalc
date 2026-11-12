@@ -21,6 +21,9 @@ impl App {
         let registry = self.registry();
         let mut cmds: Vec<CommandId> = Vec::new();
         let width = self.state.dock_basis;
+        // The bars have fixed heights: their controls keep the compact size, not the
+        // roomier one the panels and dialogs use.
+        let chrome = |ui: &mut egui::Ui| ui.spacing_mut().interact_size.y = 24.0;
         let bar = |fill, x: i8, y: i8| {
             Frame::new()
                 .fill(fill)
@@ -36,6 +39,7 @@ impl App {
                     state: &self.state,
                     registry: &registry,
                 };
+                chrome(ui);
                 panels::title::show(ui, &cx, &mut cmds);
             });
 
@@ -47,6 +51,7 @@ impl App {
             .frame(bar(theme.base, 8, 0))
             .show_separator_line(false)
             .show(ctx, |ui| {
+                chrome(ui);
                 ui.horizontal(|ui| self.ribbon.tab_strip(ui, &theme, &mut self.ribbon_state));
             });
 
@@ -55,6 +60,7 @@ impl App {
             .frame(bar(theme.raised, 6, 4))
             .show_separator_line(false)
             .show(ctx, |ui| {
+                chrome(ui);
                 let out = self
                     .ribbon
                     .show(ui, &theme, &mut self.ribbon_state, &registry);
@@ -70,13 +76,17 @@ impl App {
                     state: &self.state,
                     registry: &registry,
                 };
+                chrome(ui);
                 ui.horizontal(|ui| panels::doc_tabs::show(ui, &cx, &mut cmds));
             });
 
         egui::TopBottomPanel::bottom("status")
             .exact_height(metrics::STATUS_BAR)
             .frame(bar(theme.base, 8, 2))
-            .show(ctx, |ui| panels::status::show(ui, &self.state, &mut cmds));
+            .show(ctx, |ui| {
+                chrome(ui);
+                panels::status::show(ui, &self.state, &mut cmds)
+            });
 
         let dock = Frame::new().fill(theme.surface).inner_margin(8);
         if self.state.show_functions {
