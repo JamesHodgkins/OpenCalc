@@ -4,7 +4,6 @@ private/
 
 # Local recovery and autosave files
 *.ocalc.recovery
-*.oc.recovery
 *.tmp
 
 # Editor and OS files

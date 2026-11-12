@@ -19,6 +19,7 @@ OpenCalc: a Rust engineering worksheet on egui/eframe: free-form calculations wi
 - Source files use LF line endings; set `git config core.autocrlf false` in your clone or `cargo fmt --check` fails on CRLF files (see `.editorconfig`).
 - Files stay under about 400 production lines and functions under 150 lines; `scripts/check.ps1` enforces this with a ratchet file (`scripts/line_limit_exceptions.txt`, which may shrink but never grow).
 - No `todo!` or `dbg!`; `unsafe` is forbidden (workspace lints). Clippy does not yet enforce `unwrap` here, but new production code should not add them.
+- Keep the family consistent: when you change lints, CI, licence lists or policy files, make the same change in the siblings and in `../OpenAppTemplate` (the scaffold new apps start from).
 
 ## Checks (CI runs these on Windows and Linux)
 ```
