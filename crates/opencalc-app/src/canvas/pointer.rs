@@ -168,6 +168,36 @@ pub(super) fn pointer(
     if let Some(pos) = resp.interact_pointer_pos() {
         click(ui, resp, scene, st, cmds, pos);
     }
+    if resp.secondary_clicked() {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            right_click(scene, st, cmds, pos);
+        }
+    }
+}
+
+/// A right click, before its menu opens: it acts on what is under the pointer. A
+/// region that is not selected becomes the selection (one already in the selection
+/// keeps the whole selection); blank page clears it and puts the insertion point
+/// there, so the menu's Paste and Insert go where the click was.
+fn right_click(scene: &Scene, st: &mut CanvasUi, cmds: &mut Vec<CanvasCmd>, pos: Pos2) {
+    let doc = scene.view.screen_to_doc(pos, scene.origin);
+    match hit_test(scene.regions, &st.sizes, doc) {
+        Some(id) if st.editing == Some(id) => {}
+        Some(id) => {
+            cmds.push(CanvasCmd::Seal);
+            st.editing = None;
+            if !st.selection.contains(&id) {
+                st.selection = vec![id];
+            }
+        }
+        None => {
+            cmds.push(CanvasCmd::Seal);
+            st.editing = None;
+            st.selection.clear();
+            st.insert_at = st.snapper.snap(Pos2::new(doc.x.max(0.0), doc.y.max(0.0)));
+            st.armed = true;
+        }
+    }
 }
 
 /// The resize handle under the screen point `p`, with the region it belongs to and

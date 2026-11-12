@@ -27,6 +27,7 @@ mod borders;
 mod calculation;
 mod check;
 mod clipboard;
+mod context_menu;
 mod editor;
 mod export;
 mod files;

@@ -180,6 +180,8 @@ impl CanvasUi {
 
 pub struct CanvasOut {
     pub cmds: Vec<CanvasCmd>,
+    /// The canvas's response, for the right-click menu.
+    pub response: egui::Response,
     /// Screen rectangle the canvas occupied.
     pub viewport: Rect,
     /// The page in view (counting from 1) and the number of pages.
@@ -323,6 +325,7 @@ pub fn show(
     let middle = view.screen_to_doc(rect.center(), origin).y;
     CanvasOut {
         cmds,
+        response: resp,
         viewport: rect,
         page: (page::page_at(&env.page, middle, pages) + 1, pages),
     }

@@ -5,6 +5,7 @@ pub mod about;
 pub mod app_menu;
 pub mod check;
 pub mod colour_picker;
+pub mod context_menu;
 pub mod controls;
 pub mod dialogs;
 pub mod doc_tabs;

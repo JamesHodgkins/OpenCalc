@@ -195,6 +195,15 @@ impl App {
         state.page = out.page;
         let effects = super::dispatch::apply_canvas(state, sheet, out.cmds);
         self.run_effects(ctx, effects);
+        // The right-click menu, with what is enabled as of this frame's selection.
+        let has_selection = self
+            .state
+            .active_sheet()
+            .is_some_and(|s| !s.canvas.selection.is_empty());
+        let registry = self.registry();
+        let mut chosen = Vec::new();
+        panels::context_menu::show(&out.response, &registry, has_selection, &mut chosen);
+        self.queue.extend(chosen);
     }
 
     /// Files dropped on the window, a request to close it, and the window title.
