@@ -1,0 +1,6 @@
+# Commits that only rename or move code, so git blame can look past them.
+# Use with: git config blame.ignoreRevsFile .git-blame-ignore-revs  (GitHub reads this file by itself)
+# Rename of opencalc-ui to opencalc-app, and .ocx to .ocalc.
+380204db44a63ed8b68275c20a3d49ce3cde52e4
+# Split of canvas files (code moved, not changed).
+14ab230c55d723a972f3056b914f67567ae9a335
