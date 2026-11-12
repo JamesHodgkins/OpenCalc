@@ -130,6 +130,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | ViewDraftView
             | EditUndo
             | EditRedo
+            | EditSelectAll
             | RegionDelete
             | CalcCheck
             | ViewLabels

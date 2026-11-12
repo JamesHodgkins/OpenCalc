@@ -65,7 +65,11 @@ fn home() -> Tab {
             ),
             panel(
                 "Edit",
-                vec![stack(&[CommandId::EditFind, CommandId::EditReplace])],
+                vec![stack(&[
+                    CommandId::EditFind,
+                    CommandId::EditReplace,
+                    CommandId::EditSelectAll,
+                ])],
             ),
             panel(
                 "Region",

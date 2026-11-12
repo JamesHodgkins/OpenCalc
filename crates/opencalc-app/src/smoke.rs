@@ -36,6 +36,7 @@ mod headers;
 mod insert;
 mod instance;
 mod label;
+mod nudge;
 mod options;
 mod pictures;
 mod plot_view;

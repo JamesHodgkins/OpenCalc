@@ -162,6 +162,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         RegionDelete => with_eval_check(state, &mut fx, |s| {
             s.delete_selection();
         }),
+        EditSelectAll => select_all(state),
         EditUndo => with_eval_check(state, &mut fx, |s| {
             s.undo();
         }),
@@ -273,6 +274,13 @@ pub(super) fn close_sheet(state: &mut AppState, i: usize) {
 
 /// Run `f` on the active sheet and ask for a recalculation if that changed what
 /// the evaluator would compute. Moving or resizing a region never does.
+/// Select every region of the active worksheet.
+fn select_all(state: &mut AppState) {
+    if let Some(i) = state.active {
+        state.sheets[i].select_all();
+    }
+}
+
 fn with_eval_check(state: &mut AppState, fx: &mut Vec<Effect>, f: impl FnOnce(&mut OpenSheet)) {
     let Some(i) = state.active else { return };
     let before = state.sheets[i].doc.eval_revision();

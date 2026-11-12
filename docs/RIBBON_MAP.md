@@ -27,7 +27,7 @@ other product's ribbon. The ribbon is data in `ribbon/defs.rs`.
 |---|---|---|
 | **Home** | Clipboard | Paste (large), Cut, Copy |
 | | Regions | Math region (large), Text region (large) |
-| | Edit | Find, Replace |
+| | Edit | Find, Replace, Select all |
 | | Region | Delete, Lock, Tag |
 | | Calculate | Calculate worksheet (large), Automatic calculation (toggle) |
 | | Check | Run checks (large), Next problem, Previous problem |

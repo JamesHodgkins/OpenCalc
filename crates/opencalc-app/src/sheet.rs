@@ -287,6 +287,13 @@ impl OpenSheet {
         id
     }
 
+    /// Select every region (and stop editing, so the arrow keys move them).
+    pub fn select_all(&mut self) {
+        self.canvas.selection = self.doc.regions().iter().map(|r| r.id).collect();
+        self.canvas.editing = None;
+        self.canvas.field = None;
+    }
+
     /// Delete the selected regions as one undo step. Returns whether any were.
     pub fn delete_selection(&mut self) -> bool {
         // A locked region stays, with everything else selected going.

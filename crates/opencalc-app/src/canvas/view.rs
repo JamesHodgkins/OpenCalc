@@ -124,6 +124,23 @@ impl Snapper {
         )
     }
 
+    /// The grid point `n` lines from `p` in the direction `dir` (each of -1, 0, 1).
+    /// A point off the grid first goes to the nearest line that way, so a nudge
+    /// always ends on the grid. An axis with direction 0 is left alone.
+    pub fn step_toward(&self, p: Pos2, dir: (i8, i8), n: u32) -> Pos2 {
+        let o = self.origin_at(p.y);
+        let go = |v: f32, o: f32, d: i8| {
+            let k = (v - o) / self.step;
+            let line = match d {
+                1 => (k + 1e-3).floor() + n as f32,
+                -1 => (k - 1e-3).ceil() - n as f32,
+                _ => return v,
+            };
+            o + line * self.step
+        };
+        Pos2::new(go(p.x, o.x, dir.0), go(p.y, o.y, dir.1))
+    }
+
     /// Round a point right and down onto the grid; one already on it (within
     /// rounding error) stays where it is.
     pub fn ceil(&self, p: Pos2) -> Pos2 {

@@ -16,6 +16,7 @@ mod grid;
 pub mod grip;
 pub mod hit;
 pub mod magnet;
+mod nudge;
 mod overlay;
 pub(crate) mod page;
 pub(crate) mod paint;
@@ -118,6 +119,8 @@ pub struct CanvasUi {
     pub snapper: view::Snapper,
     /// The last click was on blank page, so typing starts a math region there.
     pub armed: bool,
+    /// An arrow key is moving the selection (one undo step until it is let go).
+    pub nudging: bool,
     /// Content sizes measured by the last paint.
     pub sizes: Sizes,
     /// Fit the page width into the viewport on the next frame (set when a
@@ -147,6 +150,7 @@ impl Default for CanvasUi {
             // The initial insertion point is ready for type-to-create, just like
             // the point after moving the crosshair or clicking the blank page.
             armed: true,
+            nudging: false,
             sizes: Sizes::new(),
             fit_pending: true,
             guides: Vec::new(),
@@ -269,7 +273,17 @@ pub fn show(
     if st.editing.is_none() {
         // (A key that just ended editing has already placed the crosshair.)
         if !was_editing {
-            overlay::move_crosshair(ui, regions, st);
+            if st.selection.is_empty() {
+                overlay::move_crosshair(ui, regions, st);
+            } else {
+                // Selection wins over the crosshair: arrows move what is selected,
+                // and Escape lets go of it (so the arrows move the crosshair again).
+                nudge::nudge(ui, env, regions, st, &mut cmds);
+                let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
+                if escape && st.pen.is_none() && !ui.ctx().wants_keyboard_input() {
+                    st.selection.clear();
+                }
+            }
         }
         if st.editing.is_none() {
             overlay::crosshair(&painter, view, origin, st, env);
