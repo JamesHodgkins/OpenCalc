@@ -144,12 +144,12 @@ pub(super) fn pointer(
         draw_with_pen(ui, resp, scene, kind, st, cmds);
         return;
     }
-    if st.drag.is_none() && resp.hovered() {
+    if matches!(st.drag, Some(Drag::Move { .. })) {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+    } else if st.drag.is_none() && resp.hovered() {
         let hover = ui.input(|i| i.pointer.hover_pos());
-        if let Some((_, h, _)) = hover.and_then(|p| handle_under(scene, st, p)) {
-            ui.ctx().set_cursor_icon(h.cursor());
-        } else if hover.is_some_and(|p| grip_under(scene, st, p).is_some()) {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        if let Some(icon) = hover.and_then(|p| hover_cursor(ui, scene, st, p)) {
+            ui.ctx().set_cursor_icon(icon);
         }
     }
     if resp.drag_started_by(PointerButton::Primary) {
@@ -198,6 +198,23 @@ fn right_click(scene: &Scene, st: &mut CanvasUi, cmds: &mut Vec<CanvasCmd>, pos:
             st.armed = true;
         }
     }
+}
+
+/// The cursor for the pointer resting at screen point `p`, if it is over something
+/// that can be acted on: a resize handle, a grip, the unit after a result (a click
+/// opens it), or the body of a region that can be dragged (not one being edited,
+/// which shows its own text cursor, and not a locked one).
+fn hover_cursor(ui: &Ui, scene: &Scene, st: &CanvasUi, p: Pos2) -> Option<egui::CursorIcon> {
+    if let Some((_, h, _)) = handle_under(scene, st, p) {
+        return Some(h.cursor());
+    }
+    if grip_under(scene, st, p).is_some() || unit_slot::hit(ui.ctx(), scene.regions, p).is_some() {
+        return Some(egui::CursorIcon::PointingHand);
+    }
+    let doc = scene.view.screen_to_doc(p, scene.origin);
+    let id = hit_test(scene.regions, &st.sizes, doc)?;
+    let region = scene.regions.iter().find(|r| r.id == id)?;
+    (!region.locked && st.editing != Some(id)).then_some(egui::CursorIcon::Move)
 }
 
 /// The resize handle under the screen point `p`, with the region it belongs to and

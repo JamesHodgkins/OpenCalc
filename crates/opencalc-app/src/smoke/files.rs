@@ -101,6 +101,7 @@ pub(super) fn setup(name: &str, state: AppState) -> Rig {
             time: 0.0,
             copied: None,
             held: Default::default(),
+            cursor: Default::default(),
         },
         script,
         dir,

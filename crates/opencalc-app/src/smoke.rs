@@ -107,6 +107,8 @@ struct Harness {
     copied: Option<String>,
     /// Modifier keys held down for every frame (set by a test, like holding Shift).
     held: Modifiers,
+    /// The cursor the app asked for in the last frame.
+    cursor: egui::CursorIcon,
 }
 
 impl Harness {
@@ -123,6 +125,7 @@ impl Harness {
             time: 0.0,
             copied: None,
             held: Modifiers::NONE,
+            cursor: egui::CursorIcon::Default,
         }
     }
 
@@ -137,6 +140,7 @@ impl Harness {
         };
         let app = &mut self.app;
         let out = self.ctx.run(input, |ctx| app.frame(ctx));
+        self.cursor = out.platform_output.cursor_icon;
         for command in out.platform_output.commands {
             if let egui::OutputCommand::CopyText(text) = command {
                 self.copied = Some(text);

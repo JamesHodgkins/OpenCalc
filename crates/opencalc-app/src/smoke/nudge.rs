@@ -194,3 +194,60 @@ fn enter_does_not_edit_a_locked_region_or_a_group() {
     assert!(h.sheet().canvas.editing.is_none());
     let _ = id;
 }
+
+fn hover(h: &mut Harness, at: eframe::egui::Pos2) {
+    h.frame_with(vec![eframe::egui::Event::PointerMoved(at)]);
+    h.frame_with(vec![eframe::egui::Event::PointerMoved(at)]);
+}
+
+#[test]
+fn the_cursor_shows_what_a_press_will_do() {
+    use eframe::egui::CursorIcon;
+    let mut h = Harness::new();
+    h.settle();
+    // Over a region that can be dragged: the move cursor.
+    let at = h.screen_centre(F);
+    hover(&mut h, at);
+    assert_eq!(h.cursor, CursorIcon::Move);
+    // Over blank page: the plain arrow.
+    let blank = h.sheet().view.doc_to_screen(
+        eframe::egui::Pos2::new(650.0, 300.0),
+        h.app.state.viewport.min,
+    );
+    hover(&mut h, blank);
+    assert_eq!(h.cursor, CursorIcon::Default);
+    // A locked region cannot be dragged, so it does not offer to be.
+    h.app.state.sheets[0].canvas.selection = vec![F];
+    h.command(CommandId::RegionLock);
+    hover(&mut h, at);
+    assert_ne!(h.cursor, CursorIcon::Move);
+}
+
+#[test]
+fn the_cursor_closes_to_a_grab_while_a_region_is_dragged() {
+    use eframe::egui::{CursorIcon, Event, PointerButton};
+    let mut h = Harness::new();
+    h.settle();
+    let from = h.screen_centre(F);
+    hover(&mut h, from);
+    h.frame_with(vec![Event::PointerButton {
+        pos: from,
+        button: PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    }]);
+    let mut at = from;
+    for _ in 0..4 {
+        at += eframe::egui::vec2(12.0, 8.0);
+        h.frame_with(vec![Event::PointerMoved(at)]);
+    }
+    assert_eq!(h.cursor, CursorIcon::Grabbing);
+    h.frame_with(vec![Event::PointerButton {
+        pos: at,
+        button: PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    }]);
+    h.frame();
+    assert_ne!(h.cursor, CursorIcon::Grabbing, "let go");
+}
