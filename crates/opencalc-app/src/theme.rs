@@ -171,7 +171,7 @@ impl Theme {
 pub mod metrics {
     pub const SPACING: f32 = 8.0;
     pub const RADIUS: u8 = 4;
-    pub const CONTROL_HEIGHT: f32 = 26.0;
+    pub const CONTROL_HEIGHT: f32 = 28.0;
     pub const WINDOW_RADIUS: u8 = RADIUS + 2;
     pub const SCROLLBAR_WIDTH: f32 = 6.0;
     /// Heights of the window's horizontal bars (SPEC 4.1).
@@ -186,8 +186,8 @@ pub mod metrics {
 
 /// Type sizes in px.
 pub mod type_size {
-    pub const BODY: f32 = 12.5;
-    pub const SMALL: f32 = 11.0;
+    pub const BODY: f32 = 13.5;
+    pub const SMALL: f32 = 12.0;
     pub const TAB: f32 = 13.0;
     pub const HEADING: f32 = 15.0;
     pub const RIBBON_LABEL: f32 = 11.5;
@@ -253,6 +253,8 @@ pub fn apply(ctx: &egui::Context, theme: &Theme) {
     ctx.style_mut(|style| {
         style.spacing.item_spacing = egui::vec2(metrics::SPACING / 2.0, metrics::SPACING / 2.0);
         style.spacing.interact_size.y = metrics::CONTROL_HEIGHT;
+        style.spacing.interact_size.x = metrics::CONTROL_HEIGHT;
+        style.spacing.button_padding = egui::vec2(8.0, 4.0);
         style.spacing.scroll = egui::style::ScrollStyle {
             bar_width: metrics::SCROLLBAR_WIDTH,
             floating: false,

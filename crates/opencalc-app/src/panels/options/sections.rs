@@ -110,15 +110,16 @@ pub(super) fn new_worksheets(ui: &mut Ui, t: &Theme, next: &mut Settings) {
         t,
         "Unit system",
         "The units results are shown in. Values calculate the same in any system.",
-        |ui| choice(ui, &mut next.units, &systems),
+        |ui| choice(ui, "options-units", &mut next.units, &systems),
     );
     let papers: Vec<(PaperSize, &str)> = PaperSize::ALL.iter().map(|&p| (p, p.label())).collect();
     row(ui, t, "Paper", "", |ui| {
-        choice(ui, &mut next.page.paper, &papers)
+        choice(ui, "options-paper", &mut next.page.paper, &papers)
     });
     row(ui, t, "Orientation", "", |ui| {
         choice(
             ui,
+            "options-orientation",
             &mut next.page.landscape,
             &[(false, "Portrait"), (true, "Landscape")],
         );
@@ -141,7 +142,14 @@ pub(super) fn new_worksheets(ui: &mut Ui, t: &Theme, next: &mut Settings) {
         "Background",
         "A pattern on the page to work on. Left out of exports unless a worksheet's \
          Page setup includes it.",
-        |ui| choice(ui, &mut next.page.background, &patterns),
+        |ui| {
+            choice(
+                ui,
+                "options-background",
+                &mut next.page.background,
+                &patterns,
+            )
+        },
     );
 }
 

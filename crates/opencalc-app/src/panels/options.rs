@@ -245,13 +245,15 @@ pub(super) fn row(ui: &mut Ui, t: &Theme, name: &str, help: &str, control: impl 
     ui.add_space(10.0);
 }
 
-/// Buttons side by side, one of them chosen.
-pub(super) fn choice<T: Copy + PartialEq>(ui: &mut Ui, value: &mut T, options: &[(T, &str)]) {
-    for (option, label) in options {
-        if ui.selectable_label(*value == *option, *label).clicked() {
-            *value = *option;
-        }
-    }
+/// A drop-down list of choices, one of them chosen.
+pub(super) fn choice<T: Copy + PartialEq>(
+    ui: &mut Ui,
+    salt: &str,
+    value: &mut T,
+    options: &[(T, &str)],
+) {
+    let options: Vec<(T, String)> = options.iter().map(|(o, l)| (*o, (*l).to_owned())).collect();
+    crate::panels::controls::combo(ui, salt, value, &options);
 }
 
 /// Show `section` the next time the window draws (tests use it to reach a page).
