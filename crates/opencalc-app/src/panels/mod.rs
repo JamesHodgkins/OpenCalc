@@ -20,6 +20,7 @@ pub mod page_setup;
 pub mod picture_window;
 pub mod plot_view;
 pub mod plot_window;
+pub mod properties;
 pub mod shape_controls;
 pub mod shortcuts;
 pub mod stale;

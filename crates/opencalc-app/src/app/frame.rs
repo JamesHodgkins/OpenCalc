@@ -107,6 +107,7 @@ impl App {
                     panels::functions::show(ui, &self.state, &mut panel_edits);
                 });
         }
+        panels::properties::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         egui::CentralPanel::default()
             .frame(bar(theme.base, 0, 0))
             .show(ctx, |ui| match self.state.active {
@@ -115,10 +116,6 @@ impl App {
             });
 
         panels::stale::show(ctx, &self.state, &mut cmds);
-        panels::plot_window::show(ctx, &self.state, &mut panel_edits);
-        panels::picture_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
-        panels::text_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
-        panels::table_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         panels::plot_view::show(ctx, &self.state);
         panels::units::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         panels::page_setup::show(ctx, &self.state, &mut cmds, &mut panel_edits);

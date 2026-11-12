@@ -42,6 +42,7 @@ mod options;
 mod pictures;
 mod plot_view;
 mod plots;
+mod properties;
 mod rich_text;
 mod shapes;
 mod tables;

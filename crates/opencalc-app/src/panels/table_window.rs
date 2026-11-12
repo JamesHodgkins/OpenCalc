@@ -1,9 +1,9 @@
-//! The table window: a small floating window beside the canvas that appears while
+//! The table panel: appears in the Properties side panel while
 //! one table region is selected. It holds the table's name, the heading and unit
 //! of each column and every cell, and buttons to add and remove rows and columns.
 //! Like every panel it reads the document and only asks for edits.
 
-use eframe::egui::{self, Context, RichText, Ui};
+use eframe::egui::{self, RichText, Ui};
 use opencalc_core::document::{RegionId, RegionKind, TableSpec, MAX_COLUMNS};
 use opencalc_core::edit::Edit;
 
@@ -24,24 +24,12 @@ pub fn selected_table(state: &AppState) -> Option<(RegionId, &TableSpec)> {
     }
 }
 
-/// Show the window for the selected table, if there is one.
-pub fn show(ctx: &Context, state: &AppState, cmds: &mut Vec<CommandId>, out: &mut Vec<CanvasCmd>) {
+/// The fields of the selected table, if a table is what is selected.
+pub fn body(ui: &mut Ui, state: &AppState, cmds: &mut Vec<CommandId>, out: &mut Vec<CanvasCmd>) {
     let Some((id, spec)) = selected_table(state) else {
         return;
     };
-    let corner = state.viewport.right_top() + egui::vec2(-364.0, 12.0);
-    let tallest = (state.viewport.height() - 60.0).max(160.0);
-    egui::Window::new("Table")
-        .id(egui::Id::new("table-window"))
-        .fixed_pos(corner)
-        .collapsible(false)
-        .resizable(false)
-        .show(ctx, |ui| {
-            egui::ScrollArea::both()
-                .max_height(tallest)
-                .max_width(340.0)
-                .show(ui, |ui| editor(ui, state, id, spec, cmds, out));
-        });
+    editor(ui, state, id, spec, cmds, out);
 }
 
 /// Replace the table with `spec`, as one undo step.

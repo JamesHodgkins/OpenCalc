@@ -64,7 +64,7 @@ Value controls (a colour, a number, a choice) are drawn by the app through `Cont
 ribbon item otherwise only runs a command. Fill and outline use a colour picker: Automatic, none, the
 palette with its shades, standard colours, and exact RGBA with hex.
 
-Planned, each replacing a floating window the same way: **Picture**, **Table** and **Plot**.
+Plot, Table, Picture and Text settings are not on the ribbon: they are in the **Properties** side panel at the right of the page (it shares the window with the page, can be resized, and appears while one such region is selected). Their forms are too long for a ribbon body. Contextual tabs for them remain possible for the short ones.
 
 ## Where the old commands went
 
@@ -86,4 +86,4 @@ Planned, each replacing a floating window the same way: **Picture**, **Table** a
 
 - A right-click menu with the draw-order
   commands.
-- Picture, Table and Plot contextual tabs (their floating windows go away as they arrive).
+- Picture, Table and Plot contextual tabs (their settings are in the Properties side panel for now).
