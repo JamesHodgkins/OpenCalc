@@ -153,6 +153,7 @@ with a shade, an exact RGBA value, or Automatic, as in common office programs.
 
 - [x] Contextual tabs and hosted value controls (2026-11-11); the Shape Format tab. Removed 2026-11-12: its settings moved into the Properties side panel, and the ribbon has no contextual tabs.
 - [x] Ordinary tabs redone by task: Home (with Calculate and Check), Insert, Draw, Format, Units, View, Help; no tab with one or two buttons; each tab measured to fit the narrowest window (`RIBBON_MAP.md`).
+- [x] Home page redesign (2026-11-12), laid out like OpenDraft's: header (logo, version, drop hint); a Start row of four tiles (New in the brand colour, Open, From template, Example); Recent worksheets as cards (kind badge, name, folder, age and size, greyed and marked Missing when the file is gone, Clear list); a Getting started card in a side column from 900 px wide. The layout is a pure, tested function. Not done: thumbnails of the worksheets, pinning, per-entry menus, recovery and update cards.
 - [x] Properties side panel (2026-11-12): the Plot, Table, Picture and Text settings moved out of four floating windows (fixed in place, covering the page) into one resizable panel at the right that shares the window with the page.
 - [x] Alt+click to pick under a filled shape.
 - [ ] A right-click menu with the draw-order commands.
