@@ -44,8 +44,12 @@ pub struct Theme {
     pub border: Color32,
     pub border_strong: Color32,
     pub pressed: Color32,
-    // Accent (red, to tell OpenCalc from OpenDraft).
+    // Accent (red, to tell OpenCalc from OpenDraft). The brand colour: the logo and
+    // the Home page's primary tile. Never a selection or focus colour.
     pub accent: Color32,
+    /// Selection and focus: the frame round a selected region, the caret, focus
+    /// rings, the insertion crosshair. Neutral blue, readable on every tone.
+    pub selection: Color32,
     // Hover and press on accent fills (SPEC 4.6). Nothing is accent-filled since
     // the app button became the File menu, so only the contrast test reads them.
     #[cfg_attr(not(test), allow(dead_code))]
@@ -60,6 +64,7 @@ pub struct Theme {
     pub text: Color32,
     pub text_weak: Color32,
     pub text_disabled: Color32,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub text_on_accent: Color32,
     /// Line colours for plot series, in order.
     pub series: [Color32; 8],
@@ -96,6 +101,7 @@ impl Theme {
             border_strong,
             pressed,
             accent: rgb(0xC62828),
+            selection: rgb(0x86BEF7),
             accent_hover: rgb(0xD32F2F),
             accent_pressed: rgb(0xB71C1C),
             accent_text: rgb(0xFF8A80),
@@ -131,6 +137,7 @@ impl Theme {
             border_strong: rgb(0x8E8E8E),
             pressed: rgb(0xD0D0D0),
             accent: rgb(0xC62828),
+            selection: rgb(0x1565C0),
             accent_hover: rgb(0xD32F2F),
             accent_pressed: rgb(0xB71C1C),
             accent_text: rgb(0xB71C1C),
@@ -203,8 +210,10 @@ pub fn apply(ctx: &egui::Context, theme: &Theme) {
     visuals.hyperlink_color = theme.accent_text;
     visuals.warn_fg_color = theme.warning;
     visuals.error_fg_color = theme.error;
-    visuals.selection.bg_fill = theme.accent;
-    visuals.selection.stroke = Stroke::new(1.0_f32, theme.text_on_accent);
+    // A selected row or button (and highlighted text) is a lighter grey, not the
+    // brand colour: neutral chrome, with an outline so it differs from a hover.
+    visuals.selection.bg_fill = theme.pressed;
+    visuals.selection.stroke = Stroke::new(1.0_f32, theme.border_strong);
     visuals.window_shadow = egui::epaint::Shadow {
         offset: [0, 6],
         blur: 18,
@@ -285,7 +294,7 @@ pub fn focus_ring(painter: &egui::Painter, rect: egui::Rect, theme: &Theme) {
     painter.rect_stroke(
         rect.expand(1.0),
         CornerRadius::same(metrics::RADIUS),
-        Stroke::new(2.0_f32, theme.accent_text),
+        Stroke::new(2.0_f32, theme.selection),
         egui::StrokeKind::Outside,
     );
 }
@@ -336,6 +345,7 @@ mod tests {
                 contrast(colour, p.base)
             );
         }
+        assert!(contrast(p.selection, p.base) >= 3.0, "selection on paper");
         for (k, colour) in p.series.iter().enumerate() {
             assert!(
                 contrast(*colour, p.base) >= 3.0,
@@ -385,7 +395,7 @@ mod tests {
             }
             // The focus ring must be visible on every tone, including hover.
             for tone in t.tones() {
-                let c = contrast(t.accent_text, tone);
+                let c = contrast(t.selection, tone);
                 assert!(c >= 3.0, "focus ring on {tone:?} in {key:?}: {c:.2}:1");
             }
         }

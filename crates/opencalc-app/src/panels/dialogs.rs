@@ -49,7 +49,7 @@ fn layout(ui: &mut egui::Ui, state: &AppState, out: &mut Commands, l: Layout) {
                 let colour = if l.icon == icons::WARNING {
                     theme.warning
                 } else {
-                    theme.accent
+                    theme.text
                 };
                 // Reserve the whole column so the gap after the icon is fixed.
                 let (rect, _) = ui
@@ -93,7 +93,7 @@ fn layout(ui: &mut egui::Ui, state: &AppState, out: &mut Commands, l: Layout) {
                 for (i, &command) in l.buttons.iter().enumerate().rev() {
                     let text = RichText::new(command.label());
                     let button = if i == 0 {
-                        egui::Button::new(text.strong()).fill(theme.accent)
+                        egui::Button::new(text.strong()).fill(theme.raised_high)
                     } else {
                         egui::Button::new(text)
                     };

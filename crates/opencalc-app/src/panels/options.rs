@@ -178,7 +178,7 @@ fn nav_row(ui: &mut Ui, t: &Theme, section: Section, current: bool) -> bool {
         painter.rect_filled(inner, r, t.raised);
         let bar =
             Rect::from_center_size(pos2(inner.left() + 1.5, inner.center().y), vec2(3.0, 16.0));
-        painter.rect_filled(bar, CornerRadius::same(2), t.accent);
+        painter.rect_filled(bar, CornerRadius::same(2), t.text_weak);
     } else if resp.hovered() {
         painter.rect_filled(inner, r, t.raised_high);
         painter.rect_stroke(inner, r, Stroke::new(1.0_f32, t.border), StrokeKind::Inside);
@@ -187,7 +187,7 @@ fn nav_row(ui: &mut Ui, t: &Theme, section: Section, current: bool) -> bool {
         painter.rect_stroke(
             inner.expand(2.0),
             r,
-            Stroke::new(2.0_f32, t.accent_text),
+            Stroke::new(2.0_f32, t.selection),
             StrokeKind::Outside,
         );
     }

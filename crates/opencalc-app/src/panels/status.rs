@@ -33,7 +33,7 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                 RichText::new(
                     "Drag to draw. Shift: equal sides. Ctrl: from the centre. Esc: cancel.",
                 )
-                .color(theme.accent)
+                .color(theme.text)
                 .size(type_size::BODY),
             );
         }

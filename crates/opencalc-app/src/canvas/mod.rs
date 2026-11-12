@@ -231,7 +231,7 @@ pub fn show(
         }
     }
 
-    chrome::selection(&painter, theme, regions, view, origin, st);
+    chrome::selection(&painter, env.paper, regions, view, origin, st);
 
     overlay::marks(ui, &painter, view, origin, regions, st, theme);
     // Regions with a Find match: a light wash, stronger on the current one.
@@ -274,7 +274,7 @@ pub fn show(
     pointer::pointer(ui, &resp, &scene, st, &mut cmds);
 
     abandon::remove_if_empty(st, regions, &mut cmds);
-    overlay::marquee(&painter, view, origin, st, theme);
+    overlay::marquee(&painter, view, origin, st, env.paper);
     for g in &st.guides {
         let at = view.doc_to_screen(Pos2::new(g.at, g.at), origin);
         let (a, b) = if g.vertical {
@@ -284,10 +284,10 @@ pub fn show(
         };
         painter.line_segment(
             [a, b],
-            Stroke::new(1.0_f32, theme.accent.gamma_multiply(0.8)),
+            Stroke::new(1.0_f32, env.paper.selection.gamma_multiply(0.8)),
         );
     }
-    chrome::pen_preview(ui, &painter, env, theme, view, origin, st);
+    chrome::pen_preview(ui, &painter, env, env.paper, view, origin, st);
     painter.text(
         rect.min + Vec2::new(10.0, 8.0),
         egui::Align2::LEFT_TOP,

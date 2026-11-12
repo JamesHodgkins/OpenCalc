@@ -299,7 +299,7 @@ fn paint(
     let (a, b) = field.selection();
     for band in lay.bands(a, b) {
         let band = band.translate(text_origin.to_vec2());
-        painter.rect_filled(band, 0.0, env.theme.accent.gamma_multiply(0.3));
+        painter.rect_filled(band, 0.0, env.paper.selection.gamma_multiply(0.3));
     }
     lay.layout.paint(painter, text_origin, env.paper.text);
     let caret = lay.caret_rect(field.caret);
@@ -308,7 +308,7 @@ fn paint(
             text_origin + caret.min.to_vec2(),
             text_origin + caret.max.to_vec2(),
         ];
-        painter.line_segment(line, Stroke::new(1.5_f32, env.theme.accent));
+        painter.line_segment(line, Stroke::new(1.5_f32, env.paper.selection));
     }
     if field.clipped {
         super::overlay::clip_notice(painter, text_origin, lay.layout.h, zoom, env);

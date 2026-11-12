@@ -166,9 +166,9 @@ fn edit_box(
     // with a thin outline around it.
     let rect = slot.rect;
     let outline = if bad.is_some() {
-        env.theme.error
+        env.paper.error
     } else {
-        env.theme.accent
+        env.paper.selection
     };
     ui.painter().rect_stroke(
         rect.expand2(Vec2::new(2.0, 1.0)),
@@ -181,7 +181,7 @@ fn edit_box(
         .scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             // The sheet's colours, not the window's: no dark box, a soft selection.
             let v = ui.visuals_mut();
-            v.selection.bg_fill = env.theme.accent.gamma_multiply(0.3);
+            v.selection.bg_fill = env.paper.selection.gamma_multiply(0.3);
             v.selection.stroke = Stroke::NONE;
             v.extreme_bg_color = Color32::TRANSPARENT;
             let colour = if bad.is_some() {
