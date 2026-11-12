@@ -131,6 +131,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | EditUndo
             | EditRedo
             | EditSelectAll
+            | EditDuplicate
             | RegionDelete
             | CalcCheck
             | ViewLabels
@@ -147,6 +148,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             || !matches!(
                 command,
                 RegionDelete
+                    | EditDuplicate
                     | ClipboardCut
                     | ClipboardCopy
                     | RegionLock

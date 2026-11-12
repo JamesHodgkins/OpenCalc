@@ -48,6 +48,33 @@ pub fn nudged(
     origins.iter().map(|&(id, p)| (id, p + delta)).collect()
 }
 
+/// Enter or F2 on a lone selected region that can be edited starts editing it (the
+/// way a double click does), with the caret at the end.
+pub(super) fn edit_on_enter(
+    ui: &Ui,
+    regions: &[Region],
+    st: &mut CanvasUi,
+    cmds: &mut Vec<CanvasCmd>,
+) {
+    let [id] = st.selection.as_slice() else {
+        return;
+    };
+    let key = ui.input(|i| i.key_pressed(Key::Enter) || i.key_pressed(Key::F2));
+    if !key || ui.ctx().wants_keyboard_input() {
+        return;
+    }
+    let editable = regions
+        .iter()
+        .any(|r| r.id == *id && r.kind.is_editable() && !r.locked);
+    if editable {
+        cmds.push(CanvasCmd::Seal);
+        st.editing = Some(*id);
+        st.focus_edit = true;
+        st.enter_at_start = false;
+        st.armed = false;
+    }
+}
+
 fn pressed(ui: &Ui, key: Key) -> i8 {
     i8::from(ui.input(|i| i.key_pressed(key)))
 }

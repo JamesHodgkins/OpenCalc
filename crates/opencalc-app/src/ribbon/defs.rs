@@ -53,7 +53,11 @@ fn home() -> Tab {
                         label: Some("Paste"),
                         items: vec![it(CommandId::ClipboardPaste)],
                     }),
-                    stack(&[CommandId::ClipboardCut, CommandId::ClipboardCopy]),
+                    stack(&[
+                        CommandId::ClipboardCut,
+                        CommandId::ClipboardCopy,
+                        CommandId::EditDuplicate,
+                    ]),
                 ],
             ),
             panel(

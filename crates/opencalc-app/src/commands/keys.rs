@@ -62,6 +62,7 @@ pub const BINDINGS: &[Binding] = &[
     bind(CommandId::InsertText, CTRL, Key::T),
     bind(CommandId::InsertArea, CTRL_SHIFT, Key::A),
     bind_free(CommandId::EditSelectAll, CTRL, Key::A),
+    bind_free(CommandId::EditDuplicate, CTRL, Key::D),
     bind(CommandId::ArrangeToFront, CTRL_SHIFT, Key::CloseBracket),
     bind(CommandId::ArrangeToBack, CTRL_SHIFT, Key::OpenBracket),
     bind(CommandId::ArrangeForward, CTRL, Key::CloseBracket),

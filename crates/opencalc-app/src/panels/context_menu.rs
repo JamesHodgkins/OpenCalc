@@ -16,6 +16,7 @@ pub fn items(has_selection: bool) -> Vec<Option<CommandId>> {
             Some(ClipboardCut),
             Some(ClipboardCopy),
             Some(ClipboardPaste),
+            Some(EditDuplicate),
             Some(RegionDelete),
             None,
             Some(RegionLock),

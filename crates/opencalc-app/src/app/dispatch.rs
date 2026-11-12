@@ -165,6 +165,7 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
             s.delete_selection();
         }),
         EditSelectAll => select_all(state),
+        EditDuplicate => duplicate(state, &mut fx),
         EditUndo => with_eval_check(state, &mut fx, |s| {
             s.undo();
         }),
@@ -276,6 +277,22 @@ pub(super) fn close_sheet(state: &mut AppState, i: usize) {
 
 /// Run `f` on the active sheet and ask for a recalculation if that changed what
 /// the evaluator would compute. Moving or resizing a region never does.
+/// Copy the selected regions (see `OpenSheet::duplicate_selection`).
+fn duplicate(state: &mut AppState, fx: &mut Vec<Effect>) {
+    use opencalc_core::persist::MAX_REGIONS;
+    let Some(sheet) = state.active_sheet() else {
+        return;
+    };
+    if sheet.doc.regions().len() + sheet.canvas.selection.len() > MAX_REGIONS {
+        let text = format!("A worksheet can hold at most {MAX_REGIONS} regions.");
+        state.message("Duplicate", text);
+        return;
+    }
+    with_eval_check(state, fx, |s| {
+        s.duplicate_selection();
+    });
+}
+
 /// Select every region of the active worksheet.
 fn select_all(state: &mut AppState) {
     if let Some(i) = state.active {

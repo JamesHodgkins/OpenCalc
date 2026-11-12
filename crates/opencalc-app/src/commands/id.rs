@@ -145,6 +145,7 @@ commands! {
     EditUndo: "edit.undo", "Undo", icons::UNDO;
     EditRedo: "edit.redo", "Redo", icons::REDO;
     EditSelectAll: "edit.select_all", "Select all", icons::LIST;
+    EditDuplicate: "edit.duplicate", "Duplicate", icons::COPY;
     EditFind: "edit.find", "Find", icons::FIND;
     EditReplace: "edit.replace", "Replace", icons::REPLACE;
     FindNext: "find.next", "Find next", icons::FIND;
@@ -256,11 +257,11 @@ impl CommandId {
             | UnitsShowIn(_) | GoToFinding(_) | InsertMatrixSize(..) | MatrixClose
             | InsertMatrix | InsertRange | InsertSolveBlock | InsertProgram | CheckClose
             | CalcCheck | WarnNext | WarnPrev | FileClose | FileExample | AppQuit | AppMenu
-            | AppMenuClose | TabHome | EditUndo | EditRedo | EditSelectAll | RegionDelete
-            | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable | PictureChoose
-            | TableImportCsv | TableExportCsv | InsertPicture | CalcAll | ViewZoomIn
-            | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto
-            | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose
+            | AppMenuClose | TabHome | EditUndo | EditRedo | EditSelectAll | EditDuplicate
+            | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot | InsertTable
+            | PictureChoose | TableImportCsv | TableExportCsv | InsertPicture | CalcAll
+            | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid | ViewSnap
+            | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions | AppOptionsClose
             | AppOptionsDefaults | FileClearRecent | ThemeNeutral | ThemeSlate | UnitsSi
             | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose | SelectSheet(_)
             | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_) | PageMarginMm(_)

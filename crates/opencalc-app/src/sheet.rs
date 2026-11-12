@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{Pos2, Rect};
-use opencalc_core::document::{PlotSpec, Point, RegionId, RegionKind, Size, Worksheet};
+use opencalc_core::document::{PlotSpec, Point, Region, RegionId, RegionKind, Size, Worksheet};
 use opencalc_core::edit::{Edit, EditError, History};
 
 use crate::canvas::adapt::{point, rect_of};
@@ -285,6 +285,46 @@ impl OpenSheet {
         self.canvas.editing = None;
         self.canvas.field = None;
         id
+    }
+
+    /// Copy the selected regions one grid step down and to the right, as one undo
+    /// step, and select the copies. A copy keeps the original's look, text and
+    /// size but not its label (a label names one region) or its lock. Returns
+    /// whether anything was copied.
+    pub fn duplicate_selection(&mut self) -> bool {
+        let step = self.canvas.grid.step();
+        let originals: Vec<_> = self
+            .doc
+            .regions()
+            .iter()
+            .filter(|r| self.canvas.selection.contains(&r.id))
+            .cloned()
+            .collect();
+        if originals.is_empty() {
+            return false;
+        }
+        let base = self.doc.regions().len();
+        let copies: Vec<(usize, Region)> = originals
+            .into_iter()
+            .enumerate()
+            .map(|(n, original)| {
+                let pos = Point::new(original.pos.x + step, original.pos.y + step);
+                let mut copy = self.doc.new_region(original.kind, pos);
+                copy.size = original.size;
+                copy.style = original.style;
+                copy.runs = original.runs;
+                copy.border = original.border;
+                (base + n, copy)
+            })
+            .collect();
+        let ids: Vec<RegionId> = copies.iter().map(|(_, r)| r.id).collect();
+        self.history.seal();
+        self.edit(Edit::InsertRegions { regions: copies });
+        self.history.seal();
+        self.canvas.selection = ids;
+        self.canvas.editing = None;
+        self.canvas.field = None;
+        true
     }
 
     /// Select every region (and stop editing, so the arrow keys move them).

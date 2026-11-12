@@ -130,3 +130,67 @@ fn select_all_selects_every_region_and_the_arrows_move_them_together() {
         );
     }
 }
+
+#[test]
+fn ctrl_d_copies_the_selection_one_step_down_and_selects_the_copy() {
+    let (mut h, id) = selected();
+    h.app.state.sheets[0].edit(opencalc_core::edit::Edit::SetLabel {
+        id,
+        label: "load".into(),
+    });
+    let before = h.sheet().doc.regions().len();
+    let at = h.region_pos(id);
+    let step = h.sheet().canvas.grid.step();
+    h.press_key(Key::D, Modifiers::COMMAND);
+    assert_eq!(h.sheet().doc.regions().len(), before + 1);
+    let [copy] = h.sheet().canvas.selection.as_slice() else {
+        panic!("the copy is selected");
+    };
+    assert_ne!(*copy, id);
+    let copy = h.sheet().doc.region(*copy).expect("copy").clone();
+    assert_eq!((copy.pos.x, copy.pos.y), (at.x + step, at.y + step));
+    assert!(copy.label.is_empty(), "a label names one region");
+    let original = h.sheet().doc.region(id).expect("original");
+    assert_eq!(copy.kind, original.kind);
+    assert_eq!(original.label, "load");
+    // One undo takes the copy away again.
+    h.command(CommandId::EditUndo);
+    assert_eq!(h.sheet().doc.regions().len(), before);
+}
+
+#[test]
+fn duplicate_needs_a_selection() {
+    let mut h = Harness::new();
+    h.settle();
+    let before = h.sheet().doc.regions().len();
+    h.press_key(Key::D, Modifiers::COMMAND);
+    assert_eq!(h.sheet().doc.regions().len(), before);
+}
+
+#[test]
+fn enter_or_f2_starts_editing_the_selected_region_and_escape_leaves_it_selected() {
+    for key in [Key::Enter, Key::F2] {
+        let (mut h, id) = selected();
+        h.press_key(key, Modifiers::NONE);
+        assert_eq!(h.sheet().canvas.editing, Some(id), "{key:?}");
+        h.press_key(Key::Escape, Modifiers::NONE);
+        assert!(h.sheet().canvas.editing.is_none());
+        assert_eq!(
+            h.sheet().canvas.selection,
+            vec![id],
+            "{key:?}: still selected"
+        );
+    }
+}
+
+#[test]
+fn enter_does_not_edit_a_locked_region_or_a_group() {
+    let (mut h, id) = selected();
+    h.command(CommandId::RegionLock);
+    h.press_key(Key::Enter, Modifiers::NONE);
+    assert!(h.sheet().canvas.editing.is_none());
+    h.command(CommandId::EditSelectAll);
+    h.press_key(Key::Enter, Modifiers::NONE);
+    assert!(h.sheet().canvas.editing.is_none());
+    let _ = id;
+}

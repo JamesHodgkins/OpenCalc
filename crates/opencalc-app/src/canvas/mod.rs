@@ -281,6 +281,7 @@ pub fn show(
                 // Selection wins over the crosshair: arrows move what is selected,
                 // and Escape lets go of it (so the arrows move the crosshair again).
                 nudge::nudge(ui, env, regions, st, &mut cmds);
+                nudge::edit_on_enter(ui, regions, st, &mut cmds);
                 let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
                 if escape && st.pen.is_none() && !ui.ctx().wants_keyboard_input() {
                     st.selection.clear();
