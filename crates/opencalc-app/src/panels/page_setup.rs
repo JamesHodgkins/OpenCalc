@@ -28,7 +28,9 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, edits: &mut Vec
     egui::Window::new("Page setup")
         .open(&mut open)
         .collapsible(false)
-        .resizable(false)
+        .resizable([true, false])
+        .default_width(380.0)
+        .min_width(340.0)
         .show(ctx, |ui| {
             egui::Grid::new("page-setup-grid")
                 .num_columns(2)
@@ -106,7 +108,10 @@ fn band(
                 egui::TextEdit::singleline(&mut buffer)
                     .id_salt((salt, n))
                     .hint_text(hint)
-                    .desired_width(110.0)
+                    .desired_width(
+                        ((ui.available_width() - 2.0 * ui.spacing().item_spacing.x) / 3.0)
+                            .max(60.0),
+                    )
                     .char_limit(MAX_HEADER_CHARS),
             );
             if response.changed() {

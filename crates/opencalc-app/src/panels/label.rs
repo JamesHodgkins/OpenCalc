@@ -46,7 +46,9 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, edits: &mut Vec
     egui::Window::new("Label")
         .open(&mut open)
         .collapsible(false)
-        .resizable(false)
+        .resizable([true, false])
+        .default_width(320.0)
+        .min_width(240.0)
         .pivot(Align2::CENTER_CENTER)
         .default_pos(super::default_pos(ctx, Align2::CENTER_CENTER, [0.0, 0.0]))
         .show(ctx, |ui| {
@@ -56,7 +58,7 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, edits: &mut Vec
                 egui::TextEdit::singleline(&mut form.text)
                     .char_limit(MAX_LABEL_CHARS)
                     .hint_text("Label")
-                    .desired_width(260.0),
+                    .desired_width(ui.available_width()),
             );
             if fresh {
                 field.request_focus();

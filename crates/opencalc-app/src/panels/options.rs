@@ -29,8 +29,8 @@ pub const THEMES: [(PaletteKey, CommandId); 2] = [
 mod sections;
 
 const NAV_WIDTH: f32 = 160.0;
-const PANE_WIDTH: f32 = 430.0;
-const HEIGHT: f32 = 360.0;
+/// Room kept below the list and the page for the row of buttons.
+const FOOTER: f32 = 48.0;
 /// Width of the column of setting names.
 const NAME_WIDTH: f32 = 140.0;
 const ROW: f32 = 30.0;
@@ -85,17 +85,23 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, change: &mut Op
     egui::Window::new("Options")
         .open(&mut open)
         .collapsible(false)
-        .resizable(false)
+        .resizable(true)
+        .default_size([620.0, 440.0])
+        .min_size([520.0, 340.0])
         .pivot(Align2::CENTER_CENTER)
         .default_pos(super::default_pos(ctx, Align2::CENTER_CENTER, [0.0, 0.0]))
         .show(ctx, |ui| {
             let t = &state.theme;
+            // The list and the page fill the window: what is left after the buttons
+            // below them is the height, and after the list the width.
+            let height = (ui.available_height() - FOOTER).max(200.0);
+            let pane_width = (ui.available_width() - NAV_WIDTH - 1.0 - 12.0 - 16.0).max(240.0);
             ui.horizontal_top(|ui| {
                 ui.allocate_ui_with_layout(
-                    vec2(NAV_WIDTH, HEIGHT),
+                    vec2(NAV_WIDTH, height),
                     Layout::top_down(Align::Min),
                     |ui| {
-                        ui.set_min_size(vec2(NAV_WIDTH, HEIGHT));
+                        ui.set_min_size(vec2(NAV_WIDTH, height));
                         for s in Section::ALL {
                             if nav_row(ui, t, s, s == section) {
                                 section = s;
@@ -104,14 +110,14 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, change: &mut Op
                     },
                 );
                 // A one-pixel divider between the list and the page.
-                let (line, _) = ui.allocate_exact_size(vec2(1.0, HEIGHT), Sense::hover());
+                let (line, _) = ui.allocate_exact_size(vec2(1.0, height), Sense::hover());
                 ui.painter().rect_filled(line, 0.0, t.border);
                 ui.add_space(12.0);
                 ui.allocate_ui_with_layout(
-                    vec2(PANE_WIDTH, HEIGHT),
+                    vec2(pane_width, height),
                     Layout::top_down(Align::Min),
                     |ui| {
-                        ui.set_min_size(vec2(PANE_WIDTH, HEIGHT));
+                        ui.set_min_size(vec2(pane_width, height));
                         ui.label(
                             RichText::new(section.label())
                                 .size(type_size::HEADING)
@@ -222,7 +228,7 @@ pub(super) fn row(ui: &mut Ui, t: &Theme, name: &str, help: &str, control: impl 
             t.text,
         );
         ui.vertical(|ui| {
-            ui.set_width(PANE_WIDTH - NAME_WIDTH - 24.0);
+            ui.set_width(ui.available_width().max(120.0));
             ui.horizontal(|ui| {
                 ui.set_min_height(ROW - 6.0);
                 control(ui);
