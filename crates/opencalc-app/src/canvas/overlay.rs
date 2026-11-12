@@ -222,7 +222,7 @@ pub(super) fn move_crosshair(ui: &Ui, regions: &[Region], st: &mut CanvasUi) {
     }
     let g = st.grid.step();
     let at = st.insert_at + Vec2::new(f32::from(dx) * g, f32::from(dy) * g);
-    st.insert_at = super::view::snap(Pos2::new(at.x.max(0.0), at.y.max(0.0)), g);
+    st.insert_at = st.snapper.snap(Pos2::new(at.x.max(0.0), at.y.max(0.0)));
     st.selection.clear();
     st.armed = true;
     // Moving onto an existing region hands control to it: the crosshair gives way
@@ -253,7 +253,7 @@ pub(super) fn leave_toward(st: &mut CanvasUi, region: &Region, (dx, dy): (i8, i8
         (_, -1) => Pos2::new(cx, (r.min.y - gap).max(0.0)),
         _ => Pos2::new(cx, r.max.y + gap),
     };
-    st.insert_at = super::view::snap(at, st.grid.step());
+    st.insert_at = st.snapper.snap(at);
     st.selection.clear();
     st.armed = true;
 }
@@ -262,7 +262,7 @@ pub(super) fn leave_toward(st: &mut CanvasUi, region: &Region, (dx, dy): (i8, i8
 /// the finished region, nothing stays selected, and typing starts a new math region.
 pub(super) fn next_input_below(st: &mut CanvasUi, region: &Region) {
     let r = rect_of(region, &st.sizes);
-    st.insert_at = super::view::snap(Pos2::new(r.min.x, r.max.y + 12.0), st.grid.step());
+    st.insert_at = st.snapper.snap(Pos2::new(r.min.x, r.max.y + 12.0));
     st.selection.clear();
     st.armed = true;
 }

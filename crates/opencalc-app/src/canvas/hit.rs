@@ -5,7 +5,7 @@ use eframe::egui::{Pos2, Rect, Vec2};
 use opencalc_core::document::{Region, RegionId, RegionKind};
 
 use super::adapt::{rect_of, Sizes};
-use super::view::snap;
+use super::view::Snapper;
 
 /// The regions in the order they are painted, back to front: by draw order (`z`),
 /// then list order. The list itself is calculation order and is never reordered.
@@ -74,13 +74,13 @@ pub fn in_marquee(regions: &[Region], sizes: &Sizes, marquee: Rect) -> Vec<Regio
 pub fn drag_positions(
     origins: &[(RegionId, Pos2)],
     total: Vec2,
-    grid: Option<f32>,
+    grid: Option<Snapper>,
 ) -> Vec<(RegionId, Pos2)> {
     let Some(&(_, lead)) = origins.first() else {
         return Vec::new();
     };
     let delta = match grid {
-        Some(g) => snap(lead + total, g) - lead,
+        Some(g) => g.snap(lead + total) - lead,
         None => total,
     };
     origins.iter().map(|&(id, p)| (id, p + delta)).collect()
@@ -249,7 +249,7 @@ mod tests {
     fn drag_with_grid_snaps_the_lead_and_keeps_group_offsets() {
         let a = (RegionId(1), Pos2::new(13.0, 13.0));
         let b = (RegionId(2), Pos2::new(53.0, 93.0));
-        let out = drag_positions(&[a, b], Vec2::new(9.0, 9.0), Some(20.0));
+        let out = drag_positions(&[a, b], Vec2::new(9.0, 9.0), Some(Snapper::plain(20.0)));
         assert_eq!(out[0].1, Pos2::new(20.0, 20.0));
         assert_eq!(out[1].1 - out[0].1, b.1 - a.1);
     }
@@ -261,8 +261,8 @@ mod tests {
         for _ in 0..1000 {
             total += Vec2::new(0.1, 0.1);
         }
-        let stepped = drag_positions(&[a], total, Some(20.0));
-        let direct = drag_positions(&[a], Vec2::new(100.0, 100.0), Some(20.0));
+        let stepped = drag_positions(&[a], total, Some(Snapper::plain(20.0)));
+        let direct = drag_positions(&[a], Vec2::new(100.0, 100.0), Some(Snapper::plain(20.0)));
         assert_eq!(stepped[0].1, direct[0].1);
     }
 

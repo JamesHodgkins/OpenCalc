@@ -114,6 +114,8 @@ pub struct CanvasUi {
     pub insert_at: Pos2,
     /// The snap grid (from the settings; `OpenSheet::set_grid` changes it).
     pub grid: crate::settings::GridSpacing,
+    /// That grid anchored to the page margins, as of the last frame.
+    pub snapper: view::Snapper,
     /// The last click was on blank page, so typing starts a math region there.
     pub armed: bool,
     /// Content sizes measured by the last paint.
@@ -141,6 +143,7 @@ impl Default for CanvasUi {
             pen: None,
             insert_at: Pos2::new(40.0, 40.0),
             grid: Default::default(),
+            snapper: view::Snapper::plain(crate::settings::GridSpacing::default().step()),
             // The initial insertion point is ready for type-to-create, just like
             // the point after moving the crosshair or clicking the blank page.
             armed: true,
@@ -205,13 +208,21 @@ pub fn show(
         st.fit_pending = false;
     }
     pointer::navigate(ui, &resp, origin, view);
+    st.snapper = view::Snapper::new(st.grid.step(), &env.page, env.draft);
 
     // The pages, and the grid inside their margins. Pages exist as far down as content reaches.
     let pages = page::page_count(&env.page, page::content_bottom(regions, &st.sizes));
     for screen in page::paint(&painter, rect, view, origin, &env.page, pages, env) {
         if env.show_grid {
             let on_page = painter.with_clip_rect(screen.intersect(rect));
-            grid::grid(&on_page, screen, view, origin, env.paper, st.grid);
+            // The lattice starts at the margin box. In page view `screen` is that box;
+            // in draft view it is the whole sheet, so step in by the margin.
+            let anchor = if env.draft {
+                screen.min + Vec2::splat(env.page.margin() * view.zoom)
+            } else {
+                screen.min
+            };
+            grid::grid(&on_page, screen, view, anchor, env.paper, st.grid);
         }
     }
 

@@ -503,8 +503,12 @@ fn clicking_selects_and_dragging_moves_a_region() {
     let moved = h.region_pos(F);
     // Snapped to the grid, and moved about (100, 60) from where it began.
     let grid = h.sheet().canvas.grid.step();
-    assert_eq!(moved.x % grid, 0.0);
-    assert_eq!(moved.y % grid, 0.0);
+    // "On the grid" means a whole number of steps from the margin corner.
+    let margin = h.sheet().doc.page().margin();
+    for (v, name) in [(moved.x, "x"), (moved.y, "y")] {
+        let k = (v - margin) / grid;
+        assert!((k - k.round()).abs() < 1e-3, "{name} {v} is off the grid");
+    }
     assert!(
         (moved.x - start.x - 100.0).abs() <= grid,
         "x: {moved:?} from {start:?}"

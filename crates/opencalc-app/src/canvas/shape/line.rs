@@ -5,6 +5,7 @@ use eframe::egui::{Color32, Painter, Pos2, Shape, Stroke, Vec2};
 use opencalc_core::document::{Arrowhead, Dash, Point, ShapeSpec, Size};
 
 use super::MIN_DRAG;
+use crate::canvas::view::Snapper;
 
 /// Fifteen degrees, the steps a constrained line turns in.
 const ANGLE_STEP: f32 = std::f32::consts::PI / 12.0;
@@ -29,13 +30,13 @@ pub(in crate::canvas) fn constrained(start: Pos2, end: Pos2) -> Pos2 {
 pub(in crate::canvas) fn drawn_line(
     start: Pos2,
     end: Pos2,
-    grid: Option<f32>,
+    grid: Option<Snapper>,
     constrain: bool,
     centre: bool,
 ) -> (Point, Point) {
     let dragged = (end - start).abs();
     let (mut a, mut b) = if dragged.x < MIN_DRAG && dragged.y < MIN_DRAG {
-        let at = grid.map_or(start, |g| crate::canvas::view::snap(start, g));
+        let at = grid.map_or(start, |g| g.snap(start));
         let half = DEFAULT_LINE / 2.0;
         if centre {
             (at - Vec2::new(half, 0.0), at + Vec2::new(half, 0.0))
@@ -43,7 +44,7 @@ pub(in crate::canvas) fn drawn_line(
             (at, at + Vec2::new(DEFAULT_LINE, 0.0))
         }
     } else {
-        let snap_to = |p: Pos2| grid.map_or(p, |g| crate::canvas::view::snap(p, g));
+        let snap_to = |p: Pos2| grid.map_or(p, |g| g.snap(p));
         let a = snap_to(start);
         let b = if constrain {
             constrained(a, end)

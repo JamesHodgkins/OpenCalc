@@ -78,7 +78,7 @@ pub(super) fn pen_preview(
 ) {
     if let (Some(kind), Some(Drag::Draw { start, current })) = (st.pen, &st.drag) {
         let mods = ui.input(|i| i.modifiers);
-        let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+        let grid = (env.snap && !mods.alt).then_some(st.snapper);
         if kind == ShapeKind::Line {
             let (from, to) = shape::drawn_line(
                 *start,

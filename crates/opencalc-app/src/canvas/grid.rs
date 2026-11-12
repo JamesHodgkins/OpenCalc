@@ -8,12 +8,14 @@ use crate::theme::Theme;
 
 /// Minor lines at the snap grid, a stronger line every inch (or centimetre, for a
 /// millimetre grid). When zoomed out far enough that lines would crowd, the
-/// spacing steps up by five.
+/// spacing steps up by five. `anchor` is where the lattice starts on screen: the
+/// top left of the margin box, so the lines meet the margins (and snapping, which
+/// starts from the same corner, lands on them).
 pub fn grid(
     painter: &Painter,
     rect: Rect,
     view: &CanvasView,
-    origin: Pos2,
+    anchor: Pos2,
     theme: &Theme,
     spacing: GridSpacing,
 ) {
@@ -23,7 +25,7 @@ pub fn grid(
         step *= 5.0;
         major_every *= 5;
     }
-    let base = origin + view.offset;
+    let base = anchor;
     let minor = Stroke::new(1.0_f32, theme.raised);
     // A little fainter than the border colour: halfway to the minor lines.
     let major = Stroke::new(1.0_f32, theme.raised.lerp_to_gamma(theme.border, 0.5));

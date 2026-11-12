@@ -8,7 +8,6 @@ pub(super) mod drag;
 
 use super::adapt::rect_of;
 use super::hit::{click_selection, hit_stack, hit_test, pick_under};
-use super::view::snap;
 use super::{grip, resize, shape, unit_slot, CanvasCmd, CanvasUi, CanvasView, Drag, Scene};
 use drag::{begin_drag, continue_drag, end_drag};
 
@@ -73,7 +72,7 @@ fn draw_with_pen(
         env, view, origin, ..
     } = *scene;
     let mods = ui.input(|i| i.modifiers);
-    let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+    let grid = (env.snap && !mods.alt).then_some(st.snapper);
     let (square, centre) = (mods.shift, mods.ctrl || mods.command);
     let to_doc = |p: Pos2| view.screen_to_doc(p, origin);
     if resp.hovered() {
@@ -248,7 +247,7 @@ fn click(
         }
         st.armed = hit.is_none();
         if hit.is_none() {
-            st.insert_at = snap(doc, st.grid.step());
+            st.insert_at = st.snapper.snap(doc);
         }
     }
 }
