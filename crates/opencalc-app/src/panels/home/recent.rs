@@ -1,14 +1,15 @@
-//! The Recent section of the Home page: the worksheets opened or saved lately, as
-//! cards with their name, folder, age and size.
+//! The Recent section of the Home page: pinned worksheets, then the ones opened or
+//! saved lately, as cards with a picture of the first page, the name, folder, age
+//! and size. A card can be pinned and has a menu.
 
-use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use eframe::egui::{
-    self, text::LayoutJob, Align2, Color32, CornerRadius, FontId, Pos2, Rect, Sense, Stroke,
-    StrokeKind, TextFormat, Ui, Vec2,
+    self, popup::popup_below_widget, text::LayoutJob, Align2, Color32, CornerRadius, FontId, Id,
+    PopupCloseBehavior, Pos2, Rect, Sense, Stroke, StrokeKind, TextFormat, Ui, Vec2,
 };
 
+use super::info::{info, meta_text, visible_fraction, Info};
 use super::layout::columns;
 use crate::app::AppState;
 use crate::commands::CommandId;
@@ -17,75 +18,9 @@ use crate::theme::{metrics, type_size, Theme};
 
 const CARD_MIN_W: f32 = 190.0;
 const CARD_GAP: f32 = 12.0;
-const PREVIEW_H: f32 = 72.0;
+const PREVIEW_H: f32 = 112.0;
 const INFO_H: f32 = 64.0;
-
-/// What is known about a file on the recent list.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Info {
-    pub name: String,
-    pub folder: String,
-    /// `None` when the file is no longer there.
-    pub found: Option<(SystemTime, u64)>,
-    pub template: bool,
-}
-
-pub fn info(path: &Path) -> Info {
-    let name = path.file_name().map_or_else(
-        || path.to_string_lossy().into_owned(),
-        |f| f.to_string_lossy().into_owned(),
-    );
-    let folder = path
-        .parent()
-        .map(|p| p.display().to_string())
-        .unwrap_or_default();
-    let found = std::fs::metadata(path)
-        .ok()
-        .and_then(|m| Some((m.modified().ok()?, m.len())));
-    let template = path
-        .extension()
-        .is_some_and(opencalc_core::persist::is_template_extension);
-    Info {
-        name,
-        folder,
-        found,
-        template,
-    }
-}
-
-/// "just now", "5 minutes ago", "3 days ago".
-pub fn age_text(elapsed_secs: u64) -> String {
-    let (n, unit) = match elapsed_secs {
-        0..=59 => return "just now".to_owned(),
-        60..=3599 => (elapsed_secs / 60, "minute"),
-        3600..=86_399 => (elapsed_secs / 3600, "hour"),
-        86_400..=2_591_999 => (elapsed_secs / 86_400, "day"),
-        2_592_000..=31_535_999 => (elapsed_secs / 2_592_000, "month"),
-        _ => (elapsed_secs / 31_536_000, "year"),
-    };
-    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
-}
-
-/// "812 B", "12 KB", "1.4 MB".
-pub fn size_text(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{bytes} B")
-    } else if bytes < 1024 * 1024 {
-        format!("{} KB", (bytes as f64 / 1024.0).round() as u64)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-    }
-}
-
-fn meta_text(info: &Info, now: SystemTime) -> String {
-    match info.found {
-        Some((modified, bytes)) => {
-            let secs = now.duration_since(modified).map_or(0, |d| d.as_secs());
-            format!("{} \u{b7} {}", age_text(secs), size_text(bytes))
-        }
-        None => "Missing".to_owned(),
-    }
-}
+const BUTTON: f32 = 24.0;
 
 /// One line of text, cut with an ellipsis where it would run past `width`.
 fn one_line(
@@ -106,16 +41,42 @@ fn one_line(
     ui.fonts(|f| f.layout_job(job))
 }
 
+/// A file on the list: its place in `state.recent`, and what is known of it.
+struct Entry {
+    n: usize,
+    path: std::path::PathBuf,
+    info: Info,
+    pinned: bool,
+}
+
 pub fn section(ui: &mut Ui, state: &AppState, width: f32, out: &mut Commands) {
     let theme = state.theme;
+    let entries: Vec<Entry> = state
+        .recent
+        .iter()
+        .enumerate()
+        .map(|(n, path)| Entry {
+            n,
+            path: path.clone(),
+            info: info(path),
+            pinned: state.pinned.contains(path),
+        })
+        .collect();
+    let (pinned, recent): (Vec<&Entry>, Vec<&Entry>) = entries.iter().partition(|e| e.pinned);
+    if !pinned.is_empty() {
+        super::section_label(ui, &theme, "Pinned");
+        ui.add_space(6.0);
+        grid(ui, state, width, &pinned, out);
+        ui.add_space(12.0);
+    }
     ui.horizontal(|ui| {
         ui.set_width(width);
         super::section_label(ui, &theme, "Recent worksheets");
-        if !state.recent.is_empty() {
+        if !recent.is_empty() {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
-                    .add(egui::Button::new("Clear list").small())
-                    .on_hover_text("Forget the recent worksheets (the files are not touched)")
+                    .add(egui::Button::new("Clear unpinned").small())
+                    .on_hover_text("Forget the recent worksheets that are not pinned (the files are not touched)")
                     .clicked()
                 {
                     out.push(CommandId::FileClearRecent);
@@ -124,36 +85,93 @@ pub fn section(ui: &mut Ui, state: &AppState, width: f32, out: &mut Commands) {
         }
     });
     ui.add_space(6.0);
-    if state.recent.is_empty() {
-        ui.label(
-            egui::RichText::new("Worksheets you open or save appear here.").color(theme.text_weak),
-        );
+    if recent.is_empty() {
+        let text = if pinned.is_empty() {
+            "Worksheets you open or save appear here."
+        } else {
+            "Nothing else lately."
+        };
+        ui.label(egui::RichText::new(text).color(theme.text_weak));
         return;
     }
+    grid(ui, state, width, &recent, out);
+}
+
+fn grid(ui: &mut Ui, state: &AppState, width: f32, entries: &[&Entry], out: &mut Commands) {
+    let theme = state.theme;
     let now = SystemTime::now();
     let per_row = columns(width, CARD_MIN_W, CARD_GAP, 4);
     let card_w = (width - CARD_GAP * (per_row as f32 - 1.0)) / per_row as f32;
-    let infos: Vec<(usize, PathBuf, Info)> = state
-        .recent
-        .iter()
-        .enumerate()
-        .map(|(n, p)| (n, p.clone(), info(p)))
-        .collect();
-    for row in infos.chunks(per_row) {
+    for row in entries.chunks(per_row) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = CARD_GAP;
-            for (n, path, info) in row {
-                if card(ui, &theme, card_w, path, info, now) {
-                    out.push(CommandId::OpenRecent(*n as u8));
-                }
+            for entry in row {
+                card(ui, state, &theme, card_w, entry, now, out);
             }
         });
         ui.add_space(CARD_GAP - ui.spacing().item_spacing.y);
     }
 }
 
-/// One card; returns whether it was clicked.
-fn card(ui: &mut Ui, theme: &Theme, width: f32, path: &Path, info: &Info, now: SystemTime) -> bool {
+/// The picture area of a card: the first page if it has been drawn, else a glyph.
+fn preview(ui: &Ui, state: &AppState, theme: &Theme, rect: Rect, entry: &Entry) {
+    let painter = ui.painter_at(rect);
+    let top_radius = CornerRadius {
+        nw: metrics::WINDOW_RADIUS,
+        ne: metrics::WINDOW_RADIUS,
+        sw: 0,
+        se: 0,
+    };
+    painter.rect_filled(rect, top_radius, theme.base);
+    let texture = entry
+        .info
+        .found
+        .and_then(|stamp| state.thumbs.texture(ui.ctx(), &entry.path, stamp));
+    if let Some(texture) = texture {
+        let f = visible_fraction(rect.width(), rect.height(), texture.size());
+        let uv = Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, f));
+        painter.image(texture.id(), rect.shrink(1.0), uv, Color32::WHITE);
+        return;
+    }
+    let missing = entry.info.found.is_none();
+    let glyph = if entry.info.template {
+        crate::icons::TEMPLATE
+    } else {
+        crate::icons::FILE_TEXT
+    };
+    painter.text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        glyph,
+        FontId::proportional(30.0),
+        if missing {
+            theme.text_disabled
+        } else {
+            theme.text_weak
+        },
+    );
+    if missing {
+        painter.text(
+            rect.center() + Vec2::new(0.0, 26.0),
+            Align2::CENTER_CENTER,
+            "Missing",
+            FontId::proportional(type_size::SMALL),
+            theme.text_weak,
+        );
+    }
+}
+
+/// One card. A click opens the file; the pin button and the menu button act on it.
+fn card(
+    ui: &mut Ui,
+    state: &AppState,
+    theme: &Theme,
+    width: f32,
+    entry: &Entry,
+    now: SystemTime,
+    out: &mut Commands,
+) {
+    let info = &entry.info;
     let missing = info.found.is_none();
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, PREVIEW_H + INFO_H), Sense::click());
     let painter = ui.painter_at(rect);
@@ -164,51 +182,30 @@ fn card(ui: &mut Ui, theme: &Theme, width: f32, path: &Path, info: &Info, now: S
         radius,
         if hovered { theme.raised } else { theme.surface },
     );
-    // The preview: no thumbnail yet, so a file glyph on a sunken field.
-    let preview = Rect::from_min_size(rect.min, Vec2::new(width, PREVIEW_H));
-    let top_radius = CornerRadius {
-        nw: metrics::WINDOW_RADIUS,
-        ne: metrics::WINDOW_RADIUS,
-        sw: 0,
-        se: 0,
-    };
-    painter.rect_filled(preview, top_radius, theme.base);
-    let glyph = if info.template {
-        crate::icons::TEMPLATE
-    } else {
-        crate::icons::FILE_TEXT
-    };
-    painter.text(
-        preview.center(),
-        Align2::CENTER_CENTER,
-        glyph,
-        FontId::proportional(30.0),
-        if missing {
-            theme.text_disabled
-        } else {
-            theme.text_weak
-        },
-    );
-    // A badge for the kind of file.
+    let area = Rect::from_min_size(rect.min, Vec2::new(width, PREVIEW_H));
+    preview(ui, state, theme, area, entry);
+    // A badge for the kind of file, and a pin mark on a pinned one.
     let badge = if info.template { "OCALCT" } else { "OCALC" };
-    let badge_galley = one_line(ui, badge, type_size::SMALL, theme.text_weak, width);
+    let badge_galley = one_line(ui, badge, type_size::SMALL, theme.text, width);
     let badge_rect = Rect::from_min_size(
-        preview.min + Vec2::new(8.0, 8.0),
+        area.min + Vec2::new(8.0, 8.0),
         badge_galley.size() + Vec2::new(10.0, 4.0),
     );
-    painter.rect_filled(badge_rect, 3.0, theme.raised);
+    painter.rect_filled(badge_rect, 3.0, theme.raised.gamma_multiply(0.92));
     painter.galley(
         badge_rect.min + Vec2::new(5.0, 2.0),
         badge_galley,
-        theme.text_weak,
+        theme.text,
     );
-    if missing {
+    if entry.pinned {
+        let at = Pos2::new(area.right() - 16.0, area.top() + 16.0);
+        painter.circle_filled(at, 11.0, theme.raised.gamma_multiply(0.92));
         painter.text(
-            preview.center() + Vec2::new(0.0, 26.0),
+            at,
             Align2::CENTER_CENTER,
-            "Missing",
-            FontId::proportional(type_size::SMALL),
-            theme.text_weak,
+            crate::icons::PIN,
+            FontId::proportional(13.0),
+            theme.text,
         );
     }
     // Name, folder, age and size.
@@ -243,42 +240,121 @@ fn card(ui: &mut Ui, theme: &Theme, width: f32, path: &Path, info: &Info, now: S
     if hovered {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    let tip = if missing {
-        format!("{}\nThis file is no longer there", path.display())
-    } else {
-        path.display().to_string()
+
+    // The two small buttons at the bottom right: the menu, and the pin.
+    let id = Id::new(("recent-card", entry.n));
+    let at = |k: f32| {
+        Rect::from_min_size(
+            Pos2::new(
+                rect.right() - 8.0 - BUTTON * k - 2.0 * (k - 1.0),
+                rect.bottom() - 8.0 - BUTTON,
+            ),
+            Vec2::splat(BUTTON),
+        )
     };
-    resp.on_hover_text(tip).clicked()
+    let more = button(
+        ui,
+        theme,
+        at(1.0),
+        crate::icons::MORE,
+        id.with("more"),
+        false,
+    );
+    let pin_glyph = if entry.pinned {
+        crate::icons::PIN_OFF
+    } else {
+        crate::icons::PIN
+    };
+    let pin = button(ui, theme, at(2.0), pin_glyph, id.with("pin"), entry.pinned);
+    let pin_tip = if entry.pinned {
+        "Unpin"
+    } else {
+        "Pin to the top"
+    };
+    if pin.on_hover_text(pin_tip).clicked() {
+        out.push(CommandId::PinRecent(entry.n as u8));
+    }
+    let menu_id = id.with("menu");
+    if more.on_hover_text("More").clicked() {
+        ui.memory_mut(|m| m.toggle_popup(menu_id));
+    }
+    popup_below_widget(
+        ui,
+        menu_id,
+        &more_anchor(ui, at(1.0), id),
+        PopupCloseBehavior::CloseOnClick,
+        |ui| menu(ui, entry, out),
+    );
+    resp.context_menu(|ui| menu(ui, entry, out));
+    // A click on the card itself (a button over it takes its own) opens the file.
+    if resp.clicked() && !missing {
+        out.push(CommandId::OpenRecent(entry.n as u8));
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// A response standing for the menu button, for a popup to hang below.
+fn more_anchor(ui: &Ui, rect: Rect, id: Id) -> egui::Response {
+    ui.interact(rect, id.with("more-anchor"), Sense::hover())
+}
 
-    #[test]
-    fn ages_read_naturally() {
-        assert_eq!(age_text(5), "just now");
-        assert_eq!(age_text(60), "1 minute ago");
-        assert_eq!(age_text(150), "2 minutes ago");
-        assert_eq!(age_text(3600), "1 hour ago");
-        assert_eq!(age_text(86_400 * 3), "3 days ago");
-        assert_eq!(age_text(86_400 * 60), "2 months ago");
-        assert_eq!(age_text(86_400 * 800), "2 years ago");
+/// A small square icon button; `lit` draws it as switched on.
+fn button(
+    ui: &mut Ui,
+    theme: &Theme,
+    rect: Rect,
+    glyph: char,
+    id: Id,
+    lit: bool,
+) -> egui::Response {
+    let resp = ui.interact(rect, id, Sense::click());
+    let painter = ui.painter();
+    if resp.hovered() {
+        painter.rect_filled(rect, metrics::RADIUS, theme.raised_high);
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    } else if lit {
+        painter.rect_filled(rect, metrics::RADIUS, theme.raised);
     }
+    painter.text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        glyph,
+        FontId::proportional(14.0),
+        if resp.hovered() || lit {
+            theme.text
+        } else {
+            theme.text_weak
+        },
+    );
+    resp
+}
 
-    #[test]
-    fn sizes_read_naturally() {
-        assert_eq!(size_text(812), "812 B");
-        assert_eq!(size_text(12 * 1024), "12 KB");
-        assert_eq!(size_text(1_500_000), "1.4 MB");
+/// The card's menu: what can be done with the file.
+fn menu(ui: &mut Ui, entry: &Entry, out: &mut Commands) {
+    ui.set_min_width(170.0);
+    let missing = entry.info.found.is_none();
+    if ui
+        .add_enabled(!missing, egui::Button::new("Open"))
+        .clicked()
+    {
+        out.push(CommandId::OpenRecent(entry.n as u8));
+        ui.close_menu();
     }
-
-    #[test]
-    fn a_missing_file_says_so_and_a_template_is_marked() {
-        let gone = info(Path::new("C:/nowhere/at/all/beam.ocalc"));
-        assert_eq!(gone.name, "beam.ocalc");
-        assert!(gone.found.is_none() && !gone.template);
-        assert_eq!(meta_text(&gone, SystemTime::now()), "Missing");
-        assert!(info(Path::new("x/starter.ocalct")).template);
+    let pin = if entry.pinned {
+        "Unpin"
+    } else {
+        "Pin to the top"
+    };
+    if ui.button(pin).clicked() {
+        out.push(CommandId::PinRecent(entry.n as u8));
+        ui.close_menu();
+    }
+    if ui.button("Copy path").clicked() {
+        ui.ctx().copy_text(entry.path.display().to_string());
+        ui.close_menu();
+    }
+    ui.separator();
+    if ui.button("Remove from this list").clicked() {
+        out.push(CommandId::ForgetRecent(entry.n as u8));
+        ui.close_menu();
     }
 }

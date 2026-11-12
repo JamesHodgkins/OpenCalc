@@ -8,6 +8,7 @@ use super::Commands;
 use crate::app::AppState;
 use crate::theme::{metrics, type_size, Theme};
 
+mod info;
 mod layout;
 mod recent;
 mod start;

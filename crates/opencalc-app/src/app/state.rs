@@ -88,6 +88,11 @@ pub struct AppState {
     pub dialog: Option<Dialog>,
     /// Recently opened or saved files, newest first.
     pub recent: Vec<PathBuf>,
+    /// Files pinned to the top of the Home page. They stay on the recent list
+    /// however long it grows.
+    pub pinned: Vec<PathBuf>,
+    /// Pictures of the recent files, drawn in the background.
+    pub thumbs: super::thumbs::Thumbs,
     /// The regions last copied inside the app.
     pub clip: Option<super::clipboard::Clip>,
     /// Recovery files found and not yet asked about.
@@ -135,6 +140,8 @@ impl AppState {
             find: Default::default(),
             dialog: None,
             recent: Vec::new(),
+            pinned: Vec::new(),
+            thumbs: Default::default(),
             clip: None,
             recoveries: Vec::new(),
         }
@@ -161,15 +168,11 @@ impl AppState {
         sheet
     }
 
-    /// Replace the opening blank worksheet with one made from the settings, once
-    /// they have been read (it was made before they were).
-    pub fn renew_blank_sheet(&mut self) {
-        if let [only] = self.sheets.as_slice() {
-            if only.is_pristine() {
-                let title = only.doc.title().to_owned();
-                self.sheets[0] = self.blank_sheet(&title);
-            }
-        }
+    /// Start with no worksheet open, so the program shows the Home page (the
+    /// opening blank worksheet is only there for tests and for `AppState::new`).
+    pub fn open_on_home(&mut self) {
+        self.sheets.clear();
+        self.active = None;
     }
 
     pub fn active_sheet(&self) -> Option<&OpenSheet> {

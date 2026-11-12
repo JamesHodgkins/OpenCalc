@@ -64,7 +64,8 @@ fn main() -> eframe::Result {
                     settings::read_text(&text, &mut state);
                 }
             }
-            state.renew_blank_sheet();
+            // The program opens on the Home page, not on a blank worksheet.
+            state.open_on_home();
             let _ = window.set(cc.egui_ctx.clone());
             let mut app = app::App::with_state(cc.egui_ctx.clone(), state);
             app.listen_for_files(later_files);
@@ -73,6 +74,17 @@ fn main() -> eframe::Result {
                 .and_then(|s| s.get_string("recent"))
                 .map(|list| list.lines().map(std::path::PathBuf::from).collect())
                 .unwrap_or_default();
+            app.state.pinned = cc
+                .storage
+                .and_then(|s| s.get_string("pinned"))
+                .map(|list| list.lines().map(std::path::PathBuf::from).collect())
+                .unwrap_or_default();
+            // A pinned file is always on the list.
+            for path in app.state.pinned.clone() {
+                if !app.state.recent.contains(&path) {
+                    app.state.recent.push(path);
+                }
+            }
             app.enable_autosave(app::recovery_dir());
             app.scan_recovery();
             for file in &files {

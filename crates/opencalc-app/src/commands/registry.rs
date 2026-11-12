@@ -68,6 +68,8 @@ impl Registry {
             | CommandId::PageLandscape(_)
             | CommandId::PageMarginMm(_)
             | CommandId::OpenRecent(_)
+            | CommandId::PinRecent(_)
+            | CommandId::ForgetRecent(_)
             | CommandId::GoToFinding(_)
             | CommandId::InsertMatrixSize(..)
             | CommandId::GoToLabel(_) => true,

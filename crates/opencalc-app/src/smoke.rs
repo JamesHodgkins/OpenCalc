@@ -43,6 +43,7 @@ mod pictures;
 mod plot_view;
 mod plots;
 mod properties;
+mod recent;
 mod rich_text;
 mod shapes;
 mod tables;

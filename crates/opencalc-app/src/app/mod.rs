@@ -24,6 +24,7 @@ mod options;
 mod recovery;
 mod state;
 mod templates;
+pub mod thumbs;
 mod view;
 
 use std::collections::HashMap;
@@ -268,6 +269,13 @@ impl eframe::App for App {
             .map(|p| p.to_string_lossy().into_owned())
             .collect();
         storage.set_string("recent", recent.join("\n"));
+        let pinned: Vec<String> = self
+            .state
+            .pinned
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        storage.set_string("pinned", pinned.join("\n"));
     }
 
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {

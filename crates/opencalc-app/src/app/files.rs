@@ -172,7 +172,11 @@ impl App {
                 }
             }
             Err(reason) => {
-                self.state.recent.retain(|p| p != path);
+                // A pinned file that has gone stays, so it can be unpinned.
+                let pinned = &self.state.pinned;
+                self.state
+                    .recent
+                    .retain(|p| p != path || pinned.contains(p));
                 self.state
                     .message("Could not open", format!("{}\n\n{reason}", path.display()));
             }
