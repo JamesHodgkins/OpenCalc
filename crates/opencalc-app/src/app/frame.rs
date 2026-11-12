@@ -41,20 +41,13 @@ impl App {
 
         // Edits that panels and the ribbon's controls ask for (they only read the document).
         let mut panel_edits: Vec<canvas::CanvasCmd> = Vec::new();
-        let contexts = panels::shape_controls::contexts(&self.state);
-        if let Some(c) = self.state.ribbon_focus.take() {
-            self.ribbon_state.focus = Some(c);
-        }
 
         egui::TopBottomPanel::top("ribbon-tabs")
             .exact_height(metrics::TAB_STRIP)
             .frame(bar(theme.base, 8, 0))
             .show_separator_line(false)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    self.ribbon
-                        .tab_strip(ui, &theme, &mut self.ribbon_state, &contexts)
-                });
+                ui.horizontal(|ui| self.ribbon.tab_strip(ui, &theme, &mut self.ribbon_state));
             });
 
         egui::TopBottomPanel::top("ribbon")
@@ -62,18 +55,9 @@ impl App {
             .frame(bar(theme.raised, 6, 4))
             .show_separator_line(false)
             .show(ctx, |ui| {
-                let mut host = panels::shape_controls::ShapeControls {
-                    state: &self.state,
-                    out: &mut panel_edits,
-                };
-                let out = self.ribbon.show(
-                    ui,
-                    &theme,
-                    &mut self.ribbon_state,
-                    &registry,
-                    &contexts,
-                    &mut host,
-                );
+                let out = self
+                    .ribbon
+                    .show(ui, &theme, &mut self.ribbon_state, &registry);
                 cmds.extend(out.clicked);
             });
 

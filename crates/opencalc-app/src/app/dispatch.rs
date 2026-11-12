@@ -240,7 +240,6 @@ pub fn apply_canvas(state: &mut AppState, sheet: usize, cmds: Vec<CanvasCmd>) ->
                     ..ShapeSpec::of(kind)
                 };
                 state.sheets[sheet].insert_drawn(RegionKind::Shape(Box::new(spec)), pos, size);
-                state.ribbon_focus = Some(crate::ribbon::Context::Shape);
             }
             CanvasCmd::TypeAhead(text) => {
                 let s = &mut state.sheets[sheet];

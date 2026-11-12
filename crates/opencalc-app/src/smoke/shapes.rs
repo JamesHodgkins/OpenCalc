@@ -625,71 +625,32 @@ fn the_status_bar_says_how_to_draw_only_while_the_tool_is_out() {
     assert!(h.sheet().canvas.pen.is_some());
 }
 
-fn shape_tab(h: &Harness) -> usize {
-    h.app
-        .ribbon
-        .tabs
-        .iter()
-        .position(|t| t.context == Some(crate::ribbon::Context::Shape))
-        .unwrap()
-}
-
 #[test]
-fn drawing_a_shape_brings_up_its_tab_and_deselecting_takes_it_away() {
+fn drawing_a_shape_brings_up_its_settings_and_deselecting_takes_them_away() {
+    use crate::panels::properties::{wanted, Kind};
     let mut h = Harness::new();
     h.settle();
-    let first = h.app.ribbon_state.active_tab;
-    assert_eq!(first, 0);
-    let _ = drawn_rectangle(&mut h);
+    assert_eq!(wanted(&h.app.state), None);
+    let id = drawn_rectangle(&mut h);
     h.frame();
     h.frame();
-    assert_eq!(
-        h.app.ribbon_state.active_tab,
-        shape_tab(&h),
-        "the tab comes forward"
+    assert_eq!(wanted(&h.app.state), Some(Kind::Shape));
+    // The ribbon is the same on every tab and no longer grows a tab for the shape.
+    assert!(h.app.ribbon.tabs.iter().all(|t| t.title != "Shape Format"));
+    // Several shapes selected together have no single set of settings.
+    let other = h.app.state.sheets[0].add(
+        RegionKind::shape(ShapeKind::Ellipse),
+        Point::new(300.0, 700.0),
     );
-    // Deselect: the tab is gone and the first tab is back.
+    select(&mut h, &[id, other]);
+    h.frame();
+    assert_eq!(wanted(&h.app.state), None);
     h.app.state.sheets[0].canvas.selection.clear();
     h.frame();
-    h.frame();
-    assert_eq!(h.app.ribbon_state.active_tab, 0);
-    // Selecting the shape again shows the tab but does not jump to it.
-    let id = h.sheet().doc.regions().last().unwrap().id;
+    assert_eq!(wanted(&h.app.state), None);
     select(&mut h, &[id]);
     h.frame();
-    assert_eq!(h.app.ribbon_state.active_tab, 0);
-    h.app.ribbon_state.active_tab = shape_tab(&h);
-    h.frame();
-    assert_eq!(
-        h.app.ribbon_state.active_tab,
-        shape_tab(&h),
-        "it can be picked"
-    );
-}
-
-#[test]
-fn the_shape_tab_is_the_same_height_as_every_other() {
-    let mut h = Harness::new();
-    h.settle();
-    let id = drawn_rectangle(&mut h);
-    let height = |h: &Harness| {
-        eframe::egui::containers::panel::PanelState::load(&h.ctx, eframe::egui::Id::new("ribbon"))
-            .expect("the ribbon panel")
-            .rect
-            .height()
-    };
-    h.app.ribbon_state.active_tab = 0;
-    select(&mut h, &[id]);
-    h.frame();
-    let plain = height(&h);
-    h.app.ribbon_state.active_tab = shape_tab(&h);
-    h.frame();
-    h.frame();
-    assert!(
-        (height(&h) - plain).abs() < 0.5,
-        "{} vs {plain}",
-        height(&h)
-    );
+    assert_eq!(wanted(&h.app.state), Some(Kind::Shape));
 }
 
 #[test]
@@ -815,9 +776,10 @@ fn alt_click_picks_what_lies_under_a_filled_shape_and_again_goes_further_down() 
 fn a_dragged_shape_snaps_its_edge_onto_another_regions_edge_but_not_with_snap_off() {
     let mut h = Harness::new();
     h.settle();
+    // Where the first goes, before its settings panel narrows the page.
+    let start = h.app.state.viewport.center();
     let first = drawn_rectangle(&mut h);
     let zoom = h.sheet().view.zoom;
-    let start = h.app.state.viewport.center();
     // A second rectangle lower down whose left edge is 37 units right of the first's.
     h.command(CommandId::InsertRectangle);
     let from = start + eframe::egui::vec2(37.0 * zoom, 200.0 * zoom);

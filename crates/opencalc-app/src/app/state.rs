@@ -43,9 +43,6 @@ pub struct AppState {
     /// The page in view (from 1) and the number of pages, from the last frame.
     pub page: (usize, usize),
     pub snap: bool,
-    /// Bring this contextual tab forward at the next draw (the frame hands it to
-    /// the ribbon): set when the user draws or inserts the thing it is about.
-    pub ribbon_focus: Option<crate::ribbon::Context>,
     /// Automatic calculation. Off is manual mode: nothing is calculated until the
     /// Calculate command. A session setting, never saved in a file.
     pub live_recalc: bool,
@@ -116,7 +113,6 @@ impl AppState {
             show_grid: true,
             page: (1, 1),
             snap: true,
-            ribbon_focus: None,
             live_recalc: true,
             show_functions: false,
             layout_gen: 0,

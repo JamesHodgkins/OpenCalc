@@ -1,11 +1,11 @@
 //! The Properties panel: a side panel at the right of the page that holds the
-//! settings of the selected plot, table, picture or text. It shares the window
+//! settings of the selected shape, plot, table, picture or text. It shares the window
 //! with the page instead of floating over it, so nothing it shows hides the
 //! worksheet, and it can be made wider or narrower.
 
 use eframe::egui::{self, Context, Frame, RichText};
 
-use super::{picture_window, plot_window, table_window, text_window, Commands};
+use super::{picture_window, plot_window, shape_controls, table_window, text_window, Commands};
 use crate::app::AppState;
 use crate::canvas::CanvasCmd;
 use crate::theme::type_size;
@@ -13,6 +13,7 @@ use crate::theme::type_size;
 /// What the panel is showing settings for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
+    Shape,
     Plot,
     Table,
     Picture,
@@ -22,6 +23,7 @@ pub enum Kind {
 impl Kind {
     pub fn title(self) -> &'static str {
         match self {
+            Kind::Shape => "Shape",
             Kind::Plot => "Plot",
             Kind::Table => "Table",
             Kind::Picture => "Picture",
@@ -32,7 +34,9 @@ impl Kind {
 
 /// The settings the current selection calls for, if any.
 pub fn wanted(state: &AppState) -> Option<Kind> {
-    if plot_window::selected_plot(state).is_some() {
+    if shape_controls::selected_shape(state).is_some() {
+        Some(Kind::Shape)
+    } else if plot_window::selected_plot(state).is_some() {
         Some(Kind::Plot)
     } else if table_window::selected_table(state).is_some() {
         Some(Kind::Table)
@@ -69,6 +73,7 @@ pub fn show(ctx: &Context, state: &AppState, cmds: &mut Commands, out: &mut Vec<
             egui::ScrollArea::both()
                 .auto_shrink([false, false])
                 .show(ui, |ui| match kind {
+                    Kind::Shape => shape_controls::body(ui, state, cmds, out),
                     Kind::Plot => plot_window::body(ui, state, out),
                     Kind::Table => table_window::body(ui, state, cmds, out),
                     Kind::Picture => picture_window::body(ui, state, cmds, out),
