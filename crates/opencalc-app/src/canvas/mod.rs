@@ -9,6 +9,7 @@
 mod abandon;
 pub mod adapt;
 pub mod align;
+mod chrome;
 mod editor;
 mod errors;
 mod grid;
@@ -38,6 +39,7 @@ use opencalc_core::registry::UnitSystem;
 
 use crate::theme::{type_size, Theme};
 use adapt::{rect_of, Sizes};
+use pointer::drag::Drag;
 pub use view::CanvasView;
 
 /// Read-only inputs the canvas needs besides the document.
@@ -82,35 +84,6 @@ pub enum CanvasCmd {
         size: Size,
         /// A line only: starts at the right edge, starts at the bottom edge.
         flip: (bool, bool),
-    },
-}
-
-enum Drag {
-    Move {
-        origins: Vec<(RegionId, Pos2)>,
-        total: Vec2,
-    },
-    /// A handle of the selected region being pulled; `orig` is its box when the
-    /// drag began (document space), so the result does not accumulate error.
-    Resize {
-        id: RegionId,
-        handle: resize::Handle,
-        orig: Rect,
-    },
-    /// A grip of the selected shape being pulled (the corner radius of a rectangle).
-    /// `fixed` is the end of a line that stays put (document space).
-    Grip {
-        id: RegionId,
-        grip: grip::Grip,
-        fixed: Pos2,
-    },
-    /// A shape being drawn with the drawing tool.
-    Draw { start: Pos2, current: Pos2 },
-    Marquee {
-        start: Pos2,
-        current: Pos2,
-        /// Selection to keep when the marquee extends rather than replaces it.
-        base: Vec<RegionId>,
     },
 }
 
@@ -258,51 +231,7 @@ pub fn show(
         }
     }
 
-    let outline = Stroke::new(1.5_f32, theme.accent);
-    // A lone resizable object gets a thin grey frame on its edge with round
-    // grips, as in Office; other selections keep the accent outline.
-    let grey = Stroke::new(1.0_f32, theme.text_weak);
-    for id in &st.selection {
-        if let Some(r) = regions.iter().find(|r| r.id == *id) {
-            let inner = view.rect_to_screen(rect_of(r, &st.sizes), origin);
-            if st.selection.len() == 1 && pointer::resizable(r) {
-                // A line has no box to pull: its two ends are its grips.
-                if pointer::has_handles(r) {
-                    painter.rect_stroke(inner, 0.0, grey, StrokeKind::Middle);
-                    for h in resize::Handle::ALL {
-                        let at = h.point(inner);
-                        let radius = pointer::HANDLE_SIZE / 2.0;
-                        painter.circle_filled(at, radius, eframe::egui::Color32::WHITE);
-                        painter.circle_stroke(
-                            at,
-                            radius,
-                            Stroke::new(1.0_f32, eframe::egui::Color32::BLACK),
-                        );
-                    }
-                }
-                for (g, at) in grip::grips(r, inner, view.zoom) {
-                    let radius = pointer::HANDLE_SIZE / 2.0;
-                    if g == grip::Grip::Corner {
-                        painter.circle_filled(at, radius, theme.accent);
-                        painter.circle_stroke(
-                            at,
-                            radius,
-                            Stroke::new(1.0_f32, eframe::egui::Color32::WHITE),
-                        );
-                    } else {
-                        painter.circle_filled(at, radius, eframe::egui::Color32::WHITE);
-                        painter.circle_stroke(
-                            at,
-                            radius,
-                            Stroke::new(1.0_f32, eframe::egui::Color32::BLACK),
-                        );
-                    }
-                }
-            } else {
-                painter.rect_stroke(inner.expand(2.0), 2.0, outline, StrokeKind::Outside);
-            }
-        }
-    }
+    chrome::selection(&painter, theme, regions, view, origin, st);
 
     overlay::marks(ui, &painter, view, origin, regions, st, theme);
     // Regions with a Find match: a light wash, stronger on the current one.
@@ -358,35 +287,7 @@ pub fn show(
             Stroke::new(1.0_f32, theme.accent.gamma_multiply(0.8)),
         );
     }
-    if let (Some(kind), Some(Drag::Draw { start, current })) = (st.pen, &st.drag) {
-        let mods = ui.input(|i| i.modifiers);
-        let grid = (env.snap && !mods.alt).then_some(st.grid.step());
-        if kind == ShapeKind::Line {
-            let (from, to) = shape::drawn_line(
-                *start,
-                *current,
-                grid,
-                mods.shift,
-                mods.ctrl || mods.command,
-            );
-            let a = view.doc_to_screen(Pos2::new(from.x, from.y), origin);
-            let b = view.doc_to_screen(Pos2::new(to.x, to.y), origin);
-            painter.line_segment([a, b], Stroke::new(1.5_f32, theme.accent));
-        }
-        let (pos, size) = shape::drawn_box(
-            kind,
-            *start,
-            *current,
-            grid,
-            mods.shift,
-            mods.ctrl || mods.command,
-        );
-        let band = view.rect_to_screen(
-            Rect::from_min_size(Pos2::new(pos.x, pos.y), Vec2::new(size.w, size.h)),
-            origin,
-        );
-        shape::preview(&painter, kind, band, theme.accent);
-    }
+    chrome::pen_preview(ui, &painter, env, theme, view, origin, st);
     painter.text(
         rect.min + Vec2::new(10.0, 8.0),
         egui::Align2::LEFT_TOP,
