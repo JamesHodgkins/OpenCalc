@@ -126,6 +126,8 @@ pub struct CanvasUi {
     /// Fit the page width into the viewport on the next frame (set when a
     /// worksheet is first shown).
     pub fit_pending: bool,
+    /// Viewport width at the last frame, so a resize can keep the view centred.
+    last_width: f32,
     /// Lines to show where the drag in progress snapped to another region's edge.
     guides: Vec<magnet::Guide>,
     drag: Option<Drag>,
@@ -153,6 +155,7 @@ impl Default for CanvasUi {
             nudging: false,
             sizes: Sizes::new(),
             fit_pending: true,
+            last_width: 0.0,
             guides: Vec::new(),
             drag: None,
         }
@@ -212,7 +215,12 @@ pub fn show(
     if st.fit_pending && rect.width() > 1.0 {
         *view = page::fit_width(&env.page, rect.size());
         st.fit_pending = false;
+    } else if st.last_width > 1.0 && rect.width() > 1.0 {
+        // On a resize keep the same document point at the middle of the viewport,
+        // so a centred page stays centred.
+        view.offset.x += (rect.width() - st.last_width) / 2.0;
     }
+    st.last_width = rect.width();
     pointer::navigate(ui, &resp, origin, view);
     st.snapper = view::Snapper::new(st.grid.step(), &env.page, env.draft);
 

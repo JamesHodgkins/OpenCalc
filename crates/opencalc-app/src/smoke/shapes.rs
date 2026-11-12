@@ -725,7 +725,13 @@ fn alt_click_picks_what_lies_under_a_filled_shape_and_again_goes_further_down() 
         (a, b)
     };
     h.frame();
-    let at = h.app.state.viewport.center();
+    // The page keeps its middle when the settings panel narrows the view, so find
+    // the spot on the screen each time.
+    let spot = |h: &Harness| {
+        h.sheet()
+            .view
+            .doc_to_screen(centre, h.app.state.viewport.min)
+    };
     let alt_click = |h: &mut Harness, at: eframe::egui::Pos2| {
         let m = Modifiers::ALT;
         h.held = m;
@@ -757,6 +763,7 @@ fn alt_click_picks_what_lies_under_a_filled_shape_and_again_goes_further_down() 
         top.len() >= 2 && top.contains(&a) && top.contains(&b),
         "{top:?}"
     );
+    let at = spot(&h);
     alt_click(&mut h, at);
     assert_eq!(
         h.sheet().canvas.selection,
@@ -767,6 +774,7 @@ fn alt_click_picks_what_lies_under_a_filled_shape_and_again_goes_further_down() 
     for _ in 0..10 {
         h.frame();
     }
+    let at = spot(&h);
     alt_click(&mut h, at + eframe::egui::vec2(20.0, 10.0));
     let next = h.sheet().canvas.selection[0];
     assert_ne!(next, top[1], "a second Alt+click moves on");
@@ -777,9 +785,17 @@ fn a_dragged_shape_snaps_its_edge_onto_another_regions_edge_but_not_with_snap_of
     let mut h = Harness::new();
     h.settle();
     // Where the first goes, before its settings panel narrows the page.
-    let start = h.app.state.viewport.center();
+    let origin = h.app.state.viewport.min;
+    let start_doc = h
+        .sheet()
+        .view
+        .screen_to_doc(h.app.state.viewport.center(), origin);
     let first = drawn_rectangle(&mut h);
     let zoom = h.sheet().view.zoom;
+    let start = h
+        .sheet()
+        .view
+        .doc_to_screen(start_doc, h.app.state.viewport.min);
     // A second rectangle lower down whose left edge is 37 units right of the first's.
     h.command(CommandId::InsertRectangle);
     let from = start + eframe::egui::vec2(37.0 * zoom, 200.0 * zoom);
