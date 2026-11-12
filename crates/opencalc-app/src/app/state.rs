@@ -65,6 +65,8 @@ pub struct AppState {
     pub page_setup_open: bool,
     /// A text box (not the math editor) held the keyboard last frame.
     pub text_box_focus: bool,
+    /// A short note for the status bar ("Saved ..."), and when it was made.
+    pub notice: Option<(String, std::time::Instant)>,
     /// Draft View (one continuous sheet) instead of Page View.
     pub draft: bool,
     /// The Options window (settings such as the theme).
@@ -124,6 +126,7 @@ impl AppState {
             about_open: false,
             page_setup_open: false,
             text_box_focus: false,
+            notice: None,
             draft: false,
             options_open: false,
             file_type: (false, false),
@@ -263,6 +266,38 @@ impl AppState {
     /// mode, edited since the last calculation, and not already being calculated.
     pub fn stale_notice(&self) -> bool {
         self.results_stale() && self.calc.worker_ok && self.calc.applied == self.calc.revision
+    }
+
+    /// Say something short on the status bar, where it fades after a few seconds.
+    /// For things that went well; a problem still gets a dialog.
+    pub fn notify(&mut self, text: impl Into<String>) {
+        self.notice = Some((text.into(), std::time::Instant::now()));
+    }
+
+    /// How many errors and warnings the active worksheet's results hold, as of the
+    /// last calculation (none while the results on show belong to another sheet).
+    pub fn problem_counts(&self) -> (usize, usize) {
+        use opencalc_core::document::RegionKind;
+        let Some(sheet) = self.active_sheet() else {
+            return (0, 0);
+        };
+        if self.calc.shown_for != Some(sheet.key) {
+            return (0, 0);
+        }
+        let out = &self.output;
+        let errors = sheet
+            .doc
+            .regions()
+            .iter()
+            .filter(|r| match &r.kind {
+                RegionKind::Math(m) => {
+                    !m.source().trim().is_empty() && matches!(out.values.get(&r.id), Some(Err(_)))
+                }
+                RegionKind::Plot(_) => matches!(out.plots.get(&r.id), Some(Err(_))),
+                _ => false,
+            })
+            .count();
+        (errors, out.warnings.len())
     }
 
     /// The calculation indicator on the status bar.

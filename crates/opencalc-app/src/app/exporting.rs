@@ -49,14 +49,21 @@ impl App {
         };
         match write(kind, &source, &path, self.export_shrink) {
             Ok(files) => {
-                let list: Vec<String> = files.iter().map(|f| f.display().to_string()).collect();
-                let pages = if files.len() == 1 && kind == Kind::Pdf {
-                    String::new()
-                } else {
-                    format!("{} page(s)\n\n", files.len())
+                let name = |f: &Path| {
+                    f.file_name()
+                        .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
                 };
-                self.state
-                    .message("Exported", format!("{pages}{}", list.join("\n")));
+                let text = match files.as_slice() {
+                    [one] => format!("Exported {}", name(one)),
+                    [first, .., last] => format!(
+                        "Exported {} pages: {} to {}",
+                        files.len(),
+                        name(first),
+                        name(last)
+                    ),
+                    [] => "Exported".to_owned(),
+                };
+                self.state.notify(text);
             }
             Err(reason) => self.state.message(
                 "Could not export",

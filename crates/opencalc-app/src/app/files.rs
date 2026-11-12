@@ -240,6 +240,11 @@ impl App {
                 }
                 sheet.mark_saved(path);
                 self.state.note_recent(path);
+                let name = path.file_name().map_or_else(
+                    || path.display().to_string(),
+                    |n| n.to_string_lossy().into_owned(),
+                );
+                self.state.notify(format!("Saved {name}"));
                 true
             }
             Err(reason) => {

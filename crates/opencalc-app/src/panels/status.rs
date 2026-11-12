@@ -11,6 +11,34 @@ use crate::commands::CommandId;
 use crate::ribbon::widgets::{self as w, Look};
 use crate::theme::type_size;
 
+/// How long a note stays on the status bar.
+const NOTICE_SECONDS: f32 = 4.0;
+
+/// The error and warning counts of the worksheet; a click lists them.
+fn problems(ui: &mut Ui, state: &AppState, out: &mut Commands) {
+    let theme = state.theme;
+    let (errors, warnings) = state.problem_counts();
+    let plural = |n: usize, one: &str| format!("{n} {one}{}", if n == 1 { "" } else { "s" });
+    for (n, one, icon, colour) in [
+        (errors, "error", crate::icons::CLOSE, theme.error),
+        (warnings, "warning", crate::icons::WARNING, theme.warning),
+    ] {
+        if n == 0 {
+            continue;
+        }
+        let text = RichText::new(format!("{icon} {}", plural(n, one)))
+            .color(colour)
+            .size(type_size::BODY);
+        if ui
+            .add(egui::Button::new(text).frame(false))
+            .on_hover_text("List the problems")
+            .clicked()
+        {
+            out.push(CommandId::CalcCheck);
+        }
+    }
+}
+
 pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
     let theme = state.theme;
     ui.horizontal_centered(|ui| {
@@ -46,6 +74,15 @@ pub fn show(ui: &mut Ui, state: &AppState, out: &mut Commands) {
                     .color(theme.text_weak)
                     .size(type_size::BODY),
             );
+        }
+        problems(ui, state, out);
+        if let Some((text, made)) = &state.notice {
+            let left = NOTICE_SECONDS - made.elapsed().as_secs_f32();
+            if left > 0.0 {
+                ui.label(RichText::new(text).color(theme.text).size(type_size::BODY));
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_secs_f32(left));
+            }
         }
         if state.active_sheet().is_some_and(|s| s.canvas.pen.is_some()) {
             ui.label(

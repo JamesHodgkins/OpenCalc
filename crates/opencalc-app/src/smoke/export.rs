@@ -213,6 +213,16 @@ fn rig(name: &str) -> Rig {
     t
 }
 
+/// What the status bar says (a success is a note there, not a dialog).
+fn notice(t: &Rig) -> String {
+    assert!(t.state().dialog.is_none(), "{:?}", t.state().dialog);
+    t.state()
+        .notice
+        .clone()
+        .map(|(text, _)| text)
+        .unwrap_or_default()
+}
+
 fn message(t: &Rig) -> String {
     match &t.state().dialog {
         Some(Dialog::Message { title, text }) => format!("{title}: {text}"),
@@ -229,7 +239,7 @@ fn exporting_writes_the_file_names_it_and_leaves_the_worksheet_alone() {
     t.run(CommandId::FileExportPdf);
     let bytes = std::fs::read(&target).unwrap();
     assert!(bytes.starts_with(b"%PDF-1.4"));
-    assert!(message(&t).contains("Exported"));
+    assert!(notice(&t).contains("Exported"), "{}", notice(&t));
     assert_eq!(
         t.state().sheets[0].doc.revision(),
         revision,
@@ -258,7 +268,7 @@ fn a_long_worksheet_exports_numbered_png_files() {
     t.run(CommandId::FileExportPng);
     assert!(t.dir.join("sheet-1.png").exists() && t.dir.join("sheet-2.png").exists());
     assert!(!t.dir.join("sheet.png").exists());
-    assert!(message(&t).contains("2 page(s)"));
+    assert!(notice(&t).contains("2 pages"), "{}", notice(&t));
 }
 
 #[test]
@@ -383,7 +393,7 @@ fn exporting_results_that_are_out_of_date_asks_first() {
     t.run(CommandId::FileExportPdf);
     t.run(CommandId::DialogExportAnyway);
     assert!(std::fs::read(&target).unwrap().starts_with(b"%PDF-1.4"));
-    assert!(message(&t).contains("Exported"));
+    assert!(notice(&t).contains("Exported"), "{}", notice(&t));
 }
 
 #[test]
@@ -392,5 +402,5 @@ fn up_to_date_results_export_without_asking() {
     assert!(!t.state().stale_notice());
     t.answer_export(Some(t.dir.join("fresh.pdf")));
     t.run(CommandId::FileExportPdf);
-    assert!(message(&t).contains("Exported"));
+    assert!(notice(&t).contains("Exported"), "{}", notice(&t));
 }

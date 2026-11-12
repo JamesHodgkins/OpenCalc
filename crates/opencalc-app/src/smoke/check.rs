@@ -5,7 +5,6 @@
 use opencalc_core::document::{Point, RegionId, RegionKind};
 
 use super::Harness;
-use crate::app::filing::Dialog;
 use crate::commands::CommandId;
 
 /// The example worksheet is clean; add two problems below it, out of order.
@@ -66,11 +65,14 @@ fn a_clean_worksheet_says_so_and_the_findings_follow_edits() {
     let mut h = Harness::new();
     h.settle();
     h.command(CommandId::WarnNext);
-    match &h.app.state.dialog {
-        Some(Dialog::Message { text, .. }) => assert!(text.contains("No problems")),
-        other => panic!("expected a message, found {other:?}"),
-    }
-    h.command(CommandId::DialogOk);
+    assert!(
+        h.app.state.dialog.is_none(),
+        "a clean result is a note, not a dialog"
+    );
+    assert_eq!(
+        h.app.state.notice.as_ref().map(|(t, _)| t.as_str()),
+        Some("No problems found")
+    );
     h.command(CommandId::CalcCheck);
     assert!(h.app.state.check.findings.is_empty());
     // Fixing a problem takes it off the list at once, with the window open.
@@ -104,4 +106,27 @@ fn the_check_commands_need_a_worksheet() {
     ] {
         assert!(!h.app.registry().allows(c), "{c:?}");
     }
+}
+
+#[test]
+fn the_status_bar_counts_what_the_check_window_lists() {
+    use opencalc_core::check::{check, Severity};
+    let mut h = Harness::new();
+    h.settle();
+    assert_eq!(h.app.state.problem_counts(), (0, 0));
+    let sheet = &mut h.app.state.sheets[0];
+    sheet.add(RegionKind::math("1 m + 2 s"), Point::new(40.0, 900.0));
+    sheet.add(RegionKind::math("zq = 5 m"), Point::new(40.0, 950.0));
+    // A blank region is not a problem.
+    sheet.add(RegionKind::math("  "), Point::new(40.0, 1000.0));
+    h.app.recalculate();
+    h.settle();
+    let found = check(&h.app.state.sheets[0].doc);
+    let errors = found
+        .iter()
+        .filter(|f| f.severity == Severity::Error)
+        .count();
+    let warnings = found.len() - errors;
+    assert!(errors >= 1 && warnings >= 1, "{found:?}");
+    assert_eq!(h.app.state.problem_counts(), (errors, warnings));
 }

@@ -207,6 +207,11 @@ fn save_asks_for_a_name_writes_the_file_and_clears_the_mark() {
         "a first save names the worksheet after the file"
     );
     assert_eq!(t.state().recent.first(), Some(&file));
+    assert_eq!(
+        t.state().notice.as_ref().map(|(text, _)| text.as_str()),
+        Some("Saved beam.ocalc"),
+        "a save says so on the status bar"
+    );
     assert_eq!(t.script.borrow().suggested, ["Untitled.ocalc"]);
     // Saving again does not ask.
     t.type_into_active("b := 2 m");
