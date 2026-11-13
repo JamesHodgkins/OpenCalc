@@ -363,6 +363,13 @@ fn the_text_of_the_worksheet_is_in_the_pdf_for_selecting_and_searching() {
 #[test]
 fn exporting_results_that_are_out_of_date_asks_first() {
     let mut t = rig("export_stale");
+    // Let the calculation of the opening worksheet land first: a slow machine may not
+    // have finished it, and the notice waits until nothing is in flight.
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while t.state().calc.applied != t.state().calc.revision && std::time::Instant::now() < end {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        t.h.frame();
+    }
     t.h.app.state.live_recalc = false;
     t.type_into_active("b := 2");
     assert!(t.state().results_stale() && t.state().stale_notice());
