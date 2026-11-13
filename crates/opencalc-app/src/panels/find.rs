@@ -37,7 +37,9 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, typed: &mut Vec
     egui::Window::new("Find")
         .open(&mut open)
         .collapsible(false)
-        .resizable(false)
+        .resizable([true, false])
+        .default_width(340.0)
+        .min_width(280.0)
         .pivot(Align2::RIGHT_BOTTOM)
         .default_pos(super::default_pos(
             ctx,
@@ -58,7 +60,7 @@ fn body(ui: &mut Ui, state: &AppState, out: &mut Commands, typed: &mut Vec<FindC
         let r = ui.add(
             egui::TextEdit::singleline(&mut query)
                 .hint_text("Find")
-                .desired_width(200.0),
+                .desired_width((ui.available_width() - 90.0).max(120.0)),
         );
         ui.label(RichText::new(count_text(state)).color(weak));
         r
@@ -95,7 +97,7 @@ fn body(ui: &mut Ui, state: &AppState, out: &mut Commands, typed: &mut Vec<FindC
         ui.add(
             egui::TextEdit::singleline(&mut replacement)
                 .hint_text("Replace with")
-                .desired_width(200.0),
+                .desired_width((ui.available_width() - 90.0).max(120.0)),
         );
         if replacement != find.replacement {
             typed.push(FindCmd::Replacement(replacement));

@@ -24,6 +24,7 @@ mod options;
 mod recovery;
 mod state;
 mod templates;
+pub mod thumbs;
 mod view;
 
 use std::collections::HashMap;
@@ -235,6 +236,7 @@ impl App {
                 Effect::Cut => self.cut(),
                 Effect::Paste => self.paste(),
                 Effect::Export(kind) => self.export_active(kind),
+                Effect::ExportNow(kind) => self.export_now(kind),
                 Effect::ImportCsv => self.import_csv(),
                 Effect::ChoosePicture => self.choose_picture(),
                 Effect::ExportCsv => self.export_csv(),
@@ -253,6 +255,13 @@ impl App {
 }
 
 impl eframe::App for App {
+    /// Behind the bars: a hairline of the window's own colour can show between two
+    /// of them (a fractional height, or a scaled display), so it is the base tone
+    /// rather than black.
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        self.state.theme.base.to_normalized_gamma_f32()
+    }
+
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string(
             crate::settings::STORAGE_KEY,
@@ -267,9 +276,37 @@ impl eframe::App for App {
             .map(|p| p.to_string_lossy().into_owned())
             .collect();
         storage.set_string("recent", recent.join("\n"));
+        let pinned: Vec<String> = self
+            .state
+            .pinned
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        storage.set_string("pinned", pinned.join("\n"));
+    }
+
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        self.claim_tab(ctx, raw_input);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        restore_usable_size(ctx);
         self.frame(ctx);
+    }
+}
+
+/// A window size remembered from last time can be tiny (a minimised window is
+/// saved that way) and the system does not always enforce the minimum on restore:
+/// open at the usual size instead, once.
+fn restore_usable_size(ctx: &egui::Context) {
+    let Some(inner) = ctx.input(|i| i.viewport().inner_rect) else {
+        return;
+    };
+    let minimised = ctx.input(|i| i.viewport().minimized).unwrap_or(false);
+    if !minimised && (inner.width() < crate::MIN_WIDTH || inner.height() < 520.0) {
+        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+            crate::INITIAL_WIDTH,
+            780.0,
+        )));
     }
 }

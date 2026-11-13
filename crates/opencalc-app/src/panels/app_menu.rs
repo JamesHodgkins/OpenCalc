@@ -511,10 +511,10 @@ impl Menu<'_> {
             };
             let fill = if row.pressed { t.pressed } else { t.raised };
             painter.rect_filled(joined, corners, fill);
-            // A short accent bar marks whose pane is showing.
+            // A short bar marks whose pane is showing.
             let bar =
                 Rect::from_center_size(pos2(inset.left() + 1.5, inset.center().y), vec2(3.0, 16.0));
-            painter.rect_filled(bar, CornerRadius::same(2), t.accent);
+            painter.rect_filled(bar, CornerRadius::same(2), t.text_weak);
         } else {
             row.paint_bg(painter, inset, t);
         }
@@ -705,7 +705,7 @@ impl Menu<'_> {
                 Align2::RIGHT_CENTER,
                 "Open",
                 FontId::proportional(type_size::SMALL),
-                t.accent_text,
+                t.text_weak,
             );
         }
         let tip = if is_open {

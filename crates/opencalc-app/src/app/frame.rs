@@ -21,6 +21,9 @@ impl App {
         let registry = self.registry();
         let mut cmds: Vec<CommandId> = Vec::new();
         let width = self.state.dock_basis;
+        // The bars have fixed heights: their controls keep the compact size, not the
+        // roomier one the panels and dialogs use.
+        let chrome = |ui: &mut egui::Ui| ui.spacing_mut().interact_size.y = 24.0;
         let bar = |fill, x: i8, y: i8| {
             Frame::new()
                 .fill(fill)
@@ -36,25 +39,20 @@ impl App {
                     state: &self.state,
                     registry: &registry,
                 };
+                chrome(ui);
                 panels::title::show(ui, &cx, &mut cmds);
             });
 
         // Edits that panels and the ribbon's controls ask for (they only read the document).
         let mut panel_edits: Vec<canvas::CanvasCmd> = Vec::new();
-        let contexts = panels::shape_controls::contexts(&self.state);
-        if let Some(c) = self.state.ribbon_focus.take() {
-            self.ribbon_state.focus = Some(c);
-        }
 
         egui::TopBottomPanel::top("ribbon-tabs")
             .exact_height(metrics::TAB_STRIP)
             .frame(bar(theme.base, 8, 0))
             .show_separator_line(false)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    self.ribbon
-                        .tab_strip(ui, &theme, &mut self.ribbon_state, &contexts)
-                });
+                chrome(ui);
+                ui.horizontal(|ui| self.ribbon.tab_strip(ui, &theme, &mut self.ribbon_state));
             });
 
         egui::TopBottomPanel::top("ribbon")
@@ -62,18 +60,10 @@ impl App {
             .frame(bar(theme.raised, 6, 4))
             .show_separator_line(false)
             .show(ctx, |ui| {
-                let mut host = panels::shape_controls::ShapeControls {
-                    state: &self.state,
-                    out: &mut panel_edits,
-                };
-                let out = self.ribbon.show(
-                    ui,
-                    &theme,
-                    &mut self.ribbon_state,
-                    &registry,
-                    &contexts,
-                    &mut host,
-                );
+                chrome(ui);
+                let out = self
+                    .ribbon
+                    .show(ui, &theme, &mut self.ribbon_state, &registry);
                 cmds.extend(out.clicked);
             });
 
@@ -86,13 +76,17 @@ impl App {
                     state: &self.state,
                     registry: &registry,
                 };
+                chrome(ui);
                 ui.horizontal(|ui| panels::doc_tabs::show(ui, &cx, &mut cmds));
             });
 
         egui::TopBottomPanel::bottom("status")
             .exact_height(metrics::STATUS_BAR)
             .frame(bar(theme.base, 8, 2))
-            .show(ctx, |ui| panels::status::show(ui, &self.state, &mut cmds));
+            .show(ctx, |ui| {
+                chrome(ui);
+                panels::status::show(ui, &self.state, &mut cmds)
+            });
 
         let dock = Frame::new().fill(theme.surface).inner_margin(8);
         if self.state.show_functions {
@@ -107,6 +101,7 @@ impl App {
                     panels::functions::show(ui, &self.state, &mut panel_edits);
                 });
         }
+        panels::properties::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         egui::CentralPanel::default()
             .frame(bar(theme.base, 0, 0))
             .show(ctx, |ui| match self.state.active {
@@ -114,10 +109,7 @@ impl App {
                 None => panels::home::show(ui, &self.state, &mut cmds),
             });
 
-        panels::plot_window::show(ctx, &self.state, &mut panel_edits);
-        panels::picture_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
-        panels::text_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
-        panels::table_window::show(ctx, &self.state, &mut cmds, &mut panel_edits);
+        panels::stale::show(ctx, &self.state, &mut cmds);
         panels::plot_view::show(ctx, &self.state);
         panels::units::show(ctx, &self.state, &mut cmds, &mut panel_edits);
         panels::page_setup::show(ctx, &self.state, &mut cmds, &mut panel_edits);
@@ -195,6 +187,15 @@ impl App {
         state.page = out.page;
         let effects = super::dispatch::apply_canvas(state, sheet, out.cmds);
         self.run_effects(ctx, effects);
+        // The right-click menu, with what is enabled as of this frame's selection.
+        let has_selection = self
+            .state
+            .active_sheet()
+            .is_some_and(|s| !s.canvas.selection.is_empty());
+        let registry = self.registry();
+        let mut chosen = Vec::new();
+        panels::context_menu::show(&out.response, &registry, has_selection, &mut chosen);
+        self.queue.extend(chosen);
     }
 
     /// Files dropped on the window, a request to close it, and the window title.
@@ -218,6 +219,32 @@ impl App {
     }
 
     /// Consume the key bindings that apply right now and queue their commands.
+    /// Tab and Shift+Tab step the selection through the regions when the canvas
+    /// has the keyboard (see `AppState::tab_steps_regions`). Called on the raw input,
+    /// before egui sees the key: afterwards it would already be moving the focus.
+    pub fn claim_tab(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        use egui::{Event, Key};
+        if !self.state.tab_steps_regions(ctx.wants_keyboard_input()) {
+            return;
+        }
+        let tab = |e: &Event| matches!(e, Event::Key { key: Key::Tab, .. });
+        let step = raw.events.iter().find_map(|e| match e {
+            Event::Key {
+                key: Key::Tab,
+                pressed: true,
+                modifiers,
+                ..
+            } if !(modifiers.ctrl || modifiers.alt || modifiers.command) => Some(!modifiers.shift),
+            _ => None,
+        });
+        let Some(forward) = step else { return };
+        raw.events.retain(|e| !tab(e));
+        if let Some(i) = self.state.active {
+            let viewport = self.state.viewport.size();
+            self.state.sheets[i].cycle_selection(forward, viewport);
+        }
+    }
+
     fn queue_shortcuts(&mut self, ctx: &egui::Context) {
         let registry = self.registry();
         let typing = ctx.wants_keyboard_input();

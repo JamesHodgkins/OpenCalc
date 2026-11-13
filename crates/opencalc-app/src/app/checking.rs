@@ -63,7 +63,7 @@ impl AppState {
         self.refresh_findings();
         let findings = &self.check.findings;
         if findings.is_empty() {
-            self.message("Check Worksheet", "No problems found.".to_owned());
+            self.notify("No problems found");
             return;
         }
         let here = self.active_sheet().and_then(|s| {

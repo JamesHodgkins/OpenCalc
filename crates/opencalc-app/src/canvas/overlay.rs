@@ -63,6 +63,13 @@ pub(super) fn edit_overlay(
                 .map(|range| range.primary.index);
             let out = ui
                 .scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+                    // Typed on the page, in the page's colours: no dark box, a soft
+                    // selection, as in a math region's unit slot.
+                    let v = ui.visuals_mut();
+                    v.override_text_color = Some(env.paper.text);
+                    v.extreme_bg_color = eframe::egui::Color32::TRANSPARENT;
+                    v.selection.bg_fill = env.paper.selection.gamma_multiply(0.3);
+                    v.selection.stroke = Stroke::NONE;
                     // Laid out in the region's own style, so it does not jump to
                     // upright regular type while it is being edited.
                     let style = r.style;
@@ -84,6 +91,9 @@ pub(super) fn edit_overlay(
                         .id(widget_id)
                         .font(super::text_style::font_id(14.0 * zoom, style))
                         .layouter(&mut layouter)
+                        .frame(false)
+                        .margin(eframe::egui::Margin::ZERO)
+                        .desired_rows(1)
                         .char_limit(opencalc_core::persist::MAX_TEXT_CHARS)
                         .desired_width(rect.width())
                         .show(ui)
@@ -157,7 +167,7 @@ pub(super) fn crosshair(
 ) {
     let c = view.doc_to_screen(st.insert_at, origin);
     let arm = 7.0;
-    let stroke = Stroke::new(1.0_f32, env.theme.accent);
+    let stroke = Stroke::new(1.0_f32, env.paper.selection);
     painter.line_segment([c - Vec2::new(arm, 0.0), c + Vec2::new(arm, 0.0)], stroke);
     painter.line_segment([c - Vec2::new(0.0, arm), c + Vec2::new(0.0, arm)], stroke);
 }
@@ -212,7 +222,7 @@ pub(super) fn move_crosshair(ui: &Ui, regions: &[Region], st: &mut CanvasUi) {
     }
     let g = st.grid.step();
     let at = st.insert_at + Vec2::new(f32::from(dx) * g, f32::from(dy) * g);
-    st.insert_at = super::view::snap(Pos2::new(at.x.max(0.0), at.y.max(0.0)), g);
+    st.insert_at = st.snapper.snap(Pos2::new(at.x.max(0.0), at.y.max(0.0)));
     st.selection.clear();
     st.armed = true;
     // Moving onto an existing region hands control to it: the crosshair gives way
@@ -243,7 +253,7 @@ pub(super) fn leave_toward(st: &mut CanvasUi, region: &Region, (dx, dy): (i8, i8
         (_, -1) => Pos2::new(cx, (r.min.y - gap).max(0.0)),
         _ => Pos2::new(cx, r.max.y + gap),
     };
-    st.insert_at = super::view::snap(at, st.grid.step());
+    st.insert_at = st.snapper.snap(at);
     st.selection.clear();
     st.armed = true;
 }
@@ -252,7 +262,7 @@ pub(super) fn leave_toward(st: &mut CanvasUi, region: &Region, (dx, dy): (i8, i8
 /// the finished region, nothing stays selected, and typing starts a new math region.
 pub(super) fn next_input_below(st: &mut CanvasUi, region: &Region) {
     let r = rect_of(region, &st.sizes);
-    st.insert_at = super::view::snap(Pos2::new(r.min.x, r.max.y + 12.0), st.grid.step());
+    st.insert_at = st.snapper.snap(Pos2::new(r.min.x, r.max.y + 12.0));
     st.selection.clear();
     st.armed = true;
 }
@@ -267,8 +277,8 @@ pub(super) fn marquee(
 ) {
     if let Some(Drag::Marquee { start, current, .. }) = &st.drag {
         let m = view.rect_to_screen(Rect::from_two_pos(*start, *current), origin);
-        painter.rect_filled(m, 0.0, theme.accent.gamma_multiply(0.18));
-        let line = Stroke::new(1.0_f32, theme.accent);
+        painter.rect_filled(m, 0.0, theme.selection.gamma_multiply(0.18));
+        let line = Stroke::new(1.0_f32, theme.selection);
         painter.rect_stroke(m, 0.0, line, eframe::egui::StrokeKind::Inside);
     }
 }

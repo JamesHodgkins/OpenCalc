@@ -8,6 +8,7 @@ mod line;
 
 use super::adapt::vec;
 use super::paint::Place;
+use super::view::Snapper;
 use super::Env;
 pub(super) use line::{constrained, drawn_line, line_ends_on_screen};
 use line::{dash_lengths, paint_line_between};
@@ -124,14 +125,14 @@ pub(super) fn drawn_box(
     kind: ShapeKind,
     start: Pos2,
     end: Pos2,
-    grid: Option<f32>,
+    grid: Option<Snapper>,
     square: bool,
     centre: bool,
 ) -> (Point, Size) {
     let dragged = (end - start).abs();
     if dragged.x < MIN_DRAG && dragged.y < MIN_DRAG {
         let size = RegionKind::shape(kind).default_size();
-        let at = grid.map_or(start, |g| super::view::snap(start, g));
+        let at = grid.map_or(start, |g| g.snap(start));
         let min = if centre {
             at - Vec2::new(size.w, size.h) / 2.0
         } else {
@@ -337,7 +338,7 @@ mod tests {
             k,
             Pos2::new(13.0, 27.0),
             Pos2::new(98.0, 71.0),
-            Some(10.0),
+            Some(Snapper::plain(10.0)),
             false,
             false,
         );

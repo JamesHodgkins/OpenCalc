@@ -137,7 +137,7 @@ with a shade, an exact RGBA value, or Automatic, as in common office programs.
 - [x] Core model (2026-11-11): `RegionKind::Shape` (rectangle with optional rounded corners, ellipse; fill, outline, width, corner radius, dash), `Colour`, `Region::z`, `Edit::SetShape` and `Edit::SetZ`, file format 3 (`FILE_FORMAT.md` 3e).
 - [x] Painting and hit-testing (2026-11-11): back to front by `z`; an empty frame is hit only on its outline, so what lies inside stays reachable; shapes appear in PDF and PNG export.
 - [x] Insert > Shapes and draw order commands (Bring to front, Bring forward, Send backward, Send to back; Ctrl+] and Ctrl+[, with Shift for front and back).
-- [x] Shape settings with a palette colour picker (theme colours and shades, standard colours, RGBA and hex); dragging a value is one undo step. They live on a contextual **Shape Format** ribbon tab that appears while one shape is selected and comes forward when a shape is drawn (the floating Shape window is gone).
+- [x] Shape settings with a palette colour picker (theme colours and shades, standard colours, RGBA and hex); dragging a value is one undo step. They live in the **Properties** side panel (2026-11-12), which appears while one shape is selected; they were first a floating window and then a contextual Shape Format ribbon tab, both gone.
 - [x] Drag to draw a new shape (the shape insert commands arm a crosshair; drag sets the box, Escape or a click without a drag gives the default size).
 - [x] Resize handles (eight, on one selected shape, picture, plot or area; typeset regions size themselves) and drawing modifiers: Shift keeps equal sides or the original proportions, Ctrl works from the centre; one undo step per drag (`Edit::SetRegionBox`); a status-bar hint while the tool is out.
 - [x] Alt+click to pick what lies under a filled shape (2026-11-11): the first goes to the region under the topmost, each further one a step down, wrapping to the top.
@@ -151,9 +151,11 @@ with a shade, an exact RGBA value, or Automatic, as in common office programs.
 
 ## Ribbon redevelopment (M)
 
-- [x] Contextual tabs and hosted value controls (2026-11-11); the Shape Format tab.
+- [x] Contextual tabs and hosted value controls (2026-11-11); the Shape Format tab. Removed 2026-11-12: its settings moved into the Properties side panel, and the ribbon has no contextual tabs.
 - [x] Ordinary tabs redone by task: Home (with Calculate and Check), Insert, Draw, Format, Units, View, Help; no tab with one or two buttons; each tab measured to fit the narrowest window (`RIBBON_MAP.md`).
-- [ ] Picture, Table and Plot contextual tabs, replacing their floating windows.
+- [x] Home page redesign (2026-11-12), laid out like OpenDraft's: header (logo, version, drop hint); a Start row of four tiles (New in the brand colour, Open, From template, Example); Recent worksheets as cards (kind badge, name, folder, age and size, greyed and marked Missing when the file is gone, Clear list); a Getting started card in a side column from 900 px wide. The layout is a pure, tested function. Thumbnails and pinning were added the same day (below). Not done: recovery and update cards.
+- [x] Home page thumbnails and pinning (2026-11-12): each recent file gets a picture of the top of its first page, drawn on a background thread by the export code (read, calculated, drawn small; kept for the session, not on disk), and a pin button; pinned files are listed first and stay however many others follow, are saved with the settings, and survive Clear unpinned. A card menu (button or right-click): Open, Pin or Unpin, Copy path, Remove from this list. The program now opens on the Home page instead of a blank worksheet.
+- [x] Properties side panel (2026-11-12): the Plot, Table, Picture and Text settings moved out of four floating windows (fixed in place, covering the page) into one resizable panel at the right that shares the window with the page.
 - [x] Alt+click to pick under a filled shape.
 - [ ] A right-click menu with the draw-order commands.
 - [x] Lines and arrows in Draw > Shapes.

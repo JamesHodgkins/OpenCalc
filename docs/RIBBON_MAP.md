@@ -12,8 +12,8 @@ other product's ribbon. The ribbon is data in `ribbon/defs.rs`.
 
 1. **One task per tab.** A tab answers "what am I doing": editing, inserting, drawing,
    formatting, working with units, or changing the view.
-2. **Every command sits in exactly one ordinary tab.** (A test checks it.) A *contextual* tab may repeat
-   commands that its selection needs close at hand.
+2. **Every command sits in exactly one tab.** (A test checks it.) The Properties panel and the
+   right-click menu may repeat commands that the selection needs close at hand.
 3. **No near-empty tab.** Every ordinary tab but Help holds at least four commands in at least two
    groups (a test checks it). A lone button belongs in a bigger tab.
 4. **Large buttons for the main action of a group**, small stacked rows for the rest.
@@ -25,9 +25,9 @@ other product's ribbon. The ribbon is data in `ribbon/defs.rs`.
 
 | Tab | Group | Contents |
 |---|---|---|
-| **Home** | Clipboard | Paste (large), Cut, Copy |
+| **Home** | Clipboard | Paste (large), Cut, Copy, Duplicate |
 | | Regions | Math region (large), Text region (large) |
-| | Edit | Find, Replace |
+| | Edit | Find, Replace, Select all |
 | | Region | Delete, Lock, Tag |
 | | Calculate | Calculate worksheet (large), Automatic calculation (toggle) |
 | | Check | Run checks (large), Next problem, Previous problem |
@@ -51,20 +51,22 @@ other product's ribbon. The ribbon is data in `ribbon/defs.rs`.
 | | Window | Reset layout (large) |
 | **Help** | Help | Shortcuts, User guide *(dimmed)*, About |
 
-## Contextual tabs
+## The Properties panel
 
-A contextual tab belongs to the selected thing. It is shown, tinted along its top edge, only while
-that thing is selected, and comes forward once when it is drawn. Selecting it again does not jump to it.
+There are no contextual tabs. The settings of the selected thing are in the **Properties** side
+panel at the right of the page. It shares the window with the page (nothing is covered), can be
+resized, and appears while one shape, plot, table, picture or text region is selected.
 
-| Tab | Shown while | Groups |
-|---|---|---|
-| **Shape Format** | one shape is selected | Shape (kind, corner radius or a polygon's sides; a rectangle also has a corner grip on the page), Style (fill, outline, width, line style), Arrowheads (start and end of a line), Arrange (draw order, Lock, Delete) |
+| Selected | Settings |
+|---|---|
+| Shape | Shape (kind), Corners (a polygon's sides), Fill, Outline, Width, Line (solid, dashed, dotted), Start and End arrowheads (lines only), then Arrange: draw order, Lock, Delete. A rectangle also has a corner grip on the page. |
+| Plot | Title, x values, a section per series, labels, axes and grid, legend, log axes |
+| Table | Name, column headings and units, cells, add and remove rows and columns, CSV import and export |
+| Picture | Choose or remove the image, description |
+| Text | Bold, italic, underline, text colours |
 
-Value controls (a colour, a number, a choice) are drawn by the app through `ControlHost`, because a
-ribbon item otherwise only runs a command. Fill and outline use a colour picker: Automatic, none, the
-palette with its shades, standard colours, and exact RGBA with hex.
-
-Planned, each replacing a floating window the same way: **Picture**, **Table** and **Plot**.
+Fill and outline use a colour picker: Automatic, none, the palette with its shades, standard
+colours, and exact RGBA with hex.
 
 ## Where the old commands went
 
@@ -86,4 +88,3 @@ Planned, each replacing a floating window the same way: **Picture**, **Table** a
 
 - A right-click menu with the draw-order
   commands.
-- Picture, Table and Plot contextual tabs (their floating windows go away as they arrive).

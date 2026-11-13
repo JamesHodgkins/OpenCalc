@@ -1,9 +1,9 @@
-//! The plot window: a small floating window next to the canvas that appears while
+//! The plot panel: appears in the Properties side panel while
 //! one plot region is selected and holds its fields (title, x values, series and
 //! how each is drawn, labels, axis limits, grid, legend and log axes). It reads the
 //! document and only asks for edits, like every panel.
 
-use eframe::egui::{self, Context, RichText, Ui};
+use eframe::egui::{self, RichText, Ui};
 use opencalc_core::document::{PlotKind, PlotOptions, PlotSpec, RegionId, RegionKind, MAX_SERIES};
 use opencalc_core::edit::Edit;
 
@@ -26,25 +26,12 @@ pub fn selected_plot(state: &AppState) -> Option<(RegionId, &PlotSpec)> {
     }
 }
 
-/// Show the window for the selected plot, if there is one.
-pub fn show(ctx: &Context, state: &AppState, out: &mut Vec<CanvasCmd>) {
+/// The fields of the selected plot, if a plot is what is selected.
+pub fn body(ui: &mut Ui, state: &AppState, out: &mut Vec<CanvasCmd>) {
     let Some((id, spec)) = selected_plot(state) else {
         return;
     };
-    // Top right of the canvas, clear of the page.
-    let corner = state.viewport.right_top() + egui::vec2(-264.0, 12.0);
-    let tallest = (state.viewport.height() - 60.0).max(160.0);
-    egui::Window::new("Plot")
-        .id(egui::Id::new("plot-window"))
-        .fixed_pos(corner)
-        .fixed_size([240.0, 0.0])
-        .collapsible(false)
-        .resizable(false)
-        .show(ctx, |ui| {
-            egui::ScrollArea::vertical()
-                .max_height(tallest)
-                .show(ui, |ui| plot_editor(ui, state, id, spec, out));
-        });
+    plot_editor(ui, state, id, spec, out);
 }
 
 /// Replace the plot's spec with `spec`, as one undo step.

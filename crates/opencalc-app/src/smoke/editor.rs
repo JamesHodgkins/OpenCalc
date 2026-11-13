@@ -137,6 +137,20 @@ fn arrows_off_the_edge_of_an_equation_leave_it_and_arrows_on_the_page_move_the_c
     h.settle();
     let id = h.new_math();
     h.type_text("x+1");
+    // Put the equation on the grid (the off-grid case has its own test below).
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.press_key(Key::Escape, Modifiers::NONE);
+    h.frame();
+    let at = h.sheet().doc.region(id).expect("region").pos;
+    let on = h.sheet().snapper().snap(eframe::egui::pos2(at.x, at.y));
+    let moves = vec![(id, Point { x: on.x, y: on.y })];
+    h.app.state.sheets[0].edit(Edit::MoveRegions { moves });
+    h.frame();
+    h.frame();
+    h.app.state.sheets[0].canvas.editing = Some(id);
+    h.app.state.sheets[0].canvas.focus_edit = true;
+    h.frame();
+    h.frame();
     h.press_key(Key::ArrowRight, Modifiers::NONE);
     assert!(
         h.sheet().canvas.editing.is_none(),
@@ -148,11 +162,26 @@ fn arrows_off_the_edge_of_an_equation_leave_it_and_arrows_on_the_page_move_the_c
     h.press_key(Key::ArrowDown, Modifiers::NONE);
     let down = h.sheet().canvas.insert_at;
     assert!(down.y > right.y && down.x == right.x, "Down moves one step");
+    // Go down until the crosshair is clear of the equation's box, so that stepping
+    // left does not run straight back into it (where the grid falls decides how
+    // many steps that takes).
+    let below = r.y + h.sheet().canvas.sizes.get(&id).map_or(0.0, |s| s.y);
+    for _ in 0..6 {
+        if h.sheet().canvas.insert_at.y > below {
+            break;
+        }
+        h.press_key(Key::ArrowDown, Modifiers::NONE);
+    }
     h.press_key(Key::ArrowLeft, Modifiers::NONE);
     assert!(h.sheet().canvas.insert_at.x < down.x);
     assert!(h.sheet().canvas.armed, "typing starts a region there");
     // Walking back (along the equation's own line) hands control to it.
-    h.press_key(Key::ArrowUp, Modifiers::NONE);
+    for _ in 0..6 {
+        if h.sheet().canvas.insert_at.y <= right.y || h.sheet().canvas.editing.is_some() {
+            break;
+        }
+        h.press_key(Key::ArrowUp, Modifiers::NONE);
+    }
     for _ in 0..30 {
         h.press_key(Key::ArrowLeft, Modifiers::NONE);
         if h.sheet().canvas.editing.is_some() {

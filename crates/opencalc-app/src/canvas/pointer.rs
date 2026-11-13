@@ -8,7 +8,6 @@ pub(super) mod drag;
 
 use super::adapt::rect_of;
 use super::hit::{click_selection, hit_stack, hit_test, pick_under};
-use super::view::snap;
 use super::{grip, resize, shape, unit_slot, CanvasCmd, CanvasUi, CanvasView, Drag, Scene};
 use drag::{begin_drag, continue_drag, end_drag};
 
@@ -73,7 +72,7 @@ fn draw_with_pen(
         env, view, origin, ..
     } = *scene;
     let mods = ui.input(|i| i.modifiers);
-    let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+    let grid = (env.snap && !mods.alt).then_some(st.snapper);
     let (square, centre) = (mods.shift, mods.ctrl || mods.command);
     let to_doc = |p: Pos2| view.screen_to_doc(p, origin);
     if resp.hovered() {
@@ -145,12 +144,12 @@ pub(super) fn pointer(
         draw_with_pen(ui, resp, scene, kind, st, cmds);
         return;
     }
-    if st.drag.is_none() && resp.hovered() {
+    if matches!(st.drag, Some(Drag::Move { .. })) {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+    } else if st.drag.is_none() && resp.hovered() {
         let hover = ui.input(|i| i.pointer.hover_pos());
-        if let Some((_, h, _)) = hover.and_then(|p| handle_under(scene, st, p)) {
-            ui.ctx().set_cursor_icon(h.cursor());
-        } else if hover.is_some_and(|p| grip_under(scene, st, p).is_some()) {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        if let Some(icon) = hover.and_then(|p| hover_cursor(ui, scene, st, p)) {
+            ui.ctx().set_cursor_icon(icon);
         }
     }
     if resp.drag_started_by(PointerButton::Primary) {
@@ -169,6 +168,53 @@ pub(super) fn pointer(
     if let Some(pos) = resp.interact_pointer_pos() {
         click(ui, resp, scene, st, cmds, pos);
     }
+    if resp.secondary_clicked() {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            right_click(scene, st, cmds, pos);
+        }
+    }
+}
+
+/// A right click, before its menu opens: it acts on what is under the pointer. A
+/// region that is not selected becomes the selection (one already in the selection
+/// keeps the whole selection); blank page clears it and puts the insertion point
+/// there, so the menu's Paste and Insert go where the click was.
+fn right_click(scene: &Scene, st: &mut CanvasUi, cmds: &mut Vec<CanvasCmd>, pos: Pos2) {
+    let doc = scene.view.screen_to_doc(pos, scene.origin);
+    match hit_test(scene.regions, &st.sizes, doc) {
+        Some(id) if st.editing == Some(id) => {}
+        Some(id) => {
+            cmds.push(CanvasCmd::Seal);
+            st.editing = None;
+            if !st.selection.contains(&id) {
+                st.selection = vec![id];
+            }
+        }
+        None => {
+            cmds.push(CanvasCmd::Seal);
+            st.editing = None;
+            st.selection.clear();
+            st.insert_at = st.snapper.snap(Pos2::new(doc.x.max(0.0), doc.y.max(0.0)));
+            st.armed = true;
+        }
+    }
+}
+
+/// The cursor for the pointer resting at screen point `p`, if it is over something
+/// that can be acted on: a resize handle, a grip, the unit after a result (a click
+/// opens it), or the body of a region that can be dragged (not one being edited,
+/// which shows its own text cursor, and not a locked one).
+fn hover_cursor(ui: &Ui, scene: &Scene, st: &CanvasUi, p: Pos2) -> Option<egui::CursorIcon> {
+    if let Some((_, h, _)) = handle_under(scene, st, p) {
+        return Some(h.cursor());
+    }
+    if grip_under(scene, st, p).is_some() || unit_slot::hit(ui.ctx(), scene.regions, p).is_some() {
+        return Some(egui::CursorIcon::PointingHand);
+    }
+    let doc = scene.view.screen_to_doc(p, scene.origin);
+    let id = hit_test(scene.regions, &st.sizes, doc)?;
+    let region = scene.regions.iter().find(|r| r.id == id)?;
+    (!region.locked && st.editing != Some(id)).then_some(egui::CursorIcon::Move)
 }
 
 /// The resize handle under the screen point `p`, with the region it belongs to and
@@ -248,7 +294,7 @@ fn click(
         }
         st.armed = hit.is_none();
         if hit.is_none() {
-            st.insert_at = snap(doc, st.grid.step());
+            st.insert_at = st.snapper.snap(doc);
         }
     }
 }

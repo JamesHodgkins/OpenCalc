@@ -29,8 +29,8 @@ pub const THEMES: [(PaletteKey, CommandId); 2] = [
 mod sections;
 
 const NAV_WIDTH: f32 = 160.0;
-const PANE_WIDTH: f32 = 430.0;
-const HEIGHT: f32 = 360.0;
+/// Room kept below the list and the page for the row of buttons.
+const FOOTER: f32 = 48.0;
 /// Width of the column of setting names.
 const NAME_WIDTH: f32 = 140.0;
 const ROW: f32 = 30.0;
@@ -85,17 +85,23 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, change: &mut Op
     egui::Window::new("Options")
         .open(&mut open)
         .collapsible(false)
-        .resizable(false)
+        .resizable(true)
+        .default_size([620.0, 440.0])
+        .min_size([520.0, 340.0])
         .pivot(Align2::CENTER_CENTER)
         .default_pos(super::default_pos(ctx, Align2::CENTER_CENTER, [0.0, 0.0]))
         .show(ctx, |ui| {
             let t = &state.theme;
+            // The list and the page fill the window: what is left after the buttons
+            // below them is the height, and after the list the width.
+            let height = (ui.available_height() - FOOTER).max(200.0);
+            let pane_width = (ui.available_width() - NAV_WIDTH - 1.0 - 12.0 - 16.0).max(240.0);
             ui.horizontal_top(|ui| {
                 ui.allocate_ui_with_layout(
-                    vec2(NAV_WIDTH, HEIGHT),
+                    vec2(NAV_WIDTH, height),
                     Layout::top_down(Align::Min),
                     |ui| {
-                        ui.set_min_size(vec2(NAV_WIDTH, HEIGHT));
+                        ui.set_min_size(vec2(NAV_WIDTH, height));
                         for s in Section::ALL {
                             if nav_row(ui, t, s, s == section) {
                                 section = s;
@@ -104,14 +110,14 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, change: &mut Op
                     },
                 );
                 // A one-pixel divider between the list and the page.
-                let (line, _) = ui.allocate_exact_size(vec2(1.0, HEIGHT), Sense::hover());
+                let (line, _) = ui.allocate_exact_size(vec2(1.0, height), Sense::hover());
                 ui.painter().rect_filled(line, 0.0, t.border);
                 ui.add_space(12.0);
                 ui.allocate_ui_with_layout(
-                    vec2(PANE_WIDTH, HEIGHT),
+                    vec2(pane_width, height),
                     Layout::top_down(Align::Min),
                     |ui| {
-                        ui.set_min_size(vec2(PANE_WIDTH, HEIGHT));
+                        ui.set_min_size(vec2(pane_width, height));
                         ui.label(
                             RichText::new(section.label())
                                 .size(type_size::HEADING)
@@ -178,7 +184,7 @@ fn nav_row(ui: &mut Ui, t: &Theme, section: Section, current: bool) -> bool {
         painter.rect_filled(inner, r, t.raised);
         let bar =
             Rect::from_center_size(pos2(inner.left() + 1.5, inner.center().y), vec2(3.0, 16.0));
-        painter.rect_filled(bar, CornerRadius::same(2), t.accent);
+        painter.rect_filled(bar, CornerRadius::same(2), t.text_weak);
     } else if resp.hovered() {
         painter.rect_filled(inner, r, t.raised_high);
         painter.rect_stroke(inner, r, Stroke::new(1.0_f32, t.border), StrokeKind::Inside);
@@ -187,7 +193,7 @@ fn nav_row(ui: &mut Ui, t: &Theme, section: Section, current: bool) -> bool {
         painter.rect_stroke(
             inner.expand(2.0),
             r,
-            Stroke::new(2.0_f32, t.accent_text),
+            Stroke::new(2.0_f32, t.selection),
             StrokeKind::Outside,
         );
     }
@@ -222,7 +228,7 @@ pub(super) fn row(ui: &mut Ui, t: &Theme, name: &str, help: &str, control: impl 
             t.text,
         );
         ui.vertical(|ui| {
-            ui.set_width(PANE_WIDTH - NAME_WIDTH - 24.0);
+            ui.set_width(ui.available_width().max(120.0));
             ui.horizontal(|ui| {
                 ui.set_min_height(ROW - 6.0);
                 control(ui);
@@ -239,34 +245,15 @@ pub(super) fn row(ui: &mut Ui, t: &Theme, name: &str, help: &str, control: impl 
     ui.add_space(10.0);
 }
 
-/// Buttons side by side, one of them chosen.
-pub(super) fn choice<T: Copy + PartialEq>(ui: &mut Ui, value: &mut T, options: &[(T, &str)]) {
-    for (option, label) in options {
-        if ui.selectable_label(*value == *option, *label).clicked() {
-            *value = *option;
-        }
-    }
-}
-
-/// A drop-down list of choices.
-pub(super) fn combo<T: Copy + PartialEq>(
+/// A drop-down list of choices, one of them chosen.
+pub(super) fn choice<T: Copy + PartialEq>(
     ui: &mut Ui,
     salt: &str,
     value: &mut T,
-    options: &[(T, String)],
+    options: &[(T, &str)],
 ) {
-    let shown = options
-        .iter()
-        .find(|(o, _)| o == value)
-        .map_or(String::new(), |(_, l)| l.clone());
-    egui::ComboBox::from_id_salt(salt)
-        .width(140.0)
-        .selected_text(shown)
-        .show_ui(ui, |ui| {
-            for (option, label) in options {
-                ui.selectable_value(value, *option, label.as_str());
-            }
-        });
+    let options: Vec<(T, String)> = options.iter().map(|(o, l)| (*o, (*l).to_owned())).collect();
+    crate::panels::controls::combo(ui, salt, value, &options);
 }
 
 /// Show `section` the next time the window draws (tests use it to reach a page).

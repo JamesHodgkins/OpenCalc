@@ -8,7 +8,6 @@ use opencalc_core::edit::Edit;
 use super::{grip_under, handle_under};
 use crate::canvas::adapt::{self, point, rect_of};
 use crate::canvas::hit::{click_selection, drag_positions, hit_test, in_marquee};
-use crate::canvas::view::snap;
 use crate::canvas::{grip, magnet, resize, CanvasCmd, CanvasUi, Scene};
 
 /// What the primary button is doing between a press and its release.
@@ -121,7 +120,7 @@ pub(super) fn continue_drag(
         Some(Drag::Move { origins, total }) => {
             *total += delta;
             let snapping = env.snap && !mods.alt;
-            let grid = snapping.then_some(st.grid.step());
+            let grid = snapping.then_some(st.snapper);
             let mut moved = drag_positions(origins, *total, grid);
             if snapping {
                 // The group's box where the pointer has put it; its edges are pulled
@@ -161,7 +160,7 @@ pub(super) fn continue_drag(
         Some(Drag::Resize { id, handle, orig }) => {
             if let Some(p) = pos {
                 let snapping = env.snap && !mods.alt;
-                let grid = snapping.then_some(st.grid.step());
+                let grid = snapping.then_some(st.snapper);
                 let keep_ratio = mods.shift && handle.is_corner();
                 let mut at = to_doc(p);
                 let mut grid_for_box = grid;
@@ -169,7 +168,7 @@ pub(super) fn continue_drag(
                     // The pulled edge goes onto another region's edge if one is near,
                     // else onto the grid.
                     if let Some(g) = grid {
-                        at = snap(at, g);
+                        at = g.snap(at);
                     }
                     let (on_x, on_y) = handle.pulls();
                     let t = magnet::targets(scene.regions, &[*id], &st.sizes);
@@ -202,7 +201,7 @@ pub(super) fn continue_drag(
                 if let RegionKind::Shape(spec) = &region.kind {
                     if let Some(is_start) = grip.line_end() {
                         let snapping = env.snap && !mods.alt;
-                        let grid = snapping.then_some(st.grid.step());
+                        let grid = snapping.then_some(st.snapper);
                         let t = magnet::targets(scene.regions, &[*id], &st.sizes);
                         let (moved, g) = grip::line_end_dragged(
                             *fixed,

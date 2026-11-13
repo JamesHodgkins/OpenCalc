@@ -65,9 +65,89 @@ impl CanvasView {
     }
 }
 
-/// Round a document point to the nearest grid intersection.
-pub fn snap(p: Pos2, grid: f32) -> Pos2 {
-    Pos2::new((p.x / grid).round() * grid, (p.y / grid).round() * grid)
+/// The snap grid, anchored to the top left of each page's margin box so that
+/// snapped things line up with the margins whatever the step. Pages stack at a
+/// fixed stride, so a point on page `k` snaps to that page's own lattice.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Snapper {
+    pub step: f32,
+    /// The margin, in document units: the lattice starts this far in.
+    pub margin: f32,
+    /// Distance from the top of one page to the top of the next, or infinite for
+    /// one lattice over the whole sheet (draft view).
+    pub stride: f32,
+}
+
+impl Snapper {
+    /// A lattice from the document origin, with no pages. For tests and for sheets
+    /// with no page setup to hand.
+    pub fn plain(step: f32) -> Snapper {
+        Snapper {
+            step,
+            margin: 0.0,
+            stride: f32::INFINITY,
+        }
+    }
+
+    pub fn new(step: f32, setup: &opencalc_core::document::PageSetup, draft: bool) -> Snapper {
+        Snapper {
+            step,
+            margin: setup.margin(),
+            stride: if draft {
+                f32::INFINITY
+            } else {
+                setup.size().1 + super::page::GAP
+            },
+        }
+    }
+
+    /// The lattice origin for a point at document height `y`: the top left of the
+    /// margin box of the page that `y` falls on (the gap belongs to the page above).
+    pub fn origin_at(&self, y: f32) -> Pos2 {
+        let k = if self.stride.is_finite() {
+            ((y + super::page::GAP / 2.0) / self.stride)
+                .floor()
+                .max(0.0)
+        } else {
+            0.0
+        };
+        let top = if k == 0.0 { 0.0 } else { k * self.stride };
+        Pos2::new(self.margin, top + self.margin)
+    }
+
+    /// Round a document point to the nearest grid intersection.
+    pub fn snap(&self, p: Pos2) -> Pos2 {
+        let o = self.origin_at(p.y);
+        Pos2::new(
+            o.x + ((p.x - o.x) / self.step).round() * self.step,
+            o.y + ((p.y - o.y) / self.step).round() * self.step,
+        )
+    }
+
+    /// The grid point `n` lines from `p` in the direction `dir` (each of -1, 0, 1).
+    /// A point off the grid first goes to the nearest line that way, so a nudge
+    /// always ends on the grid. An axis with direction 0 is left alone.
+    pub fn step_toward(&self, p: Pos2, dir: (i8, i8), n: u32) -> Pos2 {
+        let o = self.origin_at(p.y);
+        let go = |v: f32, o: f32, d: i8| {
+            let k = (v - o) / self.step;
+            let line = match d {
+                1 => (k + 1e-3).floor() + n as f32,
+                -1 => (k - 1e-3).ceil() - n as f32,
+                _ => return v,
+            };
+            o + line * self.step
+        };
+        Pos2::new(go(p.x, o.x, dir.0), go(p.y, o.y, dir.1))
+    }
+
+    /// Round a point right and down onto the grid; one already on it (within
+    /// rounding error) stays where it is.
+    pub fn ceil(&self, p: Pos2) -> Pos2 {
+        let o = self.origin_at(p.y);
+        let up = |v: f32, o: f32| o + (((v - o) / self.step) - 1e-3).ceil() * self.step;
+        Pos2::new(up(p.x, o.x), up(p.y, o.y))
+    }
 }
 
 #[cfg(test)]
@@ -156,8 +236,48 @@ mod tests {
 
     #[test]
     fn snap_rounds_to_the_nearest_grid_point() {
-        assert_eq!(snap(Pos2::new(29.0, 31.0), 20.0), Pos2::new(20.0, 40.0));
-        assert_eq!(snap(Pos2::new(-9.0, -11.0), 20.0), Pos2::new(0.0, -20.0));
-        assert_eq!(snap(Pos2::new(40.0, 60.0), 20.0), Pos2::new(40.0, 60.0));
+        let g = Snapper::plain(20.0);
+        assert_eq!(g.snap(Pos2::new(29.0, 31.0)), Pos2::new(20.0, 40.0));
+        assert_eq!(g.snap(Pos2::new(-9.0, -11.0)), Pos2::new(0.0, -20.0));
+        assert_eq!(g.snap(Pos2::new(40.0, 60.0)), Pos2::new(40.0, 60.0));
+    }
+
+    /// The point of the anchor: a snapped point sits a whole number of steps from
+    /// its page's margin corner, for every step and margin, on every page.
+    #[test]
+    fn snapping_is_anchored_to_each_pages_margin_box() {
+        use opencalc_core::document::PageSetup;
+        let setup = PageSetup::default();
+        for step in [6.0_f32, 12.0, 24.0, 7.559, 18.897] {
+            let g = Snapper::new(step, &setup, false);
+            for page in 0..3 {
+                let top = page as f32 * g.stride;
+                for p in [(100.3, 50.7), (333.0, 400.2), (700.9, 900.5)] {
+                    let p = Pos2::new(p.0, top + p.1);
+                    let s = g.snap(p);
+                    let o = g.origin_at(s.y);
+                    let (kx, ky) = ((s.x - o.x) / step, (s.y - o.y) / step);
+                    assert!((kx - kx.round()).abs() < 1e-2, "x {step} page {page}");
+                    assert!((ky - ky.round()).abs() < 1e-2, "y {step} page {page}");
+                }
+                // The margin corner itself is a grid point.
+                let corner = g.origin_at(top + 10.0);
+                assert!((g.snap(corner) - corner).length() < 1e-3);
+            }
+        }
+    }
+
+    #[test]
+    fn draft_view_has_one_lattice_for_the_whole_sheet() {
+        use opencalc_core::document::PageSetup;
+        let g = Snapper::new(12.0, &PageSetup::default(), true);
+        assert_eq!(g.origin_at(5000.0), g.origin_at(10.0));
+    }
+
+    #[test]
+    fn ceil_rounds_right_and_down_but_keeps_a_point_on_the_grid() {
+        let g = Snapper::plain(20.0);
+        assert_eq!(g.ceil(Pos2::new(21.0, 39.0)), Pos2::new(40.0, 40.0));
+        assert_eq!(g.ceil(Pos2::new(40.0, 60.0)), Pos2::new(40.0, 60.0));
     }
 }

@@ -43,9 +43,6 @@ pub struct AppState {
     /// The page in view (from 1) and the number of pages, from the last frame.
     pub page: (usize, usize),
     pub snap: bool,
-    /// Bring this contextual tab forward at the next draw (the frame hands it to
-    /// the ribbon): set when the user draws or inserts the thing it is about.
-    pub ribbon_focus: Option<crate::ribbon::Context>,
     /// Automatic calculation. Off is manual mode: nothing is calculated until the
     /// Calculate command. A session setting, never saved in a file.
     pub live_recalc: bool,
@@ -65,6 +62,8 @@ pub struct AppState {
     pub page_setup_open: bool,
     /// A text box (not the math editor) held the keyboard last frame.
     pub text_box_focus: bool,
+    /// A short note for the status bar ("Saved ..."), and when it was made.
+    pub notice: Option<(String, std::time::Instant)>,
     /// Draft View (one continuous sheet) instead of Page View.
     pub draft: bool,
     /// The Options window (settings such as the theme).
@@ -89,6 +88,11 @@ pub struct AppState {
     pub dialog: Option<Dialog>,
     /// Recently opened or saved files, newest first.
     pub recent: Vec<PathBuf>,
+    /// Files pinned to the top of the Home page. They stay on the recent list
+    /// however long it grows.
+    pub pinned: Vec<PathBuf>,
+    /// Pictures of the recent files, drawn in the background.
+    pub thumbs: super::thumbs::Thumbs,
     /// The regions last copied inside the app.
     pub clip: Option<super::clipboard::Clip>,
     /// Recovery files found and not yet asked about.
@@ -114,7 +118,6 @@ impl AppState {
             show_grid: true,
             page: (1, 1),
             snap: true,
-            ribbon_focus: None,
             live_recalc: true,
             show_functions: false,
             layout_gen: 0,
@@ -124,6 +127,7 @@ impl AppState {
             about_open: false,
             page_setup_open: false,
             text_box_focus: false,
+            notice: None,
             draft: false,
             options_open: false,
             file_type: (false, false),
@@ -136,6 +140,8 @@ impl AppState {
             find: Default::default(),
             dialog: None,
             recent: Vec::new(),
+            pinned: Vec::new(),
+            thumbs: Default::default(),
             clip: None,
             recoveries: Vec::new(),
         }
@@ -162,15 +168,11 @@ impl AppState {
         sheet
     }
 
-    /// Replace the opening blank worksheet with one made from the settings, once
-    /// they have been read (it was made before they were).
-    pub fn renew_blank_sheet(&mut self) {
-        if let [only] = self.sheets.as_slice() {
-            if only.is_pristine() {
-                let title = only.doc.title().to_owned();
-                self.sheets[0] = self.blank_sheet(&title);
-            }
-        }
+    /// Start with no worksheet open, so the program shows the Home page (the
+    /// opening blank worksheet is only there for tests and for `AppState::new`).
+    pub fn open_on_home(&mut self) {
+        self.sheets.clear();
+        self.active = None;
     }
 
     pub fn active_sheet(&self) -> Option<&OpenSheet> {
@@ -257,6 +259,73 @@ impl AppState {
             && self
                 .active_sheet()
                 .is_some_and(|s| self.calc.shown_for == Some(s.key))
+    }
+
+    /// Whether to tell the user that the numbers on the page are out of date: manual
+    /// mode, edited since the last calculation, and not already being calculated.
+    pub fn stale_notice(&self) -> bool {
+        self.results_stale() && self.calc.worker_ok && self.calc.applied == self.calc.revision
+    }
+
+    /// Whether the Tab key steps through the regions rather than through the
+    /// controls: a region is selected, nothing is being typed into, and no window,
+    /// menu or dialog is open to want Tab for itself. With nothing selected Tab
+    /// still reaches the ribbon, so the keyboard can get there (Escape lets go of
+    /// the selection).
+    pub fn tab_steps_regions(&self, typing: bool) -> bool {
+        let Some(sheet) = self.active_sheet() else {
+            return false;
+        };
+        let c = &sheet.canvas;
+        !typing
+            && !self.text_box_focus
+            && !c.selection.is_empty()
+            && c.editing.is_none()
+            && c.unit_edit.is_none()
+            && self.dialog.is_none()
+            && !(self.app_menu_open
+                || self.about_open
+                || self.page_setup_open
+                || self.options_open
+                || self.units_open
+                || self.labels_open
+                || self.shortcuts_open
+                || self.matrix_open
+                || self.check.open
+                || self.find.open
+                || self.label_for.is_some())
+    }
+
+    /// Say something short on the status bar, where it fades after a few seconds.
+    /// For things that went well; a problem still gets a dialog.
+    pub fn notify(&mut self, text: impl Into<String>) {
+        self.notice = Some((text.into(), std::time::Instant::now()));
+    }
+
+    /// How many errors and warnings the active worksheet's results hold, as of the
+    /// last calculation (none while the results on show belong to another sheet).
+    pub fn problem_counts(&self) -> (usize, usize) {
+        use opencalc_core::document::RegionKind;
+        let Some(sheet) = self.active_sheet() else {
+            return (0, 0);
+        };
+        if self.calc.shown_for != Some(sheet.key) {
+            return (0, 0);
+        }
+        let out = &self.output;
+        let errors = sheet
+            .doc
+            .regions()
+            .iter()
+            .filter(|r| match &r.kind {
+                RegionKind::Math(m) => {
+                    !m.source().trim().is_empty() && matches!(out.values.get(&r.id), Some(Err(_)))
+                }
+                RegionKind::Plot(_) => matches!(out.plots.get(&r.id), Some(Err(_))),
+                _ => false,
+            })
+            .count();
+        (errors, out.warnings.len())
     }
 
     /// The calculation indicator on the status bar.

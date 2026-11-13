@@ -8,12 +8,6 @@ use super::show::Cx;
 use super::widgets::{self as w, Look};
 use super::{Cell, Item, Split};
 
-/// Width of one hosted control row, and of its label.
-pub(super) const CONTROL_W: f32 = 168.0;
-pub(super) const CONTROL_LABEL_W: f32 = 50.0;
-/// Narrowest a column of controls is: label, a colour button, and a gap.
-pub(super) const CONTROL_MIN_W: f32 = 116.0;
-
 pub(super) fn small_item(ui: &mut Ui, cx: &mut Cx, item: &Item, label: Option<&str>, width: f32) {
     let look = cx.look(item.command);
     let resp = w::small_button(ui, cx.theme, look, Some(item.icon), label, width);

@@ -1,9 +1,9 @@
-//! The controls on the Shape Format tab: kind, fill, outline, width, line style
-//! and corner radius of the selected shape. The ribbon lays them out and this
-//! draws them. Like every panel it reads the document and only asks: each change
+//! The shape section of the Properties panel: kind, corner radius or sides, fill,
+//! outline, width, line style and arrowheads of the selected shape, and its draw
+//! order, lock and delete. Like every panel it reads the document and only asks: each change
 //! is an edit sent back as a canvas command.
 
-use eframe::egui::{self, Id, Ui};
+use eframe::egui::{self, Id, RichText, Ui};
 use opencalc_core::document::{
     Arrowhead, Dash, RegionId, RegionKind, ShapeKind, ShapeSpec, MAX_RADIUS, MAX_SIDES, MAX_STROKE,
     MIN_SIDES,
@@ -13,8 +13,8 @@ use opencalc_core::edit::Edit;
 use super::colour_picker;
 use crate::app::AppState;
 use crate::canvas::CanvasCmd;
-use crate::ribbon::{Context, Control, ControlHost, ShapeControl};
-use crate::theme::Theme;
+use crate::commands::CommandId;
+use crate::theme::{type_size, Theme};
 
 /// The single selected shape region, if that is what is selected.
 pub fn selected_shape(state: &AppState) -> Option<(RegionId, &ShapeSpec)> {
@@ -28,13 +28,32 @@ pub fn selected_shape(state: &AppState) -> Option<(RegionId, &ShapeSpec)> {
     }
 }
 
-/// The contextual tabs the current selection calls for.
-pub fn contexts(state: &AppState) -> Vec<Context> {
-    let mut found = Vec::new();
-    if selected_shape(state).is_some() {
-        found.push(Context::Shape);
+/// The settings a shape has, one row of the panel each.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ShapeControl {
+    Kind,
+    Fill,
+    Outline,
+    Width,
+    Line,
+    Corners,
+    StartHead,
+    EndHead,
+}
+
+impl ShapeControl {
+    fn label(self) -> &'static str {
+        match self {
+            ShapeControl::Kind => "Shape",
+            ShapeControl::Fill => "Fill",
+            ShapeControl::Outline => "Outline",
+            ShapeControl::Width => "Width",
+            ShapeControl::Line => "Line",
+            ShapeControl::Corners => "Corners",
+            ShapeControl::StartHead => "Start",
+            ShapeControl::EndHead => "End",
+        }
     }
-    found
 }
 
 const KINDS: [ShapeKind; 6] = [
@@ -59,9 +78,9 @@ fn colour_id(id: RegionId, what: &'static str) -> Id {
 }
 
 /// Draws the shape controls for the selected shape.
-pub struct ShapeControls<'a> {
-    pub state: &'a AppState,
-    pub out: &'a mut Vec<CanvasCmd>,
+struct ShapeControls<'a> {
+    state: &'a AppState,
+    out: &'a mut Vec<CanvasCmd>,
 }
 
 impl ShapeControls<'_> {
@@ -80,20 +99,17 @@ impl ShapeControls<'_> {
     }
 }
 
-impl ControlHost for ShapeControls<'_> {
-    fn label(&self, control: Control) -> &'static str {
-        // The row that sets a rectangle's corners sets a polygon's sides.
+impl ShapeControls<'_> {
+    /// The label before a control; the row that sets a rectangle's corners sets a
+    /// polygon's sides.
+    fn label(&self, control: ShapeControl) -> &'static str {
         match (control, selected_shape(self.state)) {
-            (Control::Shape(ShapeControl::Corners), Some((_, s)))
-                if s.kind == ShapeKind::Polygon =>
-            {
-                "Sides"
-            }
+            (ShapeControl::Corners, Some((_, s))) if s.kind == ShapeKind::Polygon => "Sides",
             _ => control.label(),
         }
     }
 
-    fn control(&mut self, ui: &mut Ui, theme: &Theme, control: Control) {
+    fn control(&mut self, ui: &mut Ui, theme: &Theme, control: ShapeControl) {
         let Some((id, spec)) = selected_shape(self.state) else {
             return;
         };
@@ -101,7 +117,6 @@ impl ControlHost for ShapeControls<'_> {
         let mut next = spec.clone();
         let mut done = true;
         let mut changed = false;
-        let Control::Shape(control) = control;
         match control {
             ShapeControl::Kind => {
                 egui::ComboBox::from_id_salt("shape-kind")
@@ -231,6 +246,68 @@ impl ControlHost for ShapeControls<'_> {
     }
 }
 
+/// The settings of the selected shape, one labelled row each, then what can be done
+/// to it as a region (draw order, lock, delete).
+pub fn body(ui: &mut Ui, state: &AppState, cmds: &mut Vec<CommandId>, out: &mut Vec<CanvasCmd>) {
+    let Some((id, spec)) = selected_shape(state) else {
+        return;
+    };
+    let theme = state.theme;
+    let kind = spec.kind;
+    let mut host = ShapeControls { state, out };
+    egui::Grid::new("shape-settings")
+        .num_columns(2)
+        .spacing([12.0, 8.0])
+        .show(ui, |ui| {
+            let mut rows = vec![
+                ShapeControl::Kind,
+                ShapeControl::Corners,
+                ShapeControl::Fill,
+                ShapeControl::Outline,
+                ShapeControl::Width,
+                ShapeControl::Line,
+            ];
+            if kind == ShapeKind::Line {
+                rows.extend([ShapeControl::StartHead, ShapeControl::EndHead]);
+            }
+            for control in rows {
+                ui.label(
+                    RichText::new(host.label(control))
+                        .size(type_size::SMALL)
+                        .color(theme.text_weak),
+                );
+                host.control(ui, &theme, control);
+                ui.end_row();
+            }
+        });
+    ui.add_space(12.0);
+    ui.label(
+        RichText::new("ARRANGE")
+            .size(type_size::SMALL)
+            .color(theme.text_weak),
+    );
+    let locked = state
+        .active_sheet()
+        .and_then(|s| s.doc.region(id))
+        .is_some_and(|r| r.locked);
+    ui.horizontal_wrapped(|ui| {
+        for command in [
+            CommandId::ArrangeToFront,
+            CommandId::ArrangeForward,
+            CommandId::ArrangeBackward,
+            CommandId::ArrangeToBack,
+            CommandId::RegionLock,
+            CommandId::RegionDelete,
+        ] {
+            let button = egui::Button::new(command.label())
+                .selected(command == CommandId::RegionLock && locked);
+            if ui.add(button).clicked() {
+                cmds.push(command);
+            }
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271,21 +348,5 @@ mod tests {
             ],
             "a drag in progress sends edits without sealing"
         );
-    }
-
-    #[test]
-    fn only_a_single_selected_shape_calls_for_the_shape_tab() {
-        let mut state = AppState::with_sample(PaletteKey::Neutral);
-        let i = state.active.unwrap();
-        assert!(contexts(&state).is_empty());
-        let a = state.sheets[i].add(
-            RegionKind::shape(ShapeKind::Rectangle),
-            Point::new(0.0, 0.0),
-        );
-        let b = state.sheets[i].add(RegionKind::shape(ShapeKind::Ellipse), Point::new(9.0, 9.0));
-        state.sheets[i].canvas.selection = vec![a];
-        assert_eq!(contexts(&state), vec![Context::Shape]);
-        state.sheets[i].canvas.selection = vec![a, b];
-        assert!(contexts(&state).is_empty());
     }
 }

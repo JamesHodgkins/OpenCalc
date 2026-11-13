@@ -19,7 +19,11 @@ pub fn dispatch_options(state: &mut AppState, command: CommandId) -> Option<Vec<
         CommandId::ThemeSlate => set_palette(state, &mut fx, PaletteKey::Slate),
         CommandId::FileTypeRegister => fx.push(Effect::SetFileType(true)),
         CommandId::FileTypeRemove => fx.push(Effect::SetFileType(false)),
-        CommandId::FileClearRecent => state.recent.clear(),
+        // Pinned files stay: they were asked to.
+        CommandId::FileClearRecent => {
+            let pinned = &state.pinned;
+            state.recent.retain(|p| pinned.contains(p));
+        }
         CommandId::AppOptionsDefaults => {
             set_palette(state, &mut fx, PaletteKey::Neutral);
             state.show_grid = true;

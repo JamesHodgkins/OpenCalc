@@ -213,6 +213,16 @@ fn rig(name: &str) -> Rig {
     t
 }
 
+/// What the status bar says (a success is a note there, not a dialog).
+fn notice(t: &Rig) -> String {
+    assert!(t.state().dialog.is_none(), "{:?}", t.state().dialog);
+    t.state()
+        .notice
+        .clone()
+        .map(|(text, _)| text)
+        .unwrap_or_default()
+}
+
 fn message(t: &Rig) -> String {
     match &t.state().dialog {
         Some(Dialog::Message { title, text }) => format!("{title}: {text}"),
@@ -229,7 +239,7 @@ fn exporting_writes_the_file_names_it_and_leaves_the_worksheet_alone() {
     t.run(CommandId::FileExportPdf);
     let bytes = std::fs::read(&target).unwrap();
     assert!(bytes.starts_with(b"%PDF-1.4"));
-    assert!(message(&t).contains("Exported"));
+    assert!(notice(&t).contains("Exported"), "{}", notice(&t));
     assert_eq!(
         t.state().sheets[0].doc.revision(),
         revision,
@@ -258,7 +268,7 @@ fn a_long_worksheet_exports_numbered_png_files() {
     t.run(CommandId::FileExportPng);
     assert!(t.dir.join("sheet-1.png").exists() && t.dir.join("sheet-2.png").exists());
     assert!(!t.dir.join("sheet.png").exists());
-    assert!(message(&t).contains("2 page(s)"));
+    assert!(notice(&t).contains("2 pages"), "{}", notice(&t));
 }
 
 #[test]
@@ -348,4 +358,56 @@ fn the_text_of_the_worksheet_is_in_the_pdf_for_selecting_and_searching() {
     // And the file carries it.
     let pdf = pdf_bytes(&source, 0.5).unwrap();
     assert!(String::from_utf8_lossy(&pdf).contains(" Tj ET"));
+}
+
+#[test]
+fn exporting_results_that_are_out_of_date_asks_first() {
+    let mut t = rig("export_stale");
+    // Let the calculation of the opening worksheet land first: a slow machine may not
+    // have finished it, and the notice waits until nothing is in flight.
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while t.state().calc.applied != t.state().calc.revision && std::time::Instant::now() < end {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        t.h.frame();
+    }
+    t.h.app.state.live_recalc = false;
+    t.type_into_active("b := 2");
+    assert!(t.state().results_stale() && t.state().stale_notice());
+    let target = t.dir.join("late.pdf");
+    t.answer_export(Some(target.clone()));
+    t.run(CommandId::FileExportPdf);
+    assert!(
+        matches!(t.state().dialog, Some(Dialog::StaleExport(_))),
+        "asked, and wrote nothing"
+    );
+    assert!(!target.exists());
+
+    t.run(CommandId::DialogCancel);
+    assert!(t.state().dialog.is_none() && !target.exists());
+
+    // Recalculating instead brings the numbers up to date; nothing is exported.
+    t.run(CommandId::FileExportPdf);
+    t.run(CommandId::DialogRecalculate);
+    for _ in 0..40 {
+        t.h.frame();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(!t.state().results_stale() && !target.exists());
+
+    // Exporting what is shown goes ahead.
+    t.type_into_active("c := 3");
+    t.answer_export(Some(target.clone()));
+    t.run(CommandId::FileExportPdf);
+    t.run(CommandId::DialogExportAnyway);
+    assert!(std::fs::read(&target).unwrap().starts_with(b"%PDF-1.4"));
+    assert!(notice(&t).contains("Exported"), "{}", notice(&t));
+}
+
+#[test]
+fn up_to_date_results_export_without_asking() {
+    let mut t = rig("export_fresh");
+    assert!(!t.state().stale_notice());
+    t.answer_export(Some(t.dir.join("fresh.pdf")));
+    t.run(CommandId::FileExportPdf);
+    assert!(notice(&t).contains("Exported"), "{}", notice(&t));
 }

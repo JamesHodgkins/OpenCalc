@@ -8,7 +8,7 @@ use opencalc_core::document::{Region, RegionKind, ShapeKind, ShapeSpec, MAX_RADI
 
 use super::magnet::{snap_point, Guide, Targets};
 use super::shape::{constrained, line_ends_on_screen};
-use super::view::snap;
+use super::view::Snapper;
 
 /// Pixels from a grip's centre that still count as on it.
 pub const REACH: f32 = 7.0;
@@ -82,7 +82,7 @@ pub fn fixed_end(grip: Grip, r: &Region) -> Pos2 {
 pub fn line_end_dragged(
     fixed: Pos2,
     p: Pos2,
-    grid: Option<f32>,
+    grid: Option<Snapper>,
     constrain: bool,
     edges: Option<(&Targets, f32)>,
 ) -> (Pos2, Vec<Guide>) {
@@ -90,7 +90,7 @@ pub fn line_end_dragged(
     let moved = if constrain {
         constrained(fixed, p)
     } else {
-        let on_grid = grid.map_or(p, |g| snap(p, g));
+        let on_grid = grid.map_or(p, |g| g.snap(p));
         match edges {
             // Another region's edge beats the grid on the axis where one is near.
             Some((t, reach)) => {
@@ -192,10 +192,23 @@ mod tests {
     fn dragging_a_line_end_snaps_constrains_and_stays_on_the_page() {
         let fixed = Pos2::new(100.0, 100.0);
         assert_eq!(
-            line_end_dragged(fixed, Pos2::new(203.0, 148.0), Some(10.0), false, None).0,
+            line_end_dragged(
+                fixed,
+                Pos2::new(203.0, 148.0),
+                Some(Snapper::plain(10.0)),
+                false,
+                None
+            )
+            .0,
             Pos2::new(200.0, 150.0)
         );
-        let (out, _) = line_end_dragged(fixed, Pos2::new(300.0, 103.0), Some(10.0), true, None);
+        let (out, _) = line_end_dragged(
+            fixed,
+            Pos2::new(300.0, 103.0),
+            Some(Snapper::plain(10.0)),
+            true,
+            None,
+        );
         assert!((out.y - 100.0).abs() < 0.1, "turned level: {out:?}");
         assert_eq!(
             line_end_dragged(fixed, Pos2::new(-20.0, -5.0), None, false, None).0,
@@ -209,7 +222,7 @@ mod tests {
         let (out, guides) = line_end_dragged(
             fixed,
             Pos2::new(204.0, 148.0),
-            Some(10.0),
+            Some(Snapper::plain(10.0)),
             false,
             Some((&t, 6.0)),
         );

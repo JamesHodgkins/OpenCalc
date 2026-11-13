@@ -104,10 +104,17 @@ fn swatch_button(
     };
     swatch(ui, drawn, Some(colour.resolve(auto)), theme);
     if selected {
+        // Two tones, so the ring shows against a swatch of any colour.
         ui.painter().rect_stroke(
-            rect.expand(2.0),
+            rect.expand(2.5),
             3.0,
-            Stroke::new(2.0_f32, theme.accent),
+            Stroke::new(1.5_f32, theme.text),
+            StrokeKind::Outside,
+        );
+        ui.painter().rect_stroke(
+            rect.expand(1.0),
+            3.0,
+            Stroke::new(1.5_f32, theme.base),
             StrokeKind::Outside,
         );
     }
@@ -154,16 +161,17 @@ fn bar(ui: &mut Ui, label: &str, face: Option<[u8; 4]>, selected: bool, theme: &
         Vec2::new(ui.available_width().max(SWATCH * 10.0), 28.0),
         Sense::click(),
     );
-    if resp.hovered() {
-        ui.painter().rect_filled(rect, 4.0, theme.accent_hover);
-    }
+    // A selected row is a lighter grey, a hovered one a step above the page.
     if selected {
+        ui.painter().rect_filled(rect, 4.0, theme.pressed);
         ui.painter().rect_stroke(
             rect,
             4.0,
-            Stroke::new(1.5_f32, theme.accent),
+            Stroke::new(1.0_f32, theme.border_strong),
             StrokeKind::Inside,
         );
+    } else if resp.hovered() {
+        ui.painter().rect_filled(rect, 4.0, theme.raised_high);
     }
     let sw = Rect::from_center_size(
         Pos2::new(rect.left() + 16.0, rect.center().y),
@@ -198,7 +206,7 @@ pub fn button(
         rect,
         3.0,
         if resp.hovered() {
-            theme.accent_hover
+            theme.raised_high
         } else {
             theme.base
         },

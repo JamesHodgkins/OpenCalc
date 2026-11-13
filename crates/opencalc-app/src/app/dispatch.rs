@@ -41,8 +41,10 @@ pub enum Effect {
     NewFromTemplate,
     /// Ask where to write the active worksheet as a template.
     SaveAsTemplate,
-    /// Export the active worksheet.
+    /// Export the active worksheet (asks first if its results are out of date).
     Export(crate::export::Kind),
+    /// Export it without asking that.
+    ExportNow(crate::export::Kind),
     /// Fill the selected table from a CSV file, or write it to one.
     ImportCsv,
     /// Choose an image file for the selected picture.
@@ -162,6 +164,8 @@ pub fn dispatch(state: &mut AppState, command: CommandId) -> Option<Vec<Effect>>
         RegionDelete => with_eval_check(state, &mut fx, |s| {
             s.delete_selection();
         }),
+        EditSelectAll => select_all(state),
+        EditDuplicate => duplicate(state, &mut fx),
         EditUndo => with_eval_check(state, &mut fx, |s| {
             s.undo();
         }),
@@ -236,7 +240,6 @@ pub fn apply_canvas(state: &mut AppState, sheet: usize, cmds: Vec<CanvasCmd>) ->
                     ..ShapeSpec::of(kind)
                 };
                 state.sheets[sheet].insert_drawn(RegionKind::Shape(Box::new(spec)), pos, size);
-                state.ribbon_focus = Some(crate::ribbon::Context::Shape);
             }
             CanvasCmd::TypeAhead(text) => {
                 let s = &mut state.sheets[sheet];
@@ -273,6 +276,29 @@ pub(super) fn close_sheet(state: &mut AppState, i: usize) {
 
 /// Run `f` on the active sheet and ask for a recalculation if that changed what
 /// the evaluator would compute. Moving or resizing a region never does.
+/// Copy the selected regions (see `OpenSheet::duplicate_selection`).
+fn duplicate(state: &mut AppState, fx: &mut Vec<Effect>) {
+    use opencalc_core::persist::MAX_REGIONS;
+    let Some(sheet) = state.active_sheet() else {
+        return;
+    };
+    if sheet.doc.regions().len() + sheet.canvas.selection.len() > MAX_REGIONS {
+        let text = format!("A worksheet can hold at most {MAX_REGIONS} regions.");
+        state.message("Duplicate", text);
+        return;
+    }
+    with_eval_check(state, fx, |s| {
+        s.duplicate_selection();
+    });
+}
+
+/// Select every region of the active worksheet.
+fn select_all(state: &mut AppState) {
+    if let Some(i) = state.active {
+        state.sheets[i].select_all();
+    }
+}
+
 fn with_eval_check(state: &mut AppState, fx: &mut Vec<Effect>, f: impl FnOnce(&mut OpenSheet)) {
     let Some(i) = state.active else { return };
     let before = state.sheets[i].doc.eval_revision();

@@ -19,6 +19,17 @@ impl App {
     /// Ask where to put it, draw the pages and write them. Reports the result, or
     /// what went wrong, in a message; the worksheet is never changed.
     pub(super) fn export_active(&mut self, kind: Kind) {
+        // A printout of numbers that no longer match the inputs is the worst
+        // surprise this program can give, so ask first.
+        if self.state.results_stale() {
+            self.state.dialog = Some(crate::app::filing::Dialog::StaleExport(kind));
+            return;
+        }
+        self.export_now(kind);
+    }
+
+    /// Export without checking that the results are up to date.
+    pub(super) fn export_now(&mut self, kind: Kind) {
         let Some(sheet) = self.state.active_sheet() else {
             return;
         };
@@ -38,14 +49,21 @@ impl App {
         };
         match write(kind, &source, &path, self.export_shrink) {
             Ok(files) => {
-                let list: Vec<String> = files.iter().map(|f| f.display().to_string()).collect();
-                let pages = if files.len() == 1 && kind == Kind::Pdf {
-                    String::new()
-                } else {
-                    format!("{} page(s)\n\n", files.len())
+                let name = |f: &Path| {
+                    f.file_name()
+                        .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
                 };
-                self.state
-                    .message("Exported", format!("{pages}{}", list.join("\n")));
+                let text = match files.as_slice() {
+                    [one] => format!("Exported {}", name(one)),
+                    [first, .., last] => format!(
+                        "Exported {} pages: {} to {}",
+                        files.len(),
+                        name(first),
+                        name(last)
+                    ),
+                    [] => "Exported".to_owned(),
+                };
+                self.state.notify(text);
             }
             Err(reason) => self.state.message(
                 "Could not export",

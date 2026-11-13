@@ -3,7 +3,7 @@
 
 use eframe::egui::{CursorIcon, Pos2, Rect, Vec2};
 
-use super::view::snap;
+use super::view::Snapper;
 
 /// The smallest a region may be made, in document units.
 pub const MIN_SIDE: f32 = 8.0;
@@ -121,14 +121,14 @@ pub fn resized(
     orig: Rect,
     handle: Handle,
     p: Pos2,
-    grid: Option<f32>,
+    grid: Option<Snapper>,
     ratio: bool,
     centre: bool,
 ) -> Rect {
     let (dx, dy) = handle.dir();
     let keep = ratio && handle.is_corner() && orig.width() > 0.0 && orig.height() > 0.0;
     let p = match grid {
-        Some(g) if !keep => snap(p, g),
+        Some(g) if !keep => g.snap(p),
         _ => p,
     };
     let (x0, x1) = axis(orig.min.x, orig.max.x, dx, p.x, centre);
@@ -161,8 +161,8 @@ pub fn resized(
 /// - `square`: equal sides (the longer drag wins), going the way the pointer went.
 /// - `centre`: `start` is the middle and the box grows both ways.
 /// - `grid`: snap the corners (the middle when drawing from it).
-pub fn drawn(start: Pos2, end: Pos2, grid: Option<f32>, square: bool, centre: bool) -> Rect {
-    let snap_to = |p: Pos2| grid.map_or(p, |g| snap(p, g));
+pub fn drawn(start: Pos2, end: Pos2, grid: Option<Snapper>, square: bool, centre: bool) -> Rect {
+    let snap_to = |p: Pos2| grid.map_or(p, |g| g.snap(p));
     let a = snap_to(start);
     let mut d = snap_to(end) - a;
     if square {
@@ -279,7 +279,7 @@ mod tests {
             r(),
             Handle::E,
             Pos2::new(347.0, 150.0),
-            Some(10.0),
+            Some(Snapper::plain(10.0)),
             false,
             false,
         );
@@ -318,7 +318,7 @@ mod tests {
         let out = drawn(
             Pos2::new(13.0, 27.0),
             Pos2::new(98.0, 71.0),
-            Some(10.0),
+            Some(Snapper::plain(10.0)),
             false,
             false,
         );

@@ -16,6 +16,7 @@ mod grid;
 pub mod grip;
 pub mod hit;
 pub mod magnet;
+mod nudge;
 mod overlay;
 pub(crate) mod page;
 pub(crate) mod paint;
@@ -114,13 +115,19 @@ pub struct CanvasUi {
     pub insert_at: Pos2,
     /// The snap grid (from the settings; `OpenSheet::set_grid` changes it).
     pub grid: crate::settings::GridSpacing,
+    /// That grid anchored to the page margins, as of the last frame.
+    pub snapper: view::Snapper,
     /// The last click was on blank page, so typing starts a math region there.
     pub armed: bool,
+    /// An arrow key is moving the selection (one undo step until it is let go).
+    pub nudging: bool,
     /// Content sizes measured by the last paint.
     pub sizes: Sizes,
     /// Fit the page width into the viewport on the next frame (set when a
     /// worksheet is first shown).
     pub fit_pending: bool,
+    /// Viewport width at the last frame, so a resize can keep the view centred.
+    last_width: f32,
     /// Lines to show where the drag in progress snapped to another region's edge.
     guides: Vec<magnet::Guide>,
     drag: Option<Drag>,
@@ -141,11 +148,14 @@ impl Default for CanvasUi {
             pen: None,
             insert_at: Pos2::new(40.0, 40.0),
             grid: Default::default(),
+            snapper: view::Snapper::plain(crate::settings::GridSpacing::default().step()),
             // The initial insertion point is ready for type-to-create, just like
             // the point after moving the crosshair or clicking the blank page.
             armed: true,
+            nudging: false,
             sizes: Sizes::new(),
             fit_pending: true,
+            last_width: 0.0,
             guides: Vec::new(),
             drag: None,
         }
@@ -173,6 +183,8 @@ impl CanvasUi {
 
 pub struct CanvasOut {
     pub cmds: Vec<CanvasCmd>,
+    /// The canvas's response, for the right-click menu.
+    pub response: egui::Response,
     /// Screen rectangle the canvas occupied.
     pub viewport: Rect,
     /// The page in view (counting from 1) and the number of pages.
@@ -203,15 +215,28 @@ pub fn show(
     if st.fit_pending && rect.width() > 1.0 {
         *view = page::fit_width(&env.page, rect.size());
         st.fit_pending = false;
+    } else if st.last_width > 1.0 && rect.width() > 1.0 {
+        // On a resize keep the same document point at the middle of the viewport,
+        // so a centred page stays centred.
+        view.offset.x += (rect.width() - st.last_width) / 2.0;
     }
+    st.last_width = rect.width();
     pointer::navigate(ui, &resp, origin, view);
+    st.snapper = view::Snapper::new(st.grid.step(), &env.page, env.draft);
 
     // The pages, and the grid inside their margins. Pages exist as far down as content reaches.
     let pages = page::page_count(&env.page, page::content_bottom(regions, &st.sizes));
     for screen in page::paint(&painter, rect, view, origin, &env.page, pages, env) {
         if env.show_grid {
             let on_page = painter.with_clip_rect(screen.intersect(rect));
-            grid::grid(&on_page, screen, view, origin, env.paper, st.grid);
+            // The lattice starts at the margin box. In page view `screen` is that box;
+            // in draft view it is the whole sheet, so step in by the margin.
+            let anchor = if env.draft {
+                screen.min + Vec2::splat(env.page.margin() * view.zoom)
+            } else {
+                screen.min
+            };
+            grid::grid(&on_page, screen, view, anchor, env.paper, st.grid);
         }
     }
 
@@ -231,7 +256,7 @@ pub fn show(
         }
     }
 
-    chrome::selection(&painter, theme, regions, view, origin, st);
+    chrome::selection(&painter, env.paper, regions, view, origin, st);
 
     overlay::marks(ui, &painter, view, origin, regions, st, theme);
     // Regions with a Find match: a light wash, stronger on the current one.
@@ -258,7 +283,18 @@ pub fn show(
     if st.editing.is_none() {
         // (A key that just ended editing has already placed the crosshair.)
         if !was_editing {
-            overlay::move_crosshair(ui, regions, st);
+            if st.selection.is_empty() {
+                overlay::move_crosshair(ui, regions, st);
+            } else {
+                // Selection wins over the crosshair: arrows move what is selected,
+                // and Escape lets go of it (so the arrows move the crosshair again).
+                nudge::nudge(ui, env, regions, st, &mut cmds);
+                nudge::edit_on_enter(ui, regions, st, &mut cmds);
+                let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
+                if escape && st.pen.is_none() && !ui.ctx().wants_keyboard_input() {
+                    st.selection.clear();
+                }
+            }
         }
         if st.editing.is_none() {
             overlay::crosshair(&painter, view, origin, st, env);
@@ -274,7 +310,7 @@ pub fn show(
     pointer::pointer(ui, &resp, &scene, st, &mut cmds);
 
     abandon::remove_if_empty(st, regions, &mut cmds);
-    overlay::marquee(&painter, view, origin, st, theme);
+    overlay::marquee(&painter, view, origin, st, env.paper);
     for g in &st.guides {
         let at = view.doc_to_screen(Pos2::new(g.at, g.at), origin);
         let (a, b) = if g.vertical {
@@ -284,10 +320,10 @@ pub fn show(
         };
         painter.line_segment(
             [a, b],
-            Stroke::new(1.0_f32, theme.accent.gamma_multiply(0.8)),
+            Stroke::new(1.0_f32, env.paper.selection.gamma_multiply(0.8)),
         );
     }
-    chrome::pen_preview(ui, &painter, env, theme, view, origin, st);
+    chrome::pen_preview(ui, &painter, env, env.paper, view, origin, st);
     painter.text(
         rect.min + Vec2::new(10.0, 8.0),
         egui::Align2::LEFT_TOP,
@@ -298,6 +334,7 @@ pub fn show(
     let middle = view.screen_to_doc(rect.center(), origin).y;
     CanvasOut {
         cmds,
+        response: resp,
         viewport: rect,
         page: (page::page_at(&env.page, middle, pages) + 1, pages),
     }

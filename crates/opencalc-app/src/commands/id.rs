@@ -28,6 +28,10 @@ macro_rules! commands {
             PageMarginMm(u8),
             /// Open the n-th recently used file.
             OpenRecent(u8),
+            /// Pin the n-th recent file to the top of the list, or unpin it.
+            PinRecent(u8),
+            /// Take the n-th recent file off the list (the file is not touched).
+            ForgetRecent(u8),
             /// Go to the n-th finding of the Check window.
             GoToFinding(u16),
             /// Insert a matrix of this many rows and columns.
@@ -57,6 +61,8 @@ macro_rules! commands {
                     CommandId::PageLandscape(_) => "page.orientation",
                     CommandId::PageMarginMm(_) => "page.margin",
                     CommandId::OpenRecent(_) => "file.open_recent",
+                    CommandId::PinRecent(_) => "file.pin_recent",
+                    CommandId::ForgetRecent(_) => "file.forget_recent",
                     CommandId::GoToFinding(_) => "check.go_to",
                     CommandId::InsertMatrixSize(..) => "insert.matrix_size",
                     CommandId::GoToLabel(_) => "labels.go_to",
@@ -77,6 +83,8 @@ macro_rules! commands {
                     CommandId::PageLandscape(false) => "Portrait",
                     CommandId::PageMarginMm(_) => "Margin",
                     CommandId::OpenRecent(_) => "Open recent file",
+                    CommandId::PinRecent(_) => "Pin or unpin recent file",
+                    CommandId::ForgetRecent(_) => "Remove from recent files",
                     CommandId::GoToFinding(_) => "Go to problem",
                     CommandId::InsertMatrixSize(..) => "Insert matrix",
                     CommandId::GoToLabel(_) => "Go to labelled region",
@@ -95,6 +103,8 @@ macro_rules! commands {
                     | CommandId::PageLandscape(_)
                     | CommandId::PageMarginMm(_) => icons::FIT,
                     CommandId::OpenRecent(_) => icons::FOLDER_OPEN,
+                    CommandId::PinRecent(_) => icons::PIN,
+                    CommandId::ForgetRecent(_) => icons::DELETE,
                     CommandId::GoToFinding(_) => icons::WARNING,
                     CommandId::InsertMatrixSize(..) => icons::TABLE,
                     CommandId::GoToLabel(_) => icons::TAG,
@@ -120,6 +130,8 @@ commands! {
     DialogOk: "dialog.ok", "OK", icons::CLOSE;
     DialogRestore: "dialog.restore", "Restore", icons::REFRESH;
     DialogDropRecovery: "dialog.drop_recovery", "Discard", icons::DELETE;
+    DialogExportAnyway: "dialog.export_anyway", "Export anyway", icons::FILE_OUTPUT;
+    DialogRecalculate: "dialog.recalculate", "Recalculate", icons::REFRESH;
     FileClose: "file.close", "Close worksheet", icons::FILE_CLOSE;
     FileNewFromTemplate: "file.new_from_template", "New from template...", icons::TEMPLATE;
     FileSaveAsTemplate: "file.save_as_template", "Save as template...", icons::TEMPLATE;
@@ -142,6 +154,8 @@ commands! {
     ClipboardCopy: "clipboard.copy", "Copy", icons::COPY;
     EditUndo: "edit.undo", "Undo", icons::UNDO;
     EditRedo: "edit.redo", "Redo", icons::REDO;
+    EditSelectAll: "edit.select_all", "Select all", icons::LIST;
+    EditDuplicate: "edit.duplicate", "Duplicate", icons::COPY;
     EditFind: "edit.find", "Find", icons::FIND;
     EditReplace: "edit.replace", "Replace", icons::REPLACE;
     FindNext: "find.next", "Find next", icons::FIND;
@@ -249,21 +263,22 @@ impl CommandId {
             | FindClose | UnitsDefine | UnitsManage | UnitsClose | FileNew
             | FileNewFromTemplate | FileSaveAsTemplate | FileOpen | FileSave | FileSaveAs
             | DialogSave | DialogDiscard | DialogCancel | DialogOk | DialogRestore
-            | DialogDropRecovery | OpenRecent(_) | UnitsShowIn(_) | GoToFinding(_)
+            | DialogDropRecovery | DialogExportAnyway | DialogRecalculate | OpenRecent(_)
+            | PinRecent(_) | ForgetRecent(_) | UnitsShowIn(_) | GoToFinding(_)
             | InsertMatrixSize(..) | MatrixClose | InsertMatrix | InsertRange
             | InsertSolveBlock | InsertProgram | CheckClose | CalcCheck | WarnNext | WarnPrev
             | FileClose | FileExample | AppQuit | AppMenu | AppMenuClose | TabHome | EditUndo
-            | EditRedo | RegionDelete | InsertMath | InsertText | InsertArea | InsertPlot
-            | InsertTable | PictureChoose | TableImportCsv | TableExportCsv | InsertPicture
-            | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit | ViewZoom100 | ViewGrid
-            | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout | AppOptions
-            | AppOptionsClose | AppOptionsDefaults | FileClearRecent | ThemeNeutral
-            | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout | HelpAboutClose
-            | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_) | PageLandscape(_)
-            | PageMarginMm(_) | DocPageSetup | DocPageSetupClose | ViewPageView | ViewDraftView
-            | InsertGreek | InsertSymbol(_) | InsertRectangle | InsertEllipse | InsertLine
-            | InsertTriangle | InsertDiamond | InsertPolygon | ArrangeToFront | ArrangeForward
-            | ArrangeBackward | ArrangeToBack => true,
+            | EditRedo | EditSelectAll | EditDuplicate | RegionDelete | InsertMath | InsertText
+            | InsertArea | InsertPlot | InsertTable | PictureChoose | TableImportCsv
+            | TableExportCsv | InsertPicture | CalcAll | ViewZoomIn | ViewZoomOut | ViewZoomFit
+            | ViewZoom100 | ViewGrid | ViewSnap | CalcAuto | ViewFunctions | ViewResetLayout
+            | AppOptions | AppOptionsClose | AppOptionsDefaults | FileClearRecent
+            | ThemeNeutral | ThemeSlate | UnitsSi | UnitsUscs | UnitsCgs | HelpAbout
+            | HelpAboutClose | SelectSheet(_) | CloseSheet(_) | ZoomTo(_) | PagePaper(_)
+            | PageLandscape(_) | PageMarginMm(_) | DocPageSetup | DocPageSetupClose
+            | ViewPageView | ViewDraftView | InsertGreek | InsertSymbol(_) | InsertRectangle
+            | InsertEllipse | InsertLine | InsertTriangle | InsertDiamond | InsertPolygon
+            | ArrangeToFront | ArrangeForward | ArrangeBackward | ArrangeToBack => true,
             HelpGuide => false,
         }
     }

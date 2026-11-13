@@ -14,7 +14,6 @@ use opencalc_core::persist::{MAX_REGIONS, MAX_TEXT_CHARS};
 
 use super::dispatch::apply_canvas;
 use super::App;
-use crate::canvas::view::snap;
 use crate::canvas::CanvasCmd;
 use crate::commands::CommandId;
 
@@ -234,8 +233,8 @@ impl App {
         sheet.canvas.editing = None;
         sheet.canvas.field = None;
         // The next paste or insertion goes just below this one.
-        let grid = sheet.canvas.grid.step();
-        sheet.canvas.insert_at = snap(eframe::egui::Pos2::new(at.x, bottom + 12.0), grid);
+        let grid = sheet.snapper();
+        sheet.canvas.insert_at = grid.snap(eframe::egui::Pos2::new(at.x, bottom + 12.0));
         if !effects.is_empty() {
             self.recalculate();
         }

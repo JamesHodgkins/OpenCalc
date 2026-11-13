@@ -87,11 +87,11 @@ fn a_new_worksheet_starts_with_the_default_units_and_page_and_is_unmodified() {
     assert_eq!(new.canvas.grid, GridSpacing::Quarter);
     assert!(!new.dirty(), "the defaults are not a change");
     assert!(!new.can_undo(), "nor something to undo");
-    // The first input sits inside the margin, on the grid.
+    // The first input sits at the margin corner, which is where the grid starts.
     let at = new.canvas.insert_at;
     let margin = page.margin();
-    assert!(at.x >= margin && at.y >= margin, "{at:?}");
-    assert_eq!(at.x % GridSpacing::Quarter.step(), 0.0);
+    assert_eq!((at.x, at.y), (margin, margin));
+    assert_eq!(new.snapper().snap(at), at, "and it is a grid point");
 }
 
 #[test]

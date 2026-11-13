@@ -76,8 +76,9 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands, edits: &mut Vec
     egui::Window::new("Units")
         .open(&mut open)
         .collapsible(false)
-        .resizable(false)
-        .default_width(380.0)
+        .resizable(true)
+        .default_size([420.0, 500.0])
+        .min_size([340.0, 380.0])
         .show(ctx, |ui| {
             let weak = state.theme.text_weak;
             heading(ui, "YOUR UNITS", weak);
@@ -126,7 +127,8 @@ fn list(ui: &mut Ui, units: &[UnitDef], form: &mut Form, edits: &mut Vec<CanvasC
     }
     egui::ScrollArea::vertical()
         .id_salt("units-list-scroll")
-        .max_height(160.0)
+        // What is left once the form below is allowed for.
+        .max_height((ui.available_height() - 260.0).max(90.0))
         .auto_shrink([false, true])
         .show(ui, |ui| {
             egui::Grid::new("units-list")

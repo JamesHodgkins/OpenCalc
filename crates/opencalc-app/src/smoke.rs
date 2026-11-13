@@ -27,6 +27,7 @@ mod borders;
 mod calculation;
 mod check;
 mod clipboard;
+mod context_menu;
 mod editor;
 mod export;
 mod files;
@@ -36,10 +37,13 @@ mod headers;
 mod insert;
 mod instance;
 mod label;
+mod nudge;
 mod options;
 mod pictures;
 mod plot_view;
 mod plots;
+mod properties;
+mod recent;
 mod rich_text;
 mod shapes;
 mod tables;
@@ -105,6 +109,8 @@ struct Harness {
     copied: Option<String>,
     /// Modifier keys held down for every frame (set by a test, like holding Shift).
     held: Modifiers,
+    /// The cursor the app asked for in the last frame.
+    cursor: egui::CursorIcon,
 }
 
 impl Harness {
@@ -121,12 +127,13 @@ impl Harness {
             time: 0.0,
             copied: None,
             held: Modifiers::NONE,
+            cursor: egui::CursorIcon::Default,
         }
     }
 
     fn frame_with(&mut self, events: Vec<Event>) {
         self.time += 0.05;
-        let input = RawInput {
+        let mut input = RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1280.0, 780.0))),
             time: Some(self.time),
             events,
@@ -134,7 +141,9 @@ impl Harness {
             ..Default::default()
         };
         let app = &mut self.app;
+        app.claim_tab(&self.ctx, &mut input);
         let out = self.ctx.run(input, |ctx| app.frame(ctx));
+        self.cursor = out.platform_output.cursor_icon;
         for command in out.platform_output.commands {
             if let egui::OutputCommand::CopyText(text) = command {
                 self.copied = Some(text);
@@ -503,8 +512,12 @@ fn clicking_selects_and_dragging_moves_a_region() {
     let moved = h.region_pos(F);
     // Snapped to the grid, and moved about (100, 60) from where it began.
     let grid = h.sheet().canvas.grid.step();
-    assert_eq!(moved.x % grid, 0.0);
-    assert_eq!(moved.y % grid, 0.0);
+    // "On the grid" means a whole number of steps from the margin corner.
+    let margin = h.sheet().doc.page().margin();
+    for (v, name) in [(moved.x, "x"), (moved.y, "y")] {
+        let k = (v - margin) / grid;
+        assert!((k - k.round()).abs() < 1e-3, "{name} {v} is off the grid");
+    }
     assert!(
         (moved.x - start.x - 100.0).abs() <= grid,
         "x: {moved:?} from {start:?}"

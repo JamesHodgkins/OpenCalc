@@ -49,7 +49,7 @@ fn layout(ui: &mut egui::Ui, state: &AppState, out: &mut Commands, l: Layout) {
                 let colour = if l.icon == icons::WARNING {
                     theme.warning
                 } else {
-                    theme.accent
+                    theme.text
                 };
                 // Reserve the whole column so the gap after the icon is fixed.
                 let (rect, _) = ui
@@ -93,7 +93,7 @@ fn layout(ui: &mut egui::Ui, state: &AppState, out: &mut Commands, l: Layout) {
                 for (i, &command) in l.buttons.iter().enumerate().rev() {
                     let text = RichText::new(command.label());
                     let button = if i == 0 {
-                        egui::Button::new(text.strong()).fill(theme.accent)
+                        egui::Button::new(text.strong()).fill(theme.raised_high)
                     } else {
                         egui::Button::new(text)
                     };
@@ -164,6 +164,23 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
                 },
             );
         }
+        Dialog::StaleExport(_) => layout(
+            ui,
+            state,
+            out,
+            Layout {
+                icon: icons::WARNING,
+                title: "The results are out of date",
+                body: "The worksheet was changed after it was last calculated, so the \
+                       numbers on the page do not match its inputs.",
+                note: Some("Recalculate, then export again, or export what is shown."),
+                buttons: &[
+                    CommandId::DialogRecalculate,
+                    CommandId::DialogExportAnyway,
+                    CommandId::DialogCancel,
+                ],
+            },
+        ),
         Dialog::Message { title, text } => layout(
             ui,
             state,
@@ -180,7 +197,9 @@ pub fn show(ctx: &Context, state: &AppState, out: &mut Commands) {
     // Escape, or a click outside, answers "Cancel" / "OK".
     if response.should_close() {
         out.push(match dialog {
-            Dialog::Unsaved { .. } | Dialog::Recover(_) => CommandId::DialogCancel,
+            Dialog::Unsaved { .. } | Dialog::Recover(_) | Dialog::StaleExport(_) => {
+                CommandId::DialogCancel
+            }
             Dialog::Message { .. } => CommandId::DialogOk,
         });
     }

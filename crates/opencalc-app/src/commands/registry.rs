@@ -68,6 +68,8 @@ impl Registry {
             | CommandId::PageLandscape(_)
             | CommandId::PageMarginMm(_)
             | CommandId::OpenRecent(_)
+            | CommandId::PinRecent(_)
+            | CommandId::ForgetRecent(_)
             | CommandId::GoToFinding(_)
             | CommandId::InsertMatrixSize(..)
             | CommandId::GoToLabel(_) => true,
@@ -130,6 +132,8 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             | ViewDraftView
             | EditUndo
             | EditRedo
+            | EditSelectAll
+            | EditDuplicate
             | RegionDelete
             | CalcCheck
             | ViewLabels
@@ -146,6 +150,7 @@ fn available(command: CommandId, ctx: &CommandContext) -> bool {
             || !matches!(
                 command,
                 RegionDelete
+                    | EditDuplicate
                     | ClipboardCut
                     | ClipboardCopy
                     | RegionLock

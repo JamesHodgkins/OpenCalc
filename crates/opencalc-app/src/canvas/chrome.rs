@@ -18,9 +18,9 @@ pub(super) fn selection(
     origin: Pos2,
     st: &CanvasUi,
 ) {
-    let outline = Stroke::new(1.5_f32, theme.accent);
+    let outline = Stroke::new(1.5_f32, theme.selection);
     // A lone resizable object gets a thin grey frame on its edge with round
-    // grips, as in Office; other selections keep the accent outline.
+    // grips, as in Office; other selections keep the selection outline.
     let grey = Stroke::new(1.0_f32, theme.text_weak);
     for id in &st.selection {
         if let Some(r) = regions.iter().find(|r| r.id == *id) {
@@ -43,7 +43,7 @@ pub(super) fn selection(
                 for (g, at) in grip::grips(r, inner, view.zoom) {
                     let radius = pointer::HANDLE_SIZE / 2.0;
                     if g == grip::Grip::Corner {
-                        painter.circle_filled(at, radius, theme.accent);
+                        painter.circle_filled(at, radius, theme.selection);
                         painter.circle_stroke(
                             at,
                             radius,
@@ -78,7 +78,7 @@ pub(super) fn pen_preview(
 ) {
     if let (Some(kind), Some(Drag::Draw { start, current })) = (st.pen, &st.drag) {
         let mods = ui.input(|i| i.modifiers);
-        let grid = (env.snap && !mods.alt).then_some(st.grid.step());
+        let grid = (env.snap && !mods.alt).then_some(st.snapper);
         if kind == ShapeKind::Line {
             let (from, to) = shape::drawn_line(
                 *start,
@@ -89,7 +89,7 @@ pub(super) fn pen_preview(
             );
             let a = view.doc_to_screen(Pos2::new(from.x, from.y), origin);
             let b = view.doc_to_screen(Pos2::new(to.x, to.y), origin);
-            painter.line_segment([a, b], Stroke::new(1.5_f32, theme.accent));
+            painter.line_segment([a, b], Stroke::new(1.5_f32, theme.selection));
         }
         let (pos, size) = shape::drawn_box(
             kind,
@@ -103,6 +103,6 @@ pub(super) fn pen_preview(
             Rect::from_min_size(Pos2::new(pos.x, pos.y), Vec2::new(size.w, size.h)),
             origin,
         );
-        shape::preview(painter, kind, band, theme.accent);
+        shape::preview(painter, kind, band, theme.selection);
     }
 }

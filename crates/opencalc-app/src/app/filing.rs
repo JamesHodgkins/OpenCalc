@@ -32,6 +32,8 @@ pub enum Dialog {
     },
     /// Changes that were not saved when the program last stopped.
     Recover(Recovery),
+    /// An export was asked for while the numbers on the page are out of date.
+    StaleExport(crate::export::Kind),
 }
 
 /// A recovery file found at startup.
@@ -57,11 +59,29 @@ impl AppState {
         });
     }
 
-    /// Put `path` first in the recent list.
+    /// Put `path` first in the recent list. Only the unpinned entries are limited
+    /// in number: a pinned file stays until it is unpinned.
     pub fn note_recent(&mut self, path: &std::path::Path) {
         self.recent.retain(|p| p != path);
         self.recent.insert(0, path.to_owned());
-        self.recent.truncate(MAX_RECENT);
+        let mut unpinned = 0;
+        let pinned = &self.pinned;
+        self.recent.retain(|p| {
+            if pinned.contains(p) {
+                return true;
+            }
+            unpinned += 1;
+            unpinned <= MAX_RECENT
+        });
+    }
+
+    /// Pin `path` to the top of the Home page, or unpin it.
+    pub fn toggle_pin(&mut self, path: &std::path::Path) {
+        if let Some(i) = self.pinned.iter().position(|p| p == path) {
+            self.pinned.remove(i);
+        } else {
+            self.pinned.push(path.to_owned());
+        }
     }
 
     /// The index of the worksheet that is open from `path`, if any.
@@ -131,6 +151,17 @@ pub fn dispatch_file(state: &mut AppState, command: CommandId) -> Option<Vec<Eff
                 fx.push(Effect::Open(path.clone()));
             }
         }
+        PinRecent(n) => {
+            if let Some(path) = state.recent.get(usize::from(n)).cloned() {
+                state.toggle_pin(&path);
+            }
+        }
+        ForgetRecent(n) => {
+            if usize::from(n) < state.recent.len() {
+                let path = state.recent.remove(usize::from(n));
+                state.pinned.retain(|p| *p != path);
+            }
+        }
         FileSave => {
             if let Some(sheet) = state.active {
                 fx.push(Effect::Save {
@@ -189,6 +220,16 @@ pub fn dispatch_file(state: &mut AppState, command: CommandId) -> Option<Vec<Eff
         DialogDropRecovery => {
             if let Some(Dialog::Recover(r)) = state.dialog.take() {
                 fx.push(Effect::DeleteFile(r.file));
+            }
+        }
+        DialogExportAnyway => {
+            if let Some(Dialog::StaleExport(kind)) = state.dialog.take() {
+                fx.push(Effect::ExportNow(kind));
+            }
+        }
+        DialogRecalculate => {
+            if let Some(Dialog::StaleExport(_)) = state.dialog.take() {
+                fx.push(Effect::CalculateNow);
             }
         }
         DialogCancel | DialogOk => state.dialog = None,

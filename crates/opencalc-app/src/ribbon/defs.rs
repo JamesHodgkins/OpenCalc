@@ -6,7 +6,7 @@
 
 use crate::commands::{greek_symbols, CommandId};
 
-use super::{Cell, Column, Context, Item, Panel, Ribbon, Split, Tab};
+use super::{Cell, Column, Item, Panel, Ribbon, Split, Tab};
 
 fn it(command: CommandId) -> Item {
     Item::of(command)
@@ -26,16 +26,7 @@ fn stack(commands: &[CommandId]) -> Column {
 
 pub fn opencalc_ribbon() -> Ribbon {
     Ribbon {
-        tabs: vec![
-            home(),
-            insert(),
-            draw(),
-            format(),
-            units(),
-            view(),
-            help(),
-            shape_format(),
-        ],
+        tabs: vec![home(), insert(), draw(), format(), units(), view(), help()],
     }
 }
 
@@ -44,7 +35,6 @@ pub fn opencalc_ribbon() -> Ribbon {
 fn home() -> Tab {
     Tab {
         title: "Home",
-        context: None,
         panels: vec![
             panel(
                 "Clipboard",
@@ -53,7 +43,11 @@ fn home() -> Tab {
                         label: Some("Paste"),
                         items: vec![it(CommandId::ClipboardPaste)],
                     }),
-                    stack(&[CommandId::ClipboardCut, CommandId::ClipboardCopy]),
+                    stack(&[
+                        CommandId::ClipboardCut,
+                        CommandId::ClipboardCopy,
+                        CommandId::EditDuplicate,
+                    ]),
                 ],
             ),
             panel(
@@ -65,7 +59,11 @@ fn home() -> Tab {
             ),
             panel(
                 "Edit",
-                vec![stack(&[CommandId::EditFind, CommandId::EditReplace])],
+                vec![stack(&[
+                    CommandId::EditFind,
+                    CommandId::EditReplace,
+                    CommandId::EditSelectAll,
+                ])],
             ),
             panel(
                 "Region",
@@ -101,7 +99,6 @@ fn insert() -> Tab {
         .collect();
     Tab {
         title: "Insert",
-        context: None,
         panels: vec![
             panel(
                 "Data",
@@ -144,7 +141,6 @@ fn insert() -> Tab {
 fn draw() -> Tab {
     Tab {
         title: "Draw",
-        context: None,
         panels: vec![
             panel(
                 "Shapes",
@@ -180,7 +176,6 @@ fn draw() -> Tab {
 fn format() -> Tab {
     Tab {
         title: "Format",
-        context: None,
         panels: vec![
             panel(
                 "Text",
@@ -207,7 +202,6 @@ fn format() -> Tab {
 fn units() -> Tab {
     Tab {
         title: "Units",
-        context: None,
         panels: vec![
             panel(
                 "Unit system",
@@ -239,7 +233,6 @@ fn units() -> Tab {
 fn view() -> Tab {
     Tab {
         title: "View",
-        context: None,
         panels: vec![
             panel(
                 "Zoom",
@@ -275,50 +268,9 @@ fn view() -> Tab {
     }
 }
 
-/// Contextual: the settings of the selected shape.
-fn shape_format() -> Tab {
-    use crate::ribbon::{Control, ShapeControl as S};
-    Tab {
-        title: "Shape Format",
-        context: Some(Context::Shape),
-        panels: vec![
-            panel(
-                "Shape",
-                vec![Column::Controls(vec![
-                    Control::Shape(S::Kind),
-                    Control::Shape(S::Corners),
-                ])],
-            ),
-            panel(
-                "Style",
-                vec![
-                    Column::Controls(vec![Control::Shape(S::Fill), Control::Shape(S::Outline)]),
-                    Column::Controls(vec![Control::Shape(S::Width), Control::Shape(S::Line)]),
-                ],
-            ),
-            panel(
-                "Arrowheads",
-                vec![Column::Controls(vec![
-                    Control::Shape(S::StartHead),
-                    Control::Shape(S::EndHead),
-                ])],
-            ),
-            panel(
-                "Arrange",
-                vec![
-                    stack(&[CommandId::ArrangeToFront, CommandId::ArrangeForward]),
-                    stack(&[CommandId::ArrangeBackward, CommandId::ArrangeToBack]),
-                    stack(&[CommandId::RegionLock, CommandId::RegionDelete]),
-                ],
-            ),
-        ],
-    }
-}
-
 fn help() -> Tab {
     Tab {
         title: "Help",
-        context: None,
         panels: vec![panel(
             "Help",
             vec![
@@ -339,10 +291,9 @@ mod tests {
         items_of(r.tabs.iter().collect())
     }
 
-    /// The items of the ordinary tabs: each command sits in exactly one of them. A
-    /// contextual tab repeats commands for the thing selected, as other apps do.
+    /// The items of the tabs: each command sits in exactly one of them.
     fn ordinary_items(r: &Ribbon) -> Vec<&Item> {
-        items_of(r.tabs.iter().filter(|t| t.context.is_none()).collect())
+        items_of(r.tabs.iter().collect())
     }
 
     fn items_of(tabs: Vec<&Tab>) -> Vec<&Item> {
@@ -354,7 +305,6 @@ mod tests {
                     Column::Large(i) => v.push(i),
                     Column::LargeSplit(s) => v.extend(s.items.iter()),
                     Column::Stack(is) => v.extend(is.iter()),
-                    Column::Controls(_) => {}
                     Column::Rows(rows) => {
                         for cell in rows.iter().flatten() {
                             match cell {
@@ -383,34 +333,8 @@ mod tests {
         let titles: Vec<_> = opencalc_ribbon().tabs.iter().map(|t| t.title).collect();
         assert_eq!(
             titles,
-            [
-                "Home",
-                "Insert",
-                "Draw",
-                "Format",
-                "Units",
-                "View",
-                "Help",
-                "Shape Format"
-            ]
+            ["Home", "Insert", "Draw", "Format", "Units", "View", "Help"]
         );
-    }
-
-    #[test]
-    fn a_contextual_tab_shows_only_while_its_context_is_selected() {
-        let r = opencalc_ribbon();
-        let shape = r
-            .tabs
-            .iter()
-            .position(|t| t.context == Some(Context::Shape))
-            .unwrap();
-        assert!(!r.visible(&[]).contains(&shape));
-        assert!(r.visible(&[Context::Shape]).contains(&shape));
-        assert_eq!(r.visible(&[]).len() + 1, r.tabs.len());
-        // The tab on show falls back to the first when its context goes.
-        assert_eq!(r.current(shape, &[]), 0);
-        assert_eq!(r.current(shape, &[Context::Shape]), shape);
-        assert_eq!(r.current(2, &[]), 2, "an ordinary tab is left alone");
     }
 
     #[test]
@@ -438,10 +362,6 @@ mod tests {
         );
         assert_eq!(panel_titles("View"), ["Zoom", "Page", "Show", "Window"]);
         assert_eq!(panel_titles("Help"), ["Help"]);
-        assert_eq!(
-            panel_titles("Shape Format"),
-            ["Shape", "Style", "Arrowheads", "Arrange"]
-        );
     }
 
     /// A tab with one control is a sign the ribbon is badly divided: every ordinary
@@ -449,11 +369,7 @@ mod tests {
     #[test]
     fn no_ordinary_tab_is_nearly_empty() {
         let r = opencalc_ribbon();
-        for tab in r
-            .tabs
-            .iter()
-            .filter(|t| t.context.is_none() && t.title != "Help")
-        {
+        for tab in r.tabs.iter().filter(|t| t.title != "Help") {
             let count = items_of(vec![tab]).len();
             assert!(count >= 4, "{} has only {count} commands", tab.title);
             assert!(tab.panels.len() >= 2, "{} has one group", tab.title);
@@ -463,7 +379,7 @@ mod tests {
     /// Every tab, drawn for real, must fit the narrowest window the program allows.
     #[test]
     fn every_tab_fits_the_smallest_window() {
-        use crate::ribbon::{CommandSource, ControlHost, RibbonState};
+        use crate::ribbon::{CommandSource, RibbonState};
         use eframe::egui;
         struct All;
         impl CommandSource for All {
@@ -474,20 +390,9 @@ mod tests {
                 None
             }
         }
-        struct Blank;
-        impl ControlHost for Blank {
-            fn control(
-                &mut self,
-                _: &mut egui::Ui,
-                _: &crate::theme::Theme,
-                _: crate::ribbon::Control,
-            ) {
-            }
-        }
         let ribbon = opencalc_ribbon();
         let theme = crate::theme::Theme::paper();
         let ctx = egui::Context::default();
-        let all = [Context::Shape];
         for tab in 0..ribbon.tabs.len() {
             let mut width = 0.0;
             let mut state = RibbonState {
@@ -505,9 +410,7 @@ mod tests {
                 };
                 let _ = ctx.run(input, |ctx| {
                     egui::CentralPanel::default().show(ctx, |ui| {
-                        width = ribbon
-                            .show(ui, &theme, &mut state, &All, &all, &mut Blank)
-                            .width;
+                        width = ribbon.show(ui, &theme, &mut state, &All).width;
                     });
                 });
             }
@@ -519,73 +422,6 @@ mod tests {
                 ribbon.tabs[tab].title
             );
         }
-    }
-
-    /// The widgets of a column of controls start at one x, whatever their labels.
-    #[test]
-    fn the_controls_of_a_column_line_up() {
-        use crate::ribbon::{Control, ControlHost, RibbonState, ShapeControl as S};
-        use eframe::egui;
-        struct All;
-        impl crate::ribbon::CommandSource for All {
-            fn is_enabled(&self, _: CommandId) -> bool {
-                true
-            }
-            fn shortcut_text(&self, _: CommandId) -> Option<String> {
-                None
-            }
-        }
-        #[derive(Default)]
-        struct Record(Vec<(Control, f32)>);
-        impl ControlHost for Record {
-            fn control(&mut self, ui: &mut egui::Ui, _: &crate::theme::Theme, c: Control) {
-                self.0.push((c, ui.cursor().min.x));
-                ui.allocate_space(egui::vec2(40.0, 10.0));
-            }
-        }
-        let ribbon = opencalc_ribbon();
-        let tab = ribbon
-            .tabs
-            .iter()
-            .position(|t| t.context == Some(Context::Shape))
-            .unwrap();
-        let theme = crate::theme::Theme::paper();
-        let ctx = egui::Context::default();
-        let mut host = Record::default();
-        let mut state = RibbonState {
-            active_tab: tab,
-            ..Default::default()
-        };
-        for _ in 0..2 {
-            host.0.clear();
-            let input = egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(
-                    egui::Pos2::ZERO,
-                    egui::vec2(1200.0, 300.0),
-                )),
-                ..Default::default()
-            };
-            let _ = ctx.run(input, |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    ribbon.show(ui, &theme, &mut state, &All, &[Context::Shape], &mut host);
-                });
-            });
-        }
-        let x = |c: S| {
-            host.0
-                .iter()
-                .find(|(k, _)| *k == Control::Shape(c))
-                .unwrap()
-                .1
-        };
-        assert_eq!(x(S::Fill), x(S::Outline), "Fill and Outline");
-        assert_eq!(x(S::Width), x(S::Line), "Width and Line");
-        assert_eq!(x(S::Kind), x(S::Corners), "Shape and Corners");
-        assert!(
-            x(S::Width) - x(S::Fill) >= 116.0,
-            "a gap is left between the columns: {} apart",
-            x(S::Width) - x(S::Fill)
-        );
     }
 
     #[test]
@@ -644,6 +480,8 @@ mod tests {
             CommandId::DialogOk,           // the message dialog
             CommandId::DialogRestore,      // the recovery dialog
             CommandId::DialogDropRecovery, // the recovery dialog
+            CommandId::DialogExportAnyway, // the out-of-date results dialog
+            CommandId::DialogRecalculate,  // the out-of-date results dialog
             CommandId::PictureChoose,      // the Picture window
             CommandId::TableImportCsv,     // the Table window
             CommandId::TableExportCsv,     // the Table window
